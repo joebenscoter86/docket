@@ -43,3 +43,6 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 .gstack/
+
+# sandbox test artifacts
+scripts/sandbox/test-invoice.pdf

@@ -604,11 +604,20 @@ All four checks must pass before a PR can be merged. No exceptions.
 *(This section grows with every session. Every time you learn something the hard way, add it here.)*
 
 **QuickBooks Online:**
-- OAuth access tokens expire in 1 hour. Refresh tokens last 100 days. Always auto-refresh before expiry.
+- OAuth access tokens expire in 1 hour. Refresh tokens last ~101 days (8726400s). Always auto-refresh before expiry.
 - Creating bills (POST) is free/unlimited. Reading data (GET) is metered under the App Partner Program.
 - Builder tier: 500K CorePlus credits/month. Enough for ~100 active users.
-- VendorRef and AccountRef require the QBO internal ID (`value`), not the display name.
-- Attaching a PDF to a bill is a separate API call via the Attachable endpoint, after bill creation.
+- VendorRef and AccountRef require the QBO internal ID (`value`), not the display name. Only send `{ value }` on write; QBO fills in `name` in the response.
+- Attaching a PDF to a bill is a separate API call via the `/upload` endpoint (multipart form-data), after bill creation. Parts: `file_metadata_0` (JSON) + `file_content_0` (binary).
+- Bill creation returns status 200 (not 201). Don't check for 201.
+- All QBO IDs are strings, even though they look numeric. Always type as `string`.
+- Error response casing is INCONSISTENT: auth errors (401) use lowercase `fault.error`, validation errors (400) use uppercase `Fault.Error`. Error parser must handle both.
+- Validation errors include `element` field naming the offending field — map back to UI fields.
+- `SyncToken` is required for updates (PUT) but not creates (POST). Must read before updating.
+- Sandbox base URL: `https://sandbox-quickbooks.api.intuit.com/v3/company/{companyId}`
+- Production base URL: `https://quickbooks.api.intuit.com/v3/company/{companyId}`
+- Use `DisplayName` for vendor display (most reliable). `CompanyName` is optional on some vendors.
+- For GL account dropdowns, filter `AccountType = 'Expense'`. Use `FullyQualifiedName` for display when `SubAccount: true`.
 
 **Xero (Phase 2, document findings from FND-10 here):**
 - Bills are created via PUT (not POST) to the Invoices endpoint with Type "ACCPAY"
@@ -763,8 +772,14 @@ NEXT_PUBLIC_SENTRY_DSN=
 
 *(Populated after FND-9, FND-10, FND-11. Paste key findings from scripts/sandbox/sandbox-notes.md here so every session has them.)*
 
-### QBO Sandbox (FND-9)
-TBD
+### QBO Sandbox (FND-9) — Validated 2026-03-15
+- All 5 API operations confirmed working: query vendors, query accounts, create bill, attach PDF, error handling
+- Full findings in `scripts/sandbox/sandbox-notes.md`
+- Key surprise: error response casing inconsistent between auth (lowercase) and validation (uppercase) errors
+- Key surprise: bill creation returns 200, not 201
+- Key surprise: all IDs are strings, not numbers
+- Attachment is a two-step process (create bill, then upload attachment separately)
+- Multipart upload uses `file_metadata_0` + `file_content_0` part names
 
 ### Xero Sandbox (FND-10)
 TBD
