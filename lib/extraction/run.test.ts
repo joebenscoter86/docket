@@ -277,7 +277,7 @@ describe("runExtraction", () => {
     const { runExtraction } = await import("./run");
 
     await expect(runExtraction(BASE_PARAMS)).rejects.toThrow(
-      "Failed to generate signed URL"
+      "Failed to retrieve uploaded file"
     );
 
     // Error path: reads retry_count then updates status to error
@@ -302,7 +302,7 @@ describe("runExtraction", () => {
     const { runExtraction } = await import("./run");
 
     await expect(runExtraction(BASE_PARAMS)).rejects.toThrow(
-      "Failed to fetch file: HTTP 403"
+      "Failed to retrieve uploaded file"
     );
   });
 

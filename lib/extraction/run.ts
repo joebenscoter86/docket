@@ -21,16 +21,13 @@ export async function runExtraction(params: {
       .createSignedUrl(filePath, 3600);
 
     if (signedUrlError || !signedUrlData?.signedUrl) {
-      throw new Error(
-        "Failed to generate signed URL: " +
-          (signedUrlError?.message ?? "unknown error")
-      );
+      throw new Error("Failed to retrieve uploaded file");
     }
 
     // 2. Fetch file bytes
     const fileResponse = await fetch(signedUrlData.signedUrl);
     if (!fileResponse.ok) {
-      throw new Error(`Failed to fetch file: HTTP ${fileResponse.status}`);
+      throw new Error("Failed to retrieve uploaded file");
     }
     const fileBuffer = Buffer.from(await fileResponse.arrayBuffer());
 
