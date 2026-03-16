@@ -5,6 +5,7 @@ import {
   lineItemsReducer,
   initLineItemsState,
   validateLineItemField,
+  type LineItemState,
 } from "./line-items-reducer";
 import { formatCurrency, parseCurrencyInput } from "@/lib/utils/currency";
 import type { ExtractedLineItemRow } from "@/lib/types/invoice";
@@ -40,7 +41,7 @@ export default function LineItemEditor({
   const descriptionRefs = useRef<Record<string, HTMLInputElement | null>>({});
 
   const calculateSubtotal = useCallback(
-    (items: typeof state.items) => {
+    (items: LineItemState[]) => {
       const total = items.reduce((sum, item) => {
         const amt = item.values.amount;
         return sum + (typeof amt === "number" ? amt : 0);
