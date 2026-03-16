@@ -173,8 +173,8 @@ export async function POST(request: Request) {
     try {
       const extractionResult = await runExtraction({
         invoiceId,
-        orgId,
-        userId,
+        orgId: orgId!,
+        userId: userId!,
         filePath: storagePath,
         fileType,
       });
