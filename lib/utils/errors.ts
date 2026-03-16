@@ -46,3 +46,7 @@ export function rateLimited(message = "Too many requests") {
 export function internalError(message = "Internal server error") {
   return apiError({ error: message, code: "INTERNAL_ERROR", status: 500 });
 }
+
+export function apiSuccess<T>(data: T) {
+  return NextResponse.json({ data });
+}
