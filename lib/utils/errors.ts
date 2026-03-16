@@ -6,6 +6,7 @@ export type ErrorCode =
   | "NOT_FOUND"
   | "CONFLICT"
   | "RATE_LIMITED"
+  | "UNPROCESSABLE"
   | "INTERNAL_ERROR"
   | "NOT_IMPLEMENTED";
 
@@ -45,6 +46,10 @@ export function conflict(message: string) {
 
 export function rateLimited(message = "Too many requests") {
   return apiError({ error: message, code: "RATE_LIMITED", status: 429 });
+}
+
+export function unprocessableEntity(message: string) {
+  return apiError({ error: message, code: "UNPROCESSABLE", status: 422 });
 }
 
 export function internalError(message = "Internal server error") {

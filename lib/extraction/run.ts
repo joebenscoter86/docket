@@ -21,22 +21,48 @@ export async function runExtraction(params: {
       .createSignedUrl(filePath, 3600);
 
     if (signedUrlError || !signedUrlData?.signedUrl) {
-      throw new Error(
-        "Failed to generate signed URL: " +
-          (signedUrlError?.message ?? "unknown error")
-      );
+      throw new Error("Failed to retrieve uploaded file");
     }
 
     // 2. Fetch file bytes
     const fileResponse = await fetch(signedUrlData.signedUrl);
     if (!fileResponse.ok) {
-      throw new Error(`Failed to fetch file: HTTP ${fileResponse.status}`);
+      throw new Error("Failed to retrieve uploaded file");
     }
     const fileBuffer = Buffer.from(await fileResponse.arrayBuffer());
 
     // 3. Call extraction provider
     const provider = getExtractionProvider();
     const result = await provider.extractInvoiceData(fileBuffer, fileType);
+
+    // 3.5. Clean up stale extraction data from prior attempts
+    const { data: existingData } = await admin
+      .from("extracted_data")
+      .select("id")
+      .eq("invoice_id", invoiceId);
+
+    if (existingData && existingData.length > 0) {
+      const existingIds = existingData.map((row: { id: string }) => row.id);
+
+      // Delete line items first (FK dependency)
+      await admin
+        .from("extracted_line_items")
+        .delete()
+        .in("extracted_data_id", existingIds);
+
+      // Delete extracted_data
+      await admin
+        .from("extracted_data")
+        .delete()
+        .eq("invoice_id", invoiceId);
+
+      logger.info("extraction_stale_data_cleaned", {
+        invoiceId,
+        orgId,
+        userId,
+        deletedIds: existingIds,
+      });
+    }
 
     // 4. Store extracted_data
     const extractedDataRow = mapToExtractedDataRow(result, invoiceId);

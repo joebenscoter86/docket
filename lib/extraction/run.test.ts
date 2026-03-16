@@ -29,6 +29,8 @@ const mockExtractedDataInsert = vi.fn();
 const mockLineItemsInsert = vi.fn();
 const mockInvoicesUpdate = vi.fn();
 const mockInvoicesSelect = vi.fn();
+const mockExtractedDataDelete = vi.fn();
+const mockLineItemsDelete = vi.fn();
 
 // Storage mock
 const mockCreateSignedUrl = vi.fn();
@@ -53,6 +55,20 @@ vi.mock("@/lib/supabase/admin", () => ({
               }),
             };
           },
+          select: (cols: string) => {
+            if (cols === "id") {
+              return {
+                eq: () => Promise.resolve({ data: [], error: null }),
+              };
+            }
+            return { eq: () => ({ single: () => Promise.resolve({ data: null, error: null }) }) };
+          },
+          delete: () => {
+            mockExtractedDataDelete();
+            return {
+              eq: () => Promise.resolve({ error: null }),
+            };
+          },
         };
       }
 
@@ -63,6 +79,12 @@ vi.mock("@/lib/supabase/admin", () => ({
             return mockLineItemsInsert.mock.results.length > 0
               ? Promise.resolve({ error: null })
               : Promise.resolve({ error: { message: "line items insert failed" } });
+          },
+          delete: () => {
+            mockLineItemsDelete();
+            return {
+              in: () => Promise.resolve({ error: null }),
+            };
           },
         };
       }
@@ -277,7 +299,7 @@ describe("runExtraction", () => {
     const { runExtraction } = await import("./run");
 
     await expect(runExtraction(BASE_PARAMS)).rejects.toThrow(
-      "Failed to generate signed URL"
+      "Failed to retrieve uploaded file"
     );
 
     // Error path: reads retry_count then updates status to error
@@ -302,7 +324,7 @@ describe("runExtraction", () => {
     const { runExtraction } = await import("./run");
 
     await expect(runExtraction(BASE_PARAMS)).rejects.toThrow(
-      "Failed to fetch file: HTTP 403"
+      "Failed to retrieve uploaded file"
     );
   });
 
@@ -333,6 +355,17 @@ describe("runExtraction", () => {
     );
   });
 
+  it("skips cleanup when no stale extracted_data exists", async () => {
+    setupHappyPath();
+    const { runExtraction } = await import("./run");
+
+    await runExtraction(BASE_PARAMS);
+
+    // No stale data in default mock → delete should not be called
+    expect(mockExtractedDataDelete).not.toHaveBeenCalled();
+    expect(mockLineItemsDelete).not.toHaveBeenCalled();
+  });
+
   it("throws when extracted_data DB insert fails", async () => {
     setupHappyPath();
 
@@ -347,6 +380,17 @@ describe("runExtraction", () => {
         from: (table: string) => {
           if (table === "extracted_data") {
             return {
+              select: (cols: string) => {
+                if (cols === "id") {
+                  return {
+                    eq: () => Promise.resolve({ data: [], error: null }),
+                  };
+                }
+                return { single: () => Promise.resolve({ data: null, error: null }) };
+              },
+              delete: () => ({
+                eq: () => Promise.resolve({ error: null }),
+              }),
               insert: () => ({
                 select: () => ({
                   single: () =>
@@ -393,6 +437,94 @@ describe("runExtraction", () => {
     );
 
     // Restore original mocks
+    vi.resetModules();
+  });
+
+  it("deletes stale extracted_data and line items when prior extraction exists", async () => {
+    setupHappyPath();
+
+    const trackLineItemsDelete = vi.fn();
+    const trackExtractedDataDelete = vi.fn();
+
+    vi.doMock("@/lib/supabase/admin", () => ({
+      createAdminClient: () => ({
+        storage: {
+          from: () => ({
+            createSignedUrl: mockCreateSignedUrl,
+          }),
+        },
+        from: (table: string) => {
+          if (table === "extracted_data") {
+            return {
+              select: (cols: string) => {
+                if (cols === "id") {
+                  return {
+                    eq: () => Promise.resolve({
+                      data: [{ id: "stale-ed-1" }],
+                      error: null,
+                    }),
+                  };
+                }
+                return {
+                  single: () => Promise.resolve({ data: { id: "ed-uuid-1" }, error: null }),
+                };
+              },
+              insert: (data: unknown) => {
+                mockExtractedDataInsert(data);
+                return {
+                  select: () => ({
+                    single: () => Promise.resolve({ data: { id: "ed-uuid-1" }, error: null }),
+                  }),
+                };
+              },
+              delete: () => {
+                trackExtractedDataDelete();
+                return {
+                  eq: () => Promise.resolve({ error: null }),
+                };
+              },
+            };
+          }
+          if (table === "extracted_line_items") {
+            return {
+              insert: (data: unknown) => {
+                mockLineItemsInsert(data);
+                return Promise.resolve({ error: null });
+              },
+              delete: () => {
+                trackLineItemsDelete();
+                return {
+                  in: () => Promise.resolve({ error: null }),
+                };
+              },
+            };
+          }
+          if (table === "invoices") {
+            return {
+              update: (data: unknown) => {
+                mockInvoicesUpdate(data);
+                return { eq: () => Promise.resolve({ error: null }) };
+              },
+              select: () => ({
+                eq: () => ({
+                  single: () => Promise.resolve({ data: { retry_count: 0 }, error: null }),
+                }),
+              }),
+            };
+          }
+          throw new Error(`Unexpected table: ${table}`);
+        },
+      }),
+    }));
+
+    vi.resetModules();
+    const { runExtraction: runExtractionFresh } = await import("./run");
+
+    const result = await runExtractionFresh(BASE_PARAMS);
+    expect(result).toBeDefined();
+    expect(trackLineItemsDelete).toHaveBeenCalled();
+    expect(trackExtractedDataDelete).toHaveBeenCalled();
+
     vi.resetModules();
   });
 });
