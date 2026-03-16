@@ -131,7 +131,7 @@ describe("ExtractionForm confidence indicators", () => {
   });
 
   it("clears confidence indicator on a field when user types in it", () => {
-    const { container } = render(
+    render(
       <ExtractionForm
         extractedData={makeExtractedData({ confidence_score: "medium" })}
         invoiceId="inv-1"
