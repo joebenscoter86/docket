@@ -254,8 +254,8 @@ export default function LineItemEditor({
       {/* Rows */}
       <div className="space-y-1">
         {state.items.map((item) => (
+          <div key={item.id}>
           <div
-            key={item.id}
             className="grid grid-cols-[1fr_70px_100px_100px_32px] gap-x-2 items-center"
           >
             {/* Description */}
@@ -366,39 +366,40 @@ export default function LineItemEditor({
 
             {/* Remove button */}
             <div className="flex items-center justify-center">
-              {confirmRemoveId === item.id ? (
-                <div className="flex items-center gap-1 text-xs">
-                  <span className="text-gray-500">Remove last item?</span>
-                  <button
-                    onClick={() => handleRemove(item.id)}
-                    className="text-red-600 hover:text-red-700"
-                  >
-                    Yes
-                  </button>
-                  <span className="text-gray-300">/</span>
-                  <button
-                    onClick={() => setConfirmRemoveId(null)}
-                    className="text-gray-500 hover:text-gray-700"
-                  >
-                    No
-                  </button>
-                </div>
-              ) : (
-                <button
-                  onClick={() => {
-                    if (state.items.length === 1) {
-                      setConfirmRemoveId(item.id);
-                    } else {
-                      handleRemove(item.id);
-                    }
-                  }}
-                  className="text-gray-400 hover:text-red-500 transition-colors"
-                  aria-label="Remove line item"
-                >
-                  ×
-                </button>
-              )}
+              <button
+                onClick={() => {
+                  if (state.items.length === 1) {
+                    setConfirmRemoveId(item.id);
+                  } else {
+                    handleRemove(item.id);
+                  }
+                }}
+                className="text-gray-400 hover:text-red-500 transition-colors"
+                aria-label="Remove line item"
+              >
+                ×
+              </button>
             </div>
+          </div>
+
+          {/* Confirmation bar — full width below the row */}
+          {confirmRemoveId === item.id && (
+            <div className="flex items-center justify-end gap-2 py-1.5 px-2 text-xs bg-red-50 rounded-md mt-0.5">
+              <span className="text-gray-600">Remove last item?</span>
+              <button
+                onClick={() => handleRemove(item.id)}
+                className="text-red-600 hover:text-red-700 font-medium"
+              >
+                Yes, remove
+              </button>
+              <button
+                onClick={() => setConfirmRemoveId(null)}
+                className="text-gray-500 hover:text-gray-700"
+              >
+                Cancel
+              </button>
+            </div>
+          )}
           </div>
         ))}
       </div>
