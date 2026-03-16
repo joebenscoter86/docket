@@ -2,8 +2,8 @@ import { render, screen, fireEvent, act } from "@testing-library/react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
 // Mock react-pdf CSS imports upfront (they can't be resolved in test env)
-vi.mock("react-pdf/dist/Page/AnnotationLayer.css", () => ({}));
-vi.mock("react-pdf/dist/Page/TextLayer.css", () => ({}));
+vi.mock("react-pdf/dist/esm/Page/AnnotationLayer.css", () => ({}));
+vi.mock("react-pdf/dist/esm/Page/TextLayer.css", () => ({}));
 
 // Mock react-pdf before importing PdfViewer
 let onLoadSuccessCallback: ((args: { numPages: number }) => void) | null = null;
@@ -14,11 +14,13 @@ vi.mock("react-pdf", () => ({
     children,
     onLoadSuccess,
     onLoadError,
+    loading,
   }: {
     children: React.ReactNode;
     file: string;
     onLoadSuccess?: (args: { numPages: number }) => void;
     onLoadError?: (error: Error) => void;
+    loading?: React.ReactNode;
   }) => {
     onLoadSuccessCallback = onLoadSuccess ?? null;
     onLoadErrorCallback = onLoadError ?? null;
