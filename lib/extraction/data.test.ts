@@ -6,6 +6,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 
 const mockSelectSingle = vi.fn();
 const mockUpdate = vi.fn();
+const mockInsert = vi.fn();
 
 vi.mock("@/lib/supabase/server", () => ({
   createClient: () => ({
@@ -29,6 +30,9 @@ vi.mock("@/lib/supabase/server", () => ({
           },
         };
       }
+      if (table === "corrections") {
+        return { insert: mockInsert };
+      }
       throw new Error(`Unexpected table: ${table}`);
     },
   }),
@@ -38,7 +42,7 @@ vi.mock("@/lib/utils/logger", () => ({
   logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn() },
 }));
 
-import { getExtractedData, updateExtractedField } from "./data";
+import { getExtractedData, updateExtractedField, recordCorrection } from "./data";
 
 // ---------------------------------------------------------------
 // Fixtures
@@ -174,5 +178,63 @@ describe("updateExtractedField", () => {
 
     const result = await updateExtractedField("ed-uuid-1", "vendor_name", "Test");
     expect(result).toBeNull();
+  });
+});
+
+describe("recordCorrection", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("inserts a correction row with all fields", async () => {
+    mockInsert.mockResolvedValue({ error: null });
+
+    await recordCorrection(
+      "inv-uuid-1",
+      "org-uuid-1",
+      "vendor_name",
+      "Acme Corp",
+      "Acme Corporation"
+    );
+
+    expect(mockInsert).toHaveBeenCalledWith({
+      invoice_id: "inv-uuid-1",
+      org_id: "org-uuid-1",
+      field_name: "vendor_name",
+      original_value: "Acme Corp",
+      corrected_value: "Acme Corporation",
+    });
+  });
+
+  it("handles null original value", async () => {
+    mockInsert.mockResolvedValue({ error: null });
+
+    await recordCorrection(
+      "inv-uuid-1",
+      "org-uuid-1",
+      "subtotal",
+      null,
+      "100.00"
+    );
+
+    expect(mockInsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        original_value: null,
+        corrected_value: "100.00",
+      })
+    );
+  });
+
+  it("logs error on Supabase failure but does not throw", async () => {
+    mockInsert.mockResolvedValue({ error: { message: "RLS violation" } });
+
+    // Should not throw
+    await recordCorrection(
+      "inv-uuid-1",
+      "org-uuid-1",
+      "vendor_name",
+      "Old",
+      "New"
+    );
   });
 });

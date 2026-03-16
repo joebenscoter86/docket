@@ -6,7 +6,7 @@ import { logger } from "@/lib/utils/logger";
 import ReviewLayout from "@/components/invoices/ReviewLayout";
 import ReviewProcessingState from "@/components/invoices/ReviewProcessingState";
 import Link from "next/link";
-import type { InvoiceStatus } from "@/lib/types/invoice";
+import type { InvoiceStatus, ExtractedDataRow } from "@/lib/types/invoice";
 
 const PROCESSING_STATUSES: InvoiceStatus[] = ["uploading", "extracting", "error"];
 
@@ -85,8 +85,7 @@ export default async function ReviewPage({
       signedUrl={signedUrlResult.data.signedUrl}
       // getExtractedData returns Supabase-inferred types where confidence_score
       // is string | null. The DB CHECK constraint guarantees valid values.
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      extractedData={extractedData as any}
+      extractedData={extractedData as unknown as ExtractedDataRow}
     />
   );
 }
