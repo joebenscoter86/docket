@@ -242,6 +242,13 @@ describe("UploadZone", () => {
 
       const liveRegion = document.querySelector('[aria-live="polite"]');
       expect(liveRegion).toBeInTheDocument();
+      expect(liveRegion?.textContent).toMatch(/uploading/i);
+
+      act(() => {
+        vi.advanceTimersByTime(1600);
+      });
+      expect(liveRegion?.textContent).toMatch(/upload complete/i);
+
       vi.useRealTimers();
     });
   });

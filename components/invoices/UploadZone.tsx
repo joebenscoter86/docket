@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, useEffect } from "react";
 
 type UploadState = "idle" | "dragging" | "uploading" | "success";
 
@@ -17,6 +17,14 @@ export default function UploadZone() {
   const inputRef = useRef<HTMLInputElement>(null);
   const dragCounterRef = useRef(0);
   const zoneRef = useRef<HTMLDivElement>(null);
+  const timerIdsRef = useRef<ReturnType<typeof setTimeout>[]>([]);
+
+  // Clean up timers on unmount
+  useEffect(() => {
+    return () => {
+      timerIdsRef.current.forEach(clearTimeout);
+    };
+  }, []);
 
   const validateFile = useCallback(
     (file: File): string | null => {
@@ -39,15 +47,17 @@ export default function UploadZone() {
       setFileName(file.name);
       setStatusAnnouncement(`Uploading ${file.name}`);
 
+      timerIdsRef.current = [];
       const steps = [30, 60, 90, 100];
       steps.forEach((value, index) => {
-        setTimeout(() => {
+        const id = setTimeout(() => {
           setProgress(value);
           if (value === 100) {
             setState("success");
-            setStatusAnnouncement(`${file.name} uploaded successfully`);
+            setStatusAnnouncement("Upload complete");
           }
         }, (index + 1) * 400);
+        timerIdsRef.current.push(id);
       });
     },
     []
@@ -188,12 +198,13 @@ export default function UploadZone() {
           rounded-lg border-2 border-dashed
           transition-colors duration-200
           focus:outline-none focus:ring-2 focus:ring-accent focus:ring-offset-2
+          p-4 md:p-8
           ${
             isDragging
               ? "border-accent bg-blue-50"
               : isUploading || isSuccess
-              ? "border-gray-300 bg-gray-50"
-              : "border-gray-300 hover:border-accent cursor-pointer"
+              ? "border-gray-300 bg-white"
+              : "border-gray-300 bg-white hover:border-accent cursor-pointer"
           }
         `}
         onClick={handleClick}
@@ -213,7 +224,7 @@ export default function UploadZone() {
 
         {/* Idle state */}
         {state === "idle" && (
-          <div className="flex flex-col items-center gap-3 p-6">
+          <div className="flex flex-col items-center gap-3">
             <svg
               className="h-12 w-12 text-gray-400"
               fill="none"
@@ -239,7 +250,7 @@ export default function UploadZone() {
 
         {/* Dragging state */}
         {state === "dragging" && (
-          <div className="flex flex-col items-center gap-3 p-6">
+          <div className="flex flex-col items-center gap-3">
             <svg
               className="h-12 w-12 text-accent"
               fill="none"
@@ -261,7 +272,7 @@ export default function UploadZone() {
 
         {/* Uploading state */}
         {state === "uploading" && (
-          <div className="flex w-full flex-col items-center gap-3 p-6">
+          <div className="flex w-full flex-col items-center gap-3">
             <p className="text-sm font-medium text-gray-700">{fileName}</p>
             <div className="w-full max-w-xs">
               <div
@@ -277,13 +288,13 @@ export default function UploadZone() {
                 />
               </div>
             </div>
-            <p className="text-xs text-gray-500">{progress}%</p>
+            <p className="text-xs text-gray-500">Uploading... {progress}%</p>
           </div>
         )}
 
         {/* Success state */}
         {state === "success" && (
-          <div className="flex flex-col items-center gap-3 p-6">
+          <div className="flex flex-col items-center gap-3">
             <svg
               className="h-12 w-12 text-success"
               fill="none"
