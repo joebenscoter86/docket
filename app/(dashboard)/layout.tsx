@@ -1,6 +1,6 @@
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
-import LogoutButton from './logout-button'
+import AppShell from '@/components/layout/AppShell'
 
 export default async function DashboardLayout({
   children,
@@ -14,20 +14,20 @@ export default async function DashboardLayout({
     redirect('/login')
   }
 
+  // Fetch org name via org_memberships → organizations
+  const { data: membership } = await supabase
+    .from('org_memberships')
+    .select('organizations(name)')
+    .eq('user_id', user.id)
+    .limit(1)
+    .single()
+
+  const orgs = membership?.organizations as { name: string }[] | { name: string } | null
+  const orgName = Array.isArray(orgs) ? orgs[0]?.name ?? '' : orgs?.name ?? ''
+
   return (
-    <div className="min-h-screen bg-gray-50">
-      <header className="border-b border-gray-200 bg-white">
-        <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-3">
-          <h1 className="text-lg font-semibold text-primary">Docket</h1>
-          <div className="flex items-center gap-4">
-            <span className="text-sm text-gray-500">{user.email}</span>
-            <LogoutButton />
-          </div>
-        </div>
-      </header>
-      <main className="mx-auto max-w-7xl p-6">
-        {children}
-      </main>
-    </div>
+    <AppShell userEmail={user.email ?? ''} orgName={orgName}>
+      {children}
+    </AppShell>
   )
 }
