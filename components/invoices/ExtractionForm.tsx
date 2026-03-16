@@ -9,11 +9,14 @@ import {
 } from "./extraction-form-reducer";
 import { formatCurrency, parseCurrencyInput } from "@/lib/utils/currency";
 import type { ExtractedDataRow } from "@/lib/types/invoice";
+import type { InvoiceStatus } from "@/lib/types/invoice";
 import LineItemEditor from "./LineItemEditor";
+import ApproveBar from "./ApproveBar";
 
 interface ExtractionFormProps {
   extractedData: ExtractedDataRow;
   invoiceId: string;
+  invoiceStatus: InvoiceStatus;
 }
 
 const FIELD_CONFIG: Record<
@@ -43,6 +46,7 @@ const CONFIDENCE_BORDER: Record<"high" | "medium" | "low", string> = {
 export default function ExtractionForm({
   extractedData,
   invoiceId,
+  invoiceStatus,
 }: ExtractionFormProps) {
   const [state, dispatch] = useReducer(
     formReducer,
@@ -384,6 +388,18 @@ export default function ExtractionForm({
           {renderField("total_amount")}
         </div>
       </div>
+
+      {/* Approve bar — only shown for pending_review invoices */}
+      {invoiceStatus === "pending_review" && (
+        <>
+          <div className="border-t border-gray-200" />
+          <ApproveBar
+            invoiceId={invoiceId}
+            vendorName={state.values.vendor_name}
+            totalAmount={state.values.total_amount}
+          />
+        </>
+      )}
     </div>
   );
 }

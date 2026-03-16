@@ -3,9 +3,12 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import ExtractionForm from "./ExtractionForm";
 import type { ExtractedDataRow } from "@/lib/types/invoice";
 
-// Mock LineItemEditor to isolate ExtractionForm tests
+// Mock LineItemEditor and ApproveBar to isolate ExtractionForm tests
 vi.mock("./LineItemEditor", () => ({
   default: () => <div data-testid="line-item-editor" />,
+}));
+vi.mock("./ApproveBar", () => ({
+  default: () => <div data-testid="approve-bar" />,
 }));
 
 function makeExtractedData(
@@ -49,6 +52,7 @@ describe("ExtractionForm confidence indicators", () => {
         <ExtractionForm
           extractedData={makeExtractedData({ confidence_score: level })}
           invoiceId="inv-1"
+          invoiceStatus="pending_review"
         />
       );
       const borderClass =
@@ -69,6 +73,7 @@ describe("ExtractionForm confidence indicators", () => {
         <ExtractionForm
           extractedData={makeExtractedData({ confidence_score: level })}
           invoiceId="inv-1"
+          invoiceStatus="pending_review"
         />
       );
       const label =
@@ -87,6 +92,7 @@ describe("ExtractionForm confidence indicators", () => {
       <ExtractionForm
         extractedData={makeExtractedData({ confidence_score: "low" })}
         invoiceId="inv-1"
+        invoiceStatus="pending_review"
       />
     );
     expect(
@@ -99,6 +105,7 @@ describe("ExtractionForm confidence indicators", () => {
       <ExtractionForm
         extractedData={makeExtractedData({ confidence_score: "high" })}
         invoiceId="inv-1"
+        invoiceStatus="pending_review"
       />
     );
     expect(
@@ -111,6 +118,7 @@ describe("ExtractionForm confidence indicators", () => {
       <ExtractionForm
         extractedData={makeExtractedData({ confidence_score: "medium" })}
         invoiceId="inv-1"
+        invoiceStatus="pending_review"
       />
     );
     expect(
@@ -123,6 +131,7 @@ describe("ExtractionForm confidence indicators", () => {
       <ExtractionForm
         extractedData={makeExtractedData({ confidence_score: null })}
         invoiceId="inv-1"
+        invoiceStatus="pending_review"
       />
     );
     expect(screen.queryByLabelText("High confidence")).toBeNull();
@@ -135,6 +144,7 @@ describe("ExtractionForm confidence indicators", () => {
       <ExtractionForm
         extractedData={makeExtractedData({ confidence_score: "medium" })}
         invoiceId="inv-1"
+        invoiceStatus="pending_review"
       />
     );
 
