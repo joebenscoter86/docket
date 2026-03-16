@@ -5,7 +5,6 @@ import {
   formReducer,
   initFormState,
   validateField,
-  FORM_FIELDS,
   type FormField,
 } from "./extraction-form-reducer";
 import { formatCurrency, parseCurrencyInput } from "@/lib/utils/currency";
