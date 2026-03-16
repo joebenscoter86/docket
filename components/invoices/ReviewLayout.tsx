@@ -5,7 +5,7 @@ import Link from "next/link";
 import InvoiceStatusBadge from "./InvoiceStatusBadge";
 import PdfViewer from "./PdfViewer";
 import ExtractionForm from "./ExtractionForm";
-import type { InvoiceStatus } from "@/lib/types/invoice";
+import type { InvoiceStatus, ExtractedDataRow } from "@/lib/types/invoice";
 
 interface ReviewLayoutProps {
   invoice: {
@@ -15,15 +15,7 @@ interface ReviewLayoutProps {
     status: InvoiceStatus;
   };
   signedUrl: string;
-  extractedData: {
-    id: string;
-    confidence_score: "high" | "medium" | "low";
-    [key: string]: unknown;
-    extracted_line_items: Array<{
-      id: string;
-      [key: string]: unknown;
-    }>;
-  } | null;
+  extractedData: ExtractedDataRow | null;
 }
 
 type MobileTab = "document" | "details";
@@ -137,7 +129,7 @@ export default function ReviewLayout({
         >
           <div className="flex-1 p-4 md:p-6">
             {extractedData ? (
-              <ExtractionForm extractedData={extractedData} />
+              <ExtractionForm extractedData={extractedData} invoiceId={invoice.id} />
             ) : (
               <div className="flex items-center justify-center h-full text-sm text-gray-400">
                 <div className="text-center">
