@@ -170,6 +170,7 @@ docket/
 │   ├── extraction/
 │   │   ├── provider.ts                     # Provider-agnostic interface
 │   │   ├── claude.ts                       # Claude Vision implementation
+│   │   ├── run.ts                          # Extraction orchestration (shared)
 │   │   └── types.ts                        # ExtractedInvoice type
 │   ├── quickbooks/
 │   │   ├── auth.ts                         # OAuth2 helpers (token refresh, etc.)
@@ -707,6 +708,8 @@ Run these before declaring any issue done:
 
 | Date | Decision | Rationale | Issue |
 |------|----------|-----------|-------|
+| 2026-03-15 | Provider interface uses `fileBuffer + mimeType` instead of `fileUrl` | Decouples provider from Supabase Storage — future providers (Google Doc AI) won't need signed URLs. Orchestration layer handles file fetching. | DOC-14 |
+| 2026-03-15 | Added `lib/extraction/run.ts` orchestration layer | Separates DB writes and status management from both the API route and the provider. Single shared function for upload auto-trigger and manual retry. | DOC-14 |
 | 2026-03-15 | org_memberships join table instead of owner_id-only RLS | Prevents full RLS rewrite in Phase 3 (team accounts). Supports bookkeepers managing multiple businesses. 30 min extra in foundation. | Plan Review |
 | 2026-03-15 | AES-256-GCM for token encryption, key rotation deferred to Phase 2 | Industry standard. Random IV per encryption prevents pattern analysis. Single key is fine for <10 users. | Plan Review |
 | 2026-03-15 | Vitest + MSW for testing, Playwright deferred to Phase 2 | Vitest is fastest for Next.js. MSW mocks external APIs cleanly. E2E adds too much CI time for MVP. | Plan Review |

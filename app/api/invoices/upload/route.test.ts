@@ -63,6 +63,11 @@ vi.mock("@/lib/upload/validate", () => ({
   validateFileSize: vi.fn(() => true),
 }));
 
+const mockRunExtraction = vi.fn();
+vi.mock("@/lib/extraction/run", () => ({
+  runExtraction: (...args: unknown[]) => mockRunExtraction(...args),
+}));
+
 // Helper: create a mock Request with FormData
 function createUploadRequest(
   file?: { name: string; type: string; content: Buffer }
@@ -81,6 +86,12 @@ function createUploadRequest(
 describe("POST /api/invoices/upload", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockRunExtraction.mockResolvedValue({
+      data: { vendorName: "Test Vendor", lineItems: [] },
+      rawResponse: {},
+      modelVersion: "claude-sonnet-4-20250514",
+      durationMs: 3000,
+    });
   });
 
   it("returns 401 when user is not authenticated", async () => {
@@ -283,5 +294,76 @@ describe("POST /api/invoices/upload", () => {
     expect(body.data).toHaveProperty("invoiceId");
     expect(body.data).toHaveProperty("signedUrl");
     expect(body.data).toHaveProperty("fileName", "invoice.pdf");
+    expect(body.data).toHaveProperty("extractionStatus");
+    expect(body.data).toHaveProperty("extractedData");
+  });
+
+  it("auto-triggers extraction and returns extracted data on success", async () => {
+    mockGetUser.mockResolvedValue({
+      data: { user: { id: "user-1" } },
+      error: null,
+    });
+    mockFrom.mockResolvedValue({
+      data: { org_id: "org-1" },
+      error: null,
+    });
+    mockStorageUpload.mockResolvedValue({ data: { path: "org-1/inv-1/invoice.pdf" }, error: null });
+    mockInsert.mockResolvedValue({ data: { id: "inv-1" }, error: null });
+    mockUpdate.mockResolvedValue({ error: null });
+    mockCreateSignedUrl.mockResolvedValue({
+      data: { signedUrl: "https://example.com/signed" },
+      error: null,
+    });
+
+    const req = createUploadRequest({
+      name: "invoice.pdf",
+      type: "application/pdf",
+      content: Buffer.from("%PDF-1.4"),
+    });
+
+    const res = await POST(req);
+    const body = await res.json();
+
+    expect(res.status).toBe(200);
+    expect(body.data.extractionStatus).toBe("pending_review");
+    expect(body.data.extractedData).toEqual({ vendorName: "Test Vendor", lineItems: [] });
+    expect(mockRunExtraction).toHaveBeenCalledOnce();
+    expect(mockRunExtraction).toHaveBeenCalledWith(
+      expect.objectContaining({ invoiceId: expect.any(String), orgId: "org-1", userId: "user-1" })
+    );
+  });
+
+  it("returns 200 even when extraction fails", async () => {
+    mockRunExtraction.mockRejectedValue(new Error("Extraction timed out"));
+
+    mockGetUser.mockResolvedValue({
+      data: { user: { id: "user-1" } },
+      error: null,
+    });
+    mockFrom.mockResolvedValue({
+      data: { org_id: "org-1" },
+      error: null,
+    });
+    mockStorageUpload.mockResolvedValue({ data: { path: "org-1/inv-1/invoice.pdf" }, error: null });
+    mockInsert.mockResolvedValue({ data: { id: "inv-1" }, error: null });
+    mockUpdate.mockResolvedValue({ error: null });
+    mockCreateSignedUrl.mockResolvedValue({
+      data: { signedUrl: "https://example.com/signed" },
+      error: null,
+    });
+
+    const req = createUploadRequest({
+      name: "invoice.pdf",
+      type: "application/pdf",
+      content: Buffer.from("%PDF-1.4"),
+    });
+
+    const res = await POST(req);
+    const body = await res.json();
+
+    expect(res.status).toBe(200);
+    expect(body.data).toHaveProperty("invoiceId");
+    expect(body.data.extractionStatus).toBe("error");
+    expect(body.data.extractedData).toBeNull();
   });
 });
