@@ -2,7 +2,7 @@ import { createClient } from "@/lib/supabase/server";
 import { logger } from "@/lib/utils/logger";
 
 /** Fields the review UI is allowed to update */
-const EDITABLE_FIELDS = new Set([
+export const EDITABLE_FIELDS = new Set([
   "vendor_name",
   "vendor_address",
   "invoice_number",
@@ -87,4 +87,36 @@ export async function updateExtractedField(
   }
 
   return data;
+}
+
+/**
+ * Record a user correction for learning/audit purposes.
+ * Non-critical: logs errors but does not throw.
+ */
+export async function recordCorrection(
+  invoiceId: string,
+  orgId: string,
+  fieldName: string,
+  originalValue: string | null,
+  correctedValue: string | null
+) {
+  const supabase = createClient();
+
+  const { error } = await supabase.from("corrections").insert({
+    invoice_id: invoiceId,
+    org_id: orgId,
+    field_name: fieldName,
+    original_value: originalValue,
+    corrected_value: correctedValue,
+  });
+
+  if (error) {
+    logger.error("record_correction_failed", {
+      invoiceId,
+      orgId,
+      field: fieldName,
+      error: error.message,
+      status: "error",
+    });
+  }
 }
