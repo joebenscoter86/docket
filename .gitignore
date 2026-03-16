@@ -46,3 +46,5 @@ next-env.d.ts
 
 # sandbox test artifacts
 scripts/sandbox/test-invoice.pdf
+scripts/sandbox/fixtures/*.pdf
+scripts/sandbox/fixtures/extraction-results.json
