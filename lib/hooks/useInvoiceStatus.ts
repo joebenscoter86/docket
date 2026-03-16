@@ -33,6 +33,12 @@ export function useInvoiceStatus(
 
     const supabase = createClient();
 
+    // Fix 1: mounted guard — prevents stale state updates after cleanup
+    const isMounted = { current: true };
+
+    // Fix 2: race condition guard — realtime data is fresher than initial fetch
+    const hasReceivedRealtimeUpdate = { current: false };
+
     // Fetch current status
     supabase
       .from("invoices")
@@ -40,6 +46,9 @@ export function useInvoiceStatus(
       .eq("id", invoiceId)
       .single()
       .then(({ data, error }) => {
+        if (!isMounted.current) return;
+        // Skip if realtime already delivered a fresher update
+        if (hasReceivedRealtimeUpdate.current) return;
         if (!error && data) {
           setStatus(data.status as InvoiceStatus);
           setErrorMessage(data.error_message ?? null);
@@ -58,6 +67,8 @@ export function useInvoiceStatus(
           filter: `id=eq.${invoiceId}`,
         },
         (payload) => {
+          if (!isMounted.current) return;
+          hasReceivedRealtimeUpdate.current = true;
           const newRecord = payload.new as {
             status: InvoiceStatus;
             error_message: string | null;
@@ -66,15 +77,16 @@ export function useInvoiceStatus(
           setErrorMessage(newRecord.error_message ?? null);
         }
       )
+      // Fix 3: handle all connection states — true only when SUBSCRIBED
       .subscribe((subscriptionStatus) => {
-        if (subscriptionStatus === "SUBSCRIBED") {
-          setIsConnected(true);
-        }
+        if (!isMounted.current) return;
+        setIsConnected(subscriptionStatus === "SUBSCRIBED");
       });
 
     channelRef.current = channel;
 
     return () => {
+      isMounted.current = false;
       if (channelRef.current) {
         supabase.removeChannel(channelRef.current);
         channelRef.current = null;
