@@ -80,9 +80,9 @@ export default function ExtractionForm({
   );
 
   const handleBlur = useCallback(
-    async (field: string) => {
+    async (field: string, valueOverride?: string | number | null) => {
       setFocusedField(null);
-      const value = state.values[field];
+      const value = valueOverride !== undefined ? valueOverride : state.values[field];
 
       // Validate
       const fieldError = validateField(field, value);
@@ -242,12 +242,15 @@ export default function ExtractionForm({
             onChange={(e) => handleChange(field, e.target.value)}
             onFocus={() => setFocusedField(field)}
             onBlur={() => {
-              // Parse raw string to number on blur before saving
+              // Parse raw string to number on blur, pass directly to handleBlur
+              // to avoid stale closure (dispatch won't update state until next render)
               const parsed = parseCurrencyInput(String(value ?? ""));
               if (parsed !== null) {
                 dispatch({ type: "SET_VALUE", field, value: parsed });
+                handleBlur(field, parsed);
+              } else {
+                handleBlur(field);
               }
-              handleBlur(field);
             }}
           />
         ) : (
