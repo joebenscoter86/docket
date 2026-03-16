@@ -12,24 +12,30 @@ interface LogEntry {
   [key: string]: unknown;
 }
 
+const isDev = process.env.NODE_ENV === "development";
+
 function log(entry: LogEntry): void {
   const output = {
     ...entry,
     timestamp: new Date().toISOString(),
   };
 
+  const formatted = isDev
+    ? JSON.stringify(output, null, 2)
+    : JSON.stringify(output);
+
   switch (entry.level) {
     case "error":
       // eslint-disable-next-line no-console
-      console.error(JSON.stringify(output));
+      console.error(formatted);
       break;
     case "warn":
       // eslint-disable-next-line no-console
-      console.warn(JSON.stringify(output));
+      console.warn(formatted);
       break;
     default:
       // eslint-disable-next-line no-console
-      console.info(JSON.stringify(output));
+      console.info(formatted);
   }
 }
 
