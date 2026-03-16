@@ -168,6 +168,33 @@ describe("UploadZone", () => {
       expect(screen.getByText("invoice.pdf")).toBeInTheDocument();
     });
 
+    it("calls onUploadComplete with invoiceId after successful upload", async () => {
+      const onUploadComplete = vi.fn();
+      render(<UploadZone onUploadComplete={onUploadComplete} />);
+      const file = createFile("invoice.pdf", 1024, "application/pdf");
+      selectFiles(getInput(), [file]);
+
+      await waitFor(() => {
+        expect(onUploadComplete).toHaveBeenCalledWith("inv-1");
+      });
+    });
+
+    it("does not call onUploadComplete on API failure", async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: false,
+        json: async () => ({ error: "Upload failed", code: "INTERNAL_ERROR" }),
+      });
+      const onUploadComplete = vi.fn();
+      render(<UploadZone onUploadComplete={onUploadComplete} />);
+      const file = createFile("invoice.pdf", 1024, "application/pdf");
+      selectFiles(getInput(), [file]);
+
+      await waitFor(() => {
+        expect(screen.getAllByText("Upload failed").length).toBeGreaterThan(0);
+      });
+      expect(onUploadComplete).not.toHaveBeenCalled();
+    });
+
     it('resets to idle when "Upload Another" is clicked', async () => {
       render(<UploadZone />);
       const file = createFile("invoice.pdf", 1024, "application/pdf");
