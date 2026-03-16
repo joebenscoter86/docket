@@ -31,6 +31,10 @@ export function authError(message = "Unauthorized") {
   return apiError({ error: message, code: "AUTH_ERROR", status: 401 });
 }
 
+export function forbiddenError(message = "Forbidden") {
+  return apiError({ error: message, code: "AUTH_ERROR", status: 403 });
+}
+
 export function notFound(message = "Resource not found") {
   return apiError({ error: message, code: "NOT_FOUND", status: 404 });
 }
