@@ -1,0 +1,196 @@
+"use client";
+
+import { useState, useRef, useCallback, useEffect } from "react";
+import { useRouter } from "next/navigation";
+
+type ApproveBarState = "idle" | "confirming" | "submitting" | "approved";
+
+interface ApproveBarProps {
+  invoiceId: string;
+  vendorName: string | number | null;
+  totalAmount: string | number | null;
+}
+
+export default function ApproveBar({
+  invoiceId,
+  vendorName,
+  totalAmount,
+}: ApproveBarProps) {
+  const router = useRouter();
+  const [barState, setBarState] = useState<ApproveBarState>("idle");
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const confirmTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const errorTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const redirectTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Cleanup timers on unmount
+  useEffect(() => {
+    return () => {
+      if (confirmTimer.current) clearTimeout(confirmTimer.current);
+      if (errorTimer.current) clearTimeout(errorTimer.current);
+      if (redirectTimer.current) clearTimeout(redirectTimer.current);
+    };
+  }, []);
+
+  // Validation
+  const missingFields: string[] = [];
+  const vendorStr = String(vendorName ?? "").trim();
+  if (!vendorStr) missingFields.push("vendor name");
+  if (totalAmount === null || totalAmount === undefined || String(totalAmount).trim() === "") {
+    missingFields.push("total amount");
+  }
+  const canApprove = missingFields.length === 0;
+
+  const handleApprove = useCallback(async () => {
+    if (barState === "idle") {
+      // First click → enter confirming state
+      setBarState("confirming");
+      setErrorMessage(null);
+      confirmTimer.current = setTimeout(() => {
+        setBarState("idle");
+      }, 3000);
+      return;
+    }
+
+    if (barState === "confirming") {
+      // Second click → fire API call
+      if (confirmTimer.current) clearTimeout(confirmTimer.current);
+
+      // Blur active element to trigger pending auto-saves
+      if (document.activeElement instanceof HTMLElement) {
+        document.activeElement.blur();
+      }
+      // Wait for auto-save to complete
+      await new Promise((resolve) => setTimeout(resolve, 500));
+
+      setBarState("submitting");
+      setErrorMessage(null);
+
+      try {
+        const res = await fetch(`/api/invoices/${invoiceId}/approve`, {
+          method: "POST",
+        });
+
+        if (!res.ok) {
+          const body = await res.json();
+          throw new Error(body.error ?? "Failed to approve invoice");
+        }
+
+        setBarState("approved");
+        // Redirect after showing success
+        redirectTimer.current = setTimeout(() => {
+          router.push("/invoices");
+        }, 2000);
+      } catch (err) {
+        setBarState("idle");
+        const message = err instanceof Error ? err.message : "Failed to approve invoice";
+        setErrorMessage(message);
+        // Auto-dismiss error after 5 seconds
+        errorTimer.current = setTimeout(() => {
+          setErrorMessage(null);
+        }, 5000);
+      }
+    }
+  }, [barState, invoiceId, router]);
+
+  // Button config by state
+  const buttonConfig = {
+    idle: {
+      label: "Approve Invoice",
+      className: canApprove
+        ? "bg-blue-600 text-white hover:bg-blue-700"
+        : "bg-blue-300 text-white cursor-not-allowed",
+      disabled: !canApprove,
+    },
+    confirming: {
+      label: "Confirm Approval",
+      className: "bg-green-600 text-white hover:bg-green-700",
+      disabled: false,
+    },
+    submitting: {
+      label: "Approving...",
+      className: "bg-blue-400 text-white cursor-not-allowed",
+      disabled: true,
+    },
+    approved: {
+      label: "Approved",
+      className: "bg-green-600 text-white cursor-not-allowed",
+      disabled: true,
+    },
+  };
+
+  const btn = buttonConfig[barState];
+
+  return (
+    <div className="bg-white px-6 py-4 flex items-center justify-between gap-4">
+      {/* Left side: status message */}
+      <div className="text-sm flex items-center gap-2 min-w-0">
+        {barState === "approved" ? (
+          <>
+            <span className="h-2 w-2 rounded-full bg-green-500 shrink-0" />
+            <span className="text-green-700">
+              Invoice approved. Ready to sync to QuickBooks.
+            </span>
+          </>
+        ) : errorMessage ? (
+          <>
+            <span className="h-2 w-2 rounded-full bg-red-500 shrink-0" />
+            <span className="text-red-700 truncate">{errorMessage}</span>
+          </>
+        ) : canApprove ? (
+          <>
+            <span className="h-2 w-2 rounded-full bg-green-500 shrink-0" />
+            <span className="text-green-700">Ready to approve</span>
+          </>
+        ) : (
+          <>
+            <span className="h-2 w-2 rounded-full bg-amber-500 shrink-0" />
+            <span className="text-amber-700">
+              Missing: {missingFields.join(", ")}
+            </span>
+          </>
+        )}
+      </div>
+
+      {/* Right side: approve button */}
+      <button
+        type="button"
+        onClick={handleApprove}
+        disabled={btn.disabled}
+        className={`${btn.className} px-6 py-2.5 rounded-md font-medium text-sm shrink-0 flex items-center gap-2 transition-colors`}
+      >
+        {barState === "submitting" && (
+          <svg
+            className="h-4 w-4 animate-spin"
+            viewBox="0 0 24 24"
+            fill="none"
+          >
+            <circle
+              className="opacity-25"
+              cx="12"
+              cy="12"
+              r="10"
+              stroke="currentColor"
+              strokeWidth="4"
+            />
+            <path
+              className="opacity-75"
+              fill="currentColor"
+              d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
+            />
+          </svg>
+        )}
+        {barState === "approved" && (
+          <svg className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+            <path
+              fillRule="evenodd"
+              d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+              clipRule="evenodd"
+            />
+          </svg>
+        )}
+        {btn.label}
+      </button>
+    </div>
+  );
+}

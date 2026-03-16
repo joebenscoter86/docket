@@ -129,7 +129,7 @@ export default function ReviewLayout({
         >
           <div className="flex-1 p-4 md:p-6">
             {extractedData ? (
-              <ExtractionForm extractedData={extractedData} invoiceId={invoice.id} />
+              <ExtractionForm extractedData={extractedData} invoiceId={invoice.id} invoiceStatus={invoice.status} />
             ) : (
               <div className="flex items-center justify-center h-full text-sm text-gray-400">
                 <div className="text-center">
