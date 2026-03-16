@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useCallback, useEffect } from "react";
+import { useState, useRef, useCallback } from "react";
 
 type UploadState = "idle" | "dragging" | "uploading" | "success";
 
@@ -17,14 +17,6 @@ export default function UploadZone() {
   const inputRef = useRef<HTMLInputElement>(null);
   const dragCounterRef = useRef(0);
   const zoneRef = useRef<HTMLDivElement>(null);
-  const timerIdsRef = useRef<ReturnType<typeof setTimeout>[]>([]);
-
-  // Clean up timers on unmount
-  useEffect(() => {
-    return () => {
-      timerIdsRef.current.forEach(clearTimeout);
-    };
-  }, []);
 
   const validateFile = useCallback(
     (file: File): string | null => {
@@ -39,26 +31,42 @@ export default function UploadZone() {
     []
   );
 
-  const startMockUpload = useCallback(
-    (file: File) => {
+  const uploadFile = useCallback(
+    async (file: File) => {
       setState("uploading");
       setError(null);
       setProgress(0);
       setFileName(file.name);
       setStatusAnnouncement(`Uploading ${file.name}`);
 
-      timerIdsRef.current = [];
-      const steps = [30, 60, 90, 100];
-      steps.forEach((value, index) => {
-        const id = setTimeout(() => {
-          setProgress(value);
-          if (value === 100) {
-            setState("success");
-            setStatusAnnouncement("Upload complete");
-          }
-        }, (index + 1) * 400);
-        timerIdsRef.current.push(id);
-      });
+      try {
+        const formData = new FormData();
+        formData.append("file", file);
+
+        setProgress(30);
+
+        const response = await fetch("/api/invoices/upload", {
+          method: "POST",
+          body: formData,
+        });
+
+        const body = await response.json();
+
+        if (!response.ok) {
+          setState("idle");
+          setError(body.error || "Upload failed. Please try again.");
+          setStatusAnnouncement("Upload failed");
+          return;
+        }
+
+        setProgress(100);
+        setState("success");
+        setStatusAnnouncement("Upload complete");
+      } catch {
+        setState("idle");
+        setError("Upload failed. Please check your connection and try again.");
+        setStatusAnnouncement("Upload failed");
+      }
     },
     []
   );
@@ -83,9 +91,9 @@ export default function UploadZone() {
         return;
       }
 
-      startMockUpload(file);
+      uploadFile(file);
     },
-    [state, validateFile, startMockUpload]
+    [state, validateFile, uploadFile]
   );
 
   const handleInputChange = useCallback(

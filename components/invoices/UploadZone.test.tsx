@@ -1,6 +1,9 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { render, screen, fireEvent, act } from "@testing-library/react";
+import { describe, it, expect, vi, beforeEach } from "vitest";
+import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import UploadZone from "./UploadZone";
+
+const mockFetch = vi.fn();
+global.fetch = mockFetch;
 
 function createFile(name: string, size: number, type: string): File {
   const buffer = new ArrayBuffer(size);
@@ -37,6 +40,21 @@ function getZone() {
 }
 
 describe("UploadZone", () => {
+  beforeEach(() => {
+    mockFetch.mockReset();
+    // Default: successful upload
+    mockFetch.mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        data: {
+          invoiceId: "inv-1",
+          fileName: "invoice.pdf",
+          signedUrl: "https://example.com/signed",
+        },
+      }),
+    });
+  });
+
   describe("Idle state", () => {
     it('renders "Drag & drop your invoice" and "or click to browse"', () => {
       render(<UploadZone />);
@@ -69,30 +87,24 @@ describe("UploadZone", () => {
     });
 
     it("accepts valid PDF and transitions to uploading state", () => {
-      vi.useFakeTimers();
       render(<UploadZone />);
       const pdfFile = createFile("invoice.pdf", 1024, "application/pdf");
       selectFiles(getInput(), [pdfFile]);
       expect(screen.getByRole("progressbar")).toBeInTheDocument();
-      vi.useRealTimers();
     });
 
     it("accepts valid JPEG and transitions to uploading state", () => {
-      vi.useFakeTimers();
       render(<UploadZone />);
       const jpegFile = createFile("photo.jpg", 1024, "image/jpeg");
       selectFiles(getInput(), [jpegFile]);
       expect(screen.getByRole("progressbar")).toBeInTheDocument();
-      vi.useRealTimers();
     });
 
     it("accepts valid PNG and transitions to uploading state", () => {
-      vi.useFakeTimers();
       render(<UploadZone />);
       const pngFile = createFile("scan.png", 1024, "image/png");
       selectFiles(getInput(), [pngFile]);
       expect(screen.getByRole("progressbar")).toBeInTheDocument();
-      vi.useRealTimers();
     });
 
     it("rejects multiple files", () => {
@@ -108,7 +120,6 @@ describe("UploadZone", () => {
     });
 
     it("clears error when valid file is selected after invalid one", () => {
-      vi.useFakeTimers();
       render(<UploadZone />);
       const input = getInput();
 
@@ -133,19 +144,10 @@ describe("UploadZone", () => {
           "Unsupported file type. Please upload a PDF, JPG, or PNG."
         )
       ).not.toBeInTheDocument();
-      vi.useRealTimers();
     });
   });
 
   describe("Upload lifecycle", () => {
-    beforeEach(() => {
-      vi.useFakeTimers();
-    });
-
-    afterEach(() => {
-      vi.useRealTimers();
-    });
-
     it("shows progress bar and file name during upload", () => {
       render(<UploadZone />);
       const file = createFile("invoice.pdf", 1024, "application/pdf");
@@ -155,27 +157,24 @@ describe("UploadZone", () => {
       expect(screen.getByText("invoice.pdf")).toBeInTheDocument();
     });
 
-    it("transitions to success after mock upload completes", () => {
+    it("transitions to success after upload completes", async () => {
       render(<UploadZone />);
       const file = createFile("invoice.pdf", 1024, "application/pdf");
       selectFiles(getInput(), [file]);
 
-      // Advance through all progress steps: 400ms * 4 = 1600ms
-      act(() => {
-        vi.advanceTimersByTime(1600);
+      await waitFor(() => {
+        expect(screen.getByText("Upload Another")).toBeInTheDocument();
       });
-
-      expect(screen.getByText("Upload Another")).toBeInTheDocument();
       expect(screen.getByText("invoice.pdf")).toBeInTheDocument();
     });
 
-    it('resets to idle when "Upload Another" is clicked', () => {
+    it('resets to idle when "Upload Another" is clicked', async () => {
       render(<UploadZone />);
       const file = createFile("invoice.pdf", 1024, "application/pdf");
       selectFiles(getInput(), [file]);
 
-      act(() => {
-        vi.advanceTimersByTime(1600);
+      await waitFor(() => {
+        expect(screen.getByText("Upload Another")).toBeInTheDocument();
       });
 
       fireEvent.click(screen.getByText("Upload Another"));
@@ -234,8 +233,7 @@ describe("UploadZone", () => {
       expect(errorEl).toBeInTheDocument();
     });
 
-    it("announces state changes via aria-live region", () => {
-      vi.useFakeTimers();
+    it("announces state changes via aria-live region", async () => {
       render(<UploadZone />);
       const file = createFile("invoice.pdf", 1024, "application/pdf");
       selectFiles(getInput(), [file]);
@@ -244,12 +242,9 @@ describe("UploadZone", () => {
       expect(liveRegion).toBeInTheDocument();
       expect(liveRegion?.textContent).toMatch(/uploading/i);
 
-      act(() => {
-        vi.advanceTimersByTime(1600);
+      await waitFor(() => {
+        expect(liveRegion?.textContent).toMatch(/upload complete/i);
       });
-      expect(liveRegion?.textContent).toMatch(/upload complete/i);
-
-      vi.useRealTimers();
     });
   });
 
@@ -281,14 +276,12 @@ describe("UploadZone", () => {
     });
 
     it("handles file drop and shows uploading state", () => {
-      vi.useFakeTimers();
       render(<UploadZone />);
       const file = createFile("invoice.pdf", 1024, "application/pdf");
 
       fireEvent.drop(getZone(), createDropData([file]));
 
       expect(screen.getByRole("progressbar")).toBeInTheDocument();
-      vi.useRealTimers();
     });
 
     it("shows validation error on invalid file drop", () => {
@@ -311,7 +304,9 @@ describe("UploadZone", () => {
 
   describe("Edge cases", () => {
     it("ignores file selection while uploading", () => {
-      vi.useFakeTimers();
+      // Never-resolving fetch to keep component in uploading state
+      mockFetch.mockReturnValueOnce(new Promise(() => {}));
+
       render(<UploadZone />);
       const input = getInput();
 
@@ -320,11 +315,6 @@ describe("UploadZone", () => {
       selectFiles(input, [file1]);
       expect(screen.getByText("first.pdf")).toBeInTheDocument();
 
-      // Advance partially
-      act(() => {
-        vi.advanceTimersByTime(400);
-      });
-
       // Try to upload another while uploading
       const file2 = createFile("second.pdf", 1024, "application/pdf");
       selectFiles(input, [file2]);
@@ -332,11 +322,12 @@ describe("UploadZone", () => {
       // Should still show first file
       expect(screen.getByText("first.pdf")).toBeInTheDocument();
       expect(screen.queryByText("second.pdf")).not.toBeInTheDocument();
-      vi.useRealTimers();
     });
 
     it("ignores drop while uploading", () => {
-      vi.useFakeTimers();
+      // Never-resolving fetch to keep component in uploading state
+      mockFetch.mockReturnValueOnce(new Promise(() => {}));
+
       render(<UploadZone />);
 
       // Start upload via input
@@ -350,7 +341,37 @@ describe("UploadZone", () => {
       // Should still show first file
       expect(screen.getByText("first.pdf")).toBeInTheDocument();
       expect(screen.queryByText("second.pdf")).not.toBeInTheDocument();
-      vi.useRealTimers();
+    });
+  });
+
+  describe("API error handling", () => {
+    it("shows error message on API failure", async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: false,
+        json: async () => ({ error: "File exceeds 10MB limit.", code: "VALIDATION_ERROR" }),
+      });
+
+      render(<UploadZone />);
+      const file = createFile("invoice.pdf", 1024, "application/pdf");
+      selectFiles(getInput(), [file]);
+
+      await waitFor(() => {
+        expect(screen.getByText("File exceeds 10MB limit.")).toBeInTheDocument();
+      });
+    });
+
+    it("shows error message on network failure", async () => {
+      mockFetch.mockRejectedValueOnce(new Error("Network error"));
+
+      render(<UploadZone />);
+      const file = createFile("invoice.pdf", 1024, "application/pdf");
+      selectFiles(getInput(), [file]);
+
+      await waitFor(() => {
+        expect(
+          screen.getByText("Upload failed. Please check your connection and try again.")
+        ).toBeInTheDocument();
+      });
     });
   });
 });
