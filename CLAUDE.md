@@ -782,7 +782,13 @@ NEXT_PUBLIC_SENTRY_DSN=
 - Multipart upload uses `file_metadata_0` + `file_content_0` part names
 
 ### Xero Sandbox (FND-10)
-TBD
+Deferred to Phase 2. Xero requires a paid org for API testing. Key differences documented from docs review.
 
-### AI Extraction (FND-11)
-TBD
+### AI Extraction (FND-11) — Validated 2026-03-15
+- Claude Sonnet via document type (base64 PDF) — 100% accuracy on 5 synthetic invoices
+- Cost: ~$0.011/invoice (~$1.11/month at 100 invoices). Negligible.
+- Response time: ~3.8 seconds average. Acceptable for synchronous UX with loading spinner.
+- Prompt returns structured JSON: vendor, dates, line items, totals, confidence score
+- Dates in ISO YYYY-MM-DD, numbers without currency symbols, null for missing fields
+- Real invoices (scans, messy layouts) will be lower accuracy — target 80%+ on typed invoices
+- Full prompt text and results in `scripts/sandbox/fixtures/extraction-results.json`

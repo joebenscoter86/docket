@@ -209,10 +209,78 @@ All errors follow this structure:
 
 ## Xero Sandbox (FND-10)
 
-TBD
+Deferred to Phase 2. Xero requires a paid org or free trial for API testing. Key differences from QBO documented in CLAUDE.md from docs review (PUT vs POST, ContactID vs VendorRef, ACCPAY type).
 
 ---
 
-## AI Extraction (FND-11)
+## AI Extraction (FND-11) — 2026-03-15
 
-TBD
+### Setup
+
+- **Model:** claude-sonnet-4-20250514
+- **API:** Anthropic Messages API with document type (base64 PDF)
+- **Test invoices:** 5 synthetic PDFs with known ground truth (see `fixtures/`)
+
+### Extraction Prompt
+
+The prompt requests structured JSON with these fields:
+- `vendor_name`, `vendor_address`, `invoice_number`, `invoice_date`, `due_date`
+- `payment_terms`, `currency` (ISO 4217)
+- `line_items[]` with `description`, `quantity`, `unit_price`, `amount`
+- `subtotal`, `tax_amount`, `total_amount`
+- `confidence` (high/medium/low)
+
+Key prompt design decisions:
+- Dates must be ISO YYYY-MM-DD format
+- Numbers must be plain (no currency symbols)
+- Null for missing fields (not empty strings)
+- "Do not infer or calculate" — extract only what's visible
+- Returns raw JSON, no markdown wrapping
+
+Full prompt text saved in `fixtures/extraction-results.json`.
+
+### Results (Synthetic Invoices)
+
+| Invoice | Type | Overall | Headers | Lines | Confidence | Time | Tokens |
+|---------|------|---------|---------|-------|------------|------|--------|
+| 001 | Standard, 3 line items | 100% | 100% | 100% | high | 4077ms | 2186/321 |
+| 002 | Simple, 1 line item, no tax | 100% | 100% | 100% | high | 2954ms | 2125/209 |
+| 003 | Detailed, 5 line items + tax | 100% | 100% | 100% | high | 4445ms | 2225/418 |
+| 004 | International (GBP + VAT) | 100% | 100% | 100% | high | 4196ms | 2190/323 |
+| 005 | Minimal, sparse formatting | 100% | 100% | 100% | high | 3331ms | 2140/253 |
+
+**Average accuracy: 100%** (on clean synthetic PDFs — real-world will be lower)
+
+### Per-Field Accuracy
+
+All fields: 100% (5/5) — vendor name, address, invoice number, dates, payment terms, currency, subtotal, tax, total, line items.
+
+### Cost Analysis
+
+| Metric | Value |
+|--------|-------|
+| Avg input tokens | ~2,173 per invoice |
+| Avg output tokens | ~305 per invoice |
+| Cost per invoice | ~$0.011 |
+| 100 invoices/month | ~$1.11/month |
+| Avg response time | 3,801ms |
+
+**Key finding:** Extraction cost is negligible — well under $2/month at MVP volumes.
+**Key finding:** ~4 second response time is acceptable for synchronous UX with loading spinner.
+
+### Caveats & Next Steps
+
+1. **These are clean synthetic PDFs** — 100% accuracy is expected. Real invoices with:
+   - Scanned/photographed documents (noise, rotation, blur)
+   - Unusual layouts (multi-column, landscape, header-heavy)
+   - Handwritten elements
+   - Multi-page invoices
+   ...will have lower accuracy. Target: 80%+ on standard typed invoices.
+
+2. **Prompt is v1** — will need iteration during EXT-4 (extraction pipeline build) with real invoice data.
+
+3. **PDF sent as document type** (not image) — Claude's document understanding handles PDFs natively. For image uploads (JPEG, PNG), switch to `image` content type with appropriate `media_type`.
+
+4. **No markdown stripping needed** — the prompt successfully suppresses code fences, but the parser handles them as fallback.
+
+5. **JSON parsing is reliable** — all 5 responses were valid JSON on first parse. No schema validation errors.
