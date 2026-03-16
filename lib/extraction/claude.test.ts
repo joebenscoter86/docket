@@ -1,0 +1,223 @@
+// @vitest-environment node
+import { describe, it, expect, vi, beforeEach } from "vitest";
+import { ClaudeExtractionProvider } from "./claude";
+
+// Mock the Anthropic SDK
+const mockCreate = vi.fn();
+vi.mock("@anthropic-ai/sdk", () => {
+  const MockAnthropic = function (this: unknown) {
+    (this as { messages: { create: typeof mockCreate } }).messages = {
+      create: mockCreate,
+    };
+  };
+  return { default: MockAnthropic };
+});
+
+// Sample AI response matching the FND-11 prompt output format
+const SAMPLE_AI_RESPONSE = {
+  vendor_name: "Acme Corp",
+  vendor_address: "123 Main St, Springfield, IL 62701",
+  invoice_number: "INV-2024-001",
+  invoice_date: "2024-03-15",
+  due_date: "2024-04-14",
+  payment_terms: "Net 30",
+  currency: "USD",
+  line_items: [
+    {
+      description: "Widget A",
+      quantity: 10,
+      unit_price: 25.0,
+      amount: 250.0,
+    },
+    {
+      description: "Widget B",
+      quantity: 5,
+      unit_price: 50.0,
+      amount: 250.0,
+    },
+  ],
+  subtotal: 500.0,
+  tax_amount: 40.0,
+  total_amount: 540.0,
+  confidence: "high",
+};
+
+function mockSuccessResponse(jsonStr?: string) {
+  mockCreate.mockResolvedValue({
+    content: [
+      {
+        type: "text",
+        text: jsonStr ?? JSON.stringify(SAMPLE_AI_RESPONSE),
+      },
+    ],
+    model: "claude-sonnet-4-20250514",
+    usage: { input_tokens: 2000, output_tokens: 300 },
+    stop_reason: "end_turn",
+  });
+}
+
+describe("ClaudeExtractionProvider", () => {
+  let provider: ClaudeExtractionProvider;
+  const pdfBuffer = Buffer.from("%PDF-1.4 test content");
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    provider = new ClaudeExtractionProvider();
+  });
+
+  it("extracts invoice data from a PDF successfully", async () => {
+    mockSuccessResponse();
+
+    const result = await provider.extractInvoiceData(
+      pdfBuffer,
+      "application/pdf"
+    );
+
+    expect(result.data.vendorName).toBe("Acme Corp");
+    expect(result.data.invoiceNumber).toBe("INV-2024-001");
+    expect(result.data.totalAmount).toBe(540.0);
+    expect(result.data.confidenceScore).toBe("high");
+    expect(result.data.lineItems).toHaveLength(2);
+    expect(result.data.lineItems[0].unitPrice).toBe(25.0);
+    expect(result.data.lineItems[0].sortOrder).toBe(0);
+    expect(result.data.lineItems[1].sortOrder).toBe(1);
+    expect(result.data.currency).toBe("USD");
+    expect(result.modelVersion).toBe("claude-sonnet-4-20250514");
+    expect(result.durationMs).toBeGreaterThanOrEqual(0);
+    expect(result.rawResponse).toBeDefined();
+  });
+
+  it("sends PDF as document type content block", async () => {
+    mockSuccessResponse();
+
+    await provider.extractInvoiceData(pdfBuffer, "application/pdf");
+
+    const callArgs = mockCreate.mock.calls[0][0];
+    const content = callArgs.messages[0].content;
+    expect(content[0].type).toBe("document");
+    expect(content[0].source.media_type).toBe("application/pdf");
+  });
+
+  it("sends JPEG as image type content block", async () => {
+    mockSuccessResponse();
+
+    await provider.extractInvoiceData(pdfBuffer, "image/jpeg");
+
+    const callArgs = mockCreate.mock.calls[0][0];
+    const content = callArgs.messages[0].content;
+    expect(content[0].type).toBe("image");
+    expect(content[0].source.media_type).toBe("image/jpeg");
+  });
+
+  it("sends PNG as image type content block", async () => {
+    mockSuccessResponse();
+
+    await provider.extractInvoiceData(pdfBuffer, "image/png");
+
+    const callArgs = mockCreate.mock.calls[0][0];
+    const content = callArgs.messages[0].content;
+    expect(content[0].type).toBe("image");
+    expect(content[0].source.media_type).toBe("image/png");
+  });
+
+  it("strips markdown code fences from response", async () => {
+    mockSuccessResponse(
+      "```json\n" + JSON.stringify(SAMPLE_AI_RESPONSE) + "\n```"
+    );
+
+    const result = await provider.extractInvoiceData(
+      pdfBuffer,
+      "application/pdf"
+    );
+
+    expect(result.data.vendorName).toBe("Acme Corp");
+  });
+
+  it("handles null fields in AI response", async () => {
+    const partialResponse = {
+      ...SAMPLE_AI_RESPONSE,
+      vendor_address: null,
+      due_date: null,
+      payment_terms: null,
+      subtotal: null,
+      tax_amount: null,
+    };
+    mockSuccessResponse(JSON.stringify(partialResponse));
+
+    const result = await provider.extractInvoiceData(
+      pdfBuffer,
+      "application/pdf"
+    );
+
+    expect(result.data.vendorAddress).toBeNull();
+    expect(result.data.dueDate).toBeNull();
+    expect(result.data.paymentTerms).toBeNull();
+  });
+
+  it("defaults currency to USD when not provided", async () => {
+    const noCurrency = { ...SAMPLE_AI_RESPONSE, currency: null };
+    mockSuccessResponse(JSON.stringify(noCurrency));
+
+    const result = await provider.extractInvoiceData(
+      pdfBuffer,
+      "application/pdf"
+    );
+
+    expect(result.data.currency).toBe("USD");
+  });
+
+  it("throws on empty response content", async () => {
+    mockCreate.mockResolvedValue({
+      content: [],
+      model: "claude-sonnet-4-20250514",
+      usage: { input_tokens: 100, output_tokens: 0 },
+    });
+
+    await expect(
+      provider.extractInvoiceData(pdfBuffer, "application/pdf")
+    ).rejects.toThrow("Could not extract data from this document");
+  });
+
+  it("throws on malformed JSON response", async () => {
+    mockCreate.mockResolvedValue({
+      content: [{ type: "text", text: "this is not json at all" }],
+      model: "claude-sonnet-4-20250514",
+      usage: { input_tokens: 100, output_tokens: 50 },
+    });
+
+    await expect(
+      provider.extractInvoiceData(pdfBuffer, "application/pdf")
+    ).rejects.toThrow("Could not parse extraction results");
+  });
+
+  it("throws on timeout", async () => {
+    const timeoutError = new Error("Request timed out");
+    timeoutError.name = "APIConnectionTimeoutError";
+    mockCreate.mockRejectedValue(timeoutError);
+
+    await expect(
+      provider.extractInvoiceData(pdfBuffer, "application/pdf")
+    ).rejects.toThrow("Extraction timed out");
+  });
+
+  it("throws on API error (5xx)", async () => {
+    const apiError = new Error("Internal server error");
+    (apiError as unknown as Record<string, unknown>).status = 500;
+    apiError.name = "APIError";
+    mockCreate.mockRejectedValue(apiError);
+
+    await expect(
+      provider.extractInvoiceData(pdfBuffer, "application/pdf")
+    ).rejects.toThrow("Extraction service unavailable");
+  });
+
+  it("throws on rate limit after retries exhausted", async () => {
+    const rateLimitError = new Error("Rate limit exceeded");
+    rateLimitError.name = "RateLimitError";
+    mockCreate.mockRejectedValue(rateLimitError);
+
+    await expect(
+      provider.extractInvoiceData(pdfBuffer, "application/pdf")
+    ).rejects.toThrow("Extraction service is busy");
+  });
+});
