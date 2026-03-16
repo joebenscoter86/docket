@@ -637,6 +637,13 @@ All four checks must pass before a PR can be merged. No exceptions.
 **Vercel:**
 - Preview deploys on PR, production on push to `main`.
 - "Add Domain" with the redirect checkbox adds both apex + www in one step.
+- Env vars must be set in Vercel Dashboard (Settings → Environment Variables). They are NOT auto-synced from `.env.local`.
+- New env vars require a **new deployment** to take effect — existing preview deploys won't pick them up. Push a new commit or hit "Redeploy" in the dashboard.
+- **Env var environment strategy:** Most vars (Supabase, Anthropic, Encryption) can use "All Environments" during dev since they're all sandbox/dev credentials. Exceptions:
+  - `QBO_ENVIRONMENT`: set per-environment (`sandbox` for Preview, `production` for Production)
+  - `QBO_REDIRECT_URI`: different per environment (preview URL vs production URL)
+  - Stripe keys: different per environment (`sk_test_*` for Preview, `sk_live_*` for Production)
+  - When going to production, swap all credentials to production-grade values per-environment.
 
 **DNS:**
 - Always copy-paste verification codes. Characters like uppercase I, lowercase l, and 1 are visually ambiguous.
