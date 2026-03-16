@@ -1,6 +1,12 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 
+// Routes that require authentication — everything under (dashboard)
+const PROTECTED_PATHS = ['/invoices', '/upload', '/settings']
+
+// Routes only accessible when NOT authenticated
+const AUTH_PATHS = ['/login', '/signup']
+
 export async function updateSession(request: NextRequest) {
   let supabaseResponse = NextResponse.next({
     request,
@@ -31,7 +37,23 @@ export async function updateSession(request: NextRequest) {
 
   // Refresh the auth token — this is required for Server Components
   // to read the session. Do not remove this line.
-  await supabase.auth.getUser()
+  const { data: { user } } = await supabase.auth.getUser()
+
+  const pathname = request.nextUrl.pathname
+
+  // Redirect unauthenticated users away from protected routes
+  if (!user && PROTECTED_PATHS.some((path) => pathname.startsWith(path))) {
+    const loginUrl = request.nextUrl.clone()
+    loginUrl.pathname = '/login'
+    return NextResponse.redirect(loginUrl)
+  }
+
+  // Redirect authenticated users away from auth pages
+  if (user && AUTH_PATHS.some((path) => pathname.startsWith(path))) {
+    const dashboardUrl = request.nextUrl.clone()
+    dashboardUrl.pathname = '/invoices'
+    return NextResponse.redirect(dashboardUrl)
+  }
 
   return supabaseResponse
 }
