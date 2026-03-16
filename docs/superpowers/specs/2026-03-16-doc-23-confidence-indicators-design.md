@@ -15,6 +15,12 @@ Add visual confidence indicators to the extraction review form so users immediat
 
 ## Design
 
+### Data Flow
+
+`ExtractionForm` already receives `extractedData: ExtractedDataRow` which includes `confidence_score`. Rather than adding a separate prop, the component reads `extractedData.confidence_score` directly. This avoids prop duplication since the type already carries the field. ReviewLayout already uses `confidence_score` for the header dot indicator — ExtractionForm now also consumes it for field-level styling.
+
+When `confidence_score` is `null` (e.g., extraction failed to produce one), no confidence-related UI elements are rendered — no banner, no borders, no icons.
+
 ### Confidence Banner
 
 When `confidence_score === "low"`, render an amber banner at the top of ExtractionForm:
@@ -35,6 +41,8 @@ Each form field gets a colored left border and a small icon next to the field la
 | low | `border-l-2 border-red-500` | Alert circle | `text-red-500` |
 
 Icons are small (3.5x3.5 / `h-3.5 w-3.5`) and positioned next to the field label, similar to the existing `FieldStatusIcon`. Each icon has an `aria-label` for screen readers.
+
+`ConfidenceIcon` is a private function at the bottom of `ExtractionForm.tsx`, following the same pattern as `FieldStatusIcon`.
 
 ### Clearing on Edit
 
@@ -59,8 +67,7 @@ The confidence icon appears in the label row alongside `FieldStatusIcon`. Both c
 
 | File | Change |
 |------|--------|
-| `components/invoices/ExtractionForm.tsx` | Add `confidenceScore` prop, confidence banner, `ConfidenceIcon` component, update `renderField` wrapper class logic |
-| `components/invoices/ReviewLayout.tsx` | Pass `extractedData.confidence_score` to ExtractionForm |
+| `components/invoices/ExtractionForm.tsx` | Add confidence banner, `ConfidenceIcon` component, update `renderField` wrapper class logic (reads `confidence_score` from existing `extractedData` prop) |
 | `components/invoices/ExtractionForm.test.tsx` | Tests for confidence rendering and clearing behavior |
 
 ## Not Changed
@@ -70,7 +77,13 @@ The confidence icon appears in the label row alongside `FieldStatusIcon`. Both c
 - No database changes
 - No new dependencies
 
+### Note: Auto-Calculated Fields
+
+When the user edits `subtotal` or `tax_amount`, `total_amount` is auto-recalculated and will show as "changed" (blue border). Meanwhile, other unedited fields retain their confidence indicators. This asymmetry is correct — it reflects which fields have been human-verified.
+
 ## Testing
+
+This is the first component test file for ExtractionForm. Tests will need to mock `fetch` for the auto-save behavior that fires on blur.
 
 - Renders confidence border + icon on all fields when confidence is high/medium/low
 - Renders low-confidence banner only when confidence is "low"
