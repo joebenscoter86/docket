@@ -1,5 +1,6 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getExtractionProvider } from "./provider";
+import { mapToExtractedDataRow, mapToLineItemRows } from "./mapper";
 import { logger } from "@/lib/utils/logger";
 import type { ExtractionResult } from "./types";
 
@@ -38,25 +39,10 @@ export async function runExtraction(params: {
     const result = await provider.extractInvoiceData(fileBuffer, fileType);
 
     // 4. Store extracted_data
+    const extractedDataRow = mapToExtractedDataRow(result, invoiceId);
     const { data: extractedRow, error: insertError } = await admin
       .from("extracted_data")
-      .insert({
-        invoice_id: invoiceId,
-        vendor_name: result.data.vendorName,
-        vendor_address: result.data.vendorAddress,
-        invoice_number: result.data.invoiceNumber,
-        invoice_date: result.data.invoiceDate,
-        due_date: result.data.dueDate,
-        subtotal: result.data.subtotal,
-        tax_amount: result.data.taxAmount,
-        total_amount: result.data.totalAmount,
-        currency: result.data.currency,
-        payment_terms: result.data.paymentTerms,
-        raw_ai_response: result.rawResponse,
-        confidence_score: result.data.confidenceScore,
-        model_version: result.modelVersion,
-        extraction_duration_ms: result.durationMs,
-      })
+      .insert(extractedDataRow)
       .select("id")
       .single();
 
@@ -69,15 +55,10 @@ export async function runExtraction(params: {
 
     // 5. Store line items
     if (result.data.lineItems.length > 0) {
-      const lineItemRows = result.data.lineItems.map((item) => ({
-        extracted_data_id: extractedRow.id,
-        description: item.description,
-        quantity: item.quantity,
-        unit_price: item.unitPrice,
-        amount: item.amount,
-        gl_account_id: null,
-        sort_order: item.sortOrder,
-      }));
+      const lineItemRows = mapToLineItemRows(
+        result.data.lineItems,
+        extractedRow.id
+      );
 
       const { error: lineItemError } = await admin
         .from("extracted_line_items")
