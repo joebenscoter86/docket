@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { getExtractedData } from "@/lib/extraction/data";
 import { logger } from "@/lib/utils/logger";
 import ReviewLayout from "@/components/invoices/ReviewLayout";
@@ -43,9 +44,11 @@ export default async function ReviewPage({
   }
 
   // Fetch extracted data and signed URL in parallel
+  // Admin client required for Storage — bucket RLS restricts anon access
+  const admin = createAdminClient();
   const [extractedData, signedUrlResult] = await Promise.all([
     getExtractedData(invoice.id),
-    supabase.storage
+    admin.storage
       .from("invoices")
       .createSignedUrl(invoice.file_path, 3600),
   ]);
