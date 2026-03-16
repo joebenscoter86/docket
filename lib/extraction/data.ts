@@ -120,3 +120,101 @@ export async function recordCorrection(
     });
   }
 }
+
+/** Allowed fields for line item updates */
+export const LINE_ITEM_EDITABLE_FIELDS = new Set([
+  "description",
+  "quantity",
+  "unit_price",
+  "amount",
+]);
+
+export async function createLineItem(extractedDataId: string) {
+  const supabase = createClient();
+
+  const { data: existing } = await supabase
+    .from("extracted_line_items")
+    .select("sort_order")
+    .eq("extracted_data_id", extractedDataId)
+    .order("sort_order", { ascending: false })
+    .limit(1);
+
+  const nextSortOrder =
+    existing && existing.length > 0 ? existing[0].sort_order + 1 : 0;
+
+  const { data, error } = await supabase
+    .from("extracted_line_items")
+    .insert({
+      extracted_data_id: extractedDataId,
+      description: null,
+      quantity: null,
+      unit_price: null,
+      amount: null,
+      gl_account_id: null,
+      sort_order: nextSortOrder,
+    })
+    .select("id, description, quantity, unit_price, amount, gl_account_id, sort_order")
+    .single();
+
+  if (error || !data) {
+    logger.error("create_line_item_failed", {
+      extractedDataId,
+      error: error?.message ?? "unknown",
+      status: "error",
+    });
+    return null;
+  }
+
+  return data;
+}
+
+export async function updateLineItemField(
+  itemId: string,
+  field: string,
+  value: string | number | null
+) {
+  if (!LINE_ITEM_EDITABLE_FIELDS.has(field)) {
+    throw new Error(`Field '${field}' is not editable on line items`);
+  }
+
+  const supabase = createClient();
+
+  const { data, error } = await supabase
+    .from("extracted_line_items")
+    .update({ [field]: value })
+    .eq("id", itemId)
+    .select("id, description, quantity, unit_price, amount, gl_account_id, sort_order")
+    .single();
+
+  if (error || !data) {
+    logger.error("update_line_item_field_failed", {
+      itemId,
+      field,
+      error: error?.message ?? "unknown",
+      status: "error",
+    });
+    return null;
+  }
+
+  return data;
+}
+
+export async function deleteLineItem(itemId: string) {
+  const supabase = createClient();
+
+  const { error } = await supabase
+    .from("extracted_line_items")
+    .delete()
+    .eq("id", itemId);
+
+  if (error) {
+    logger.error("delete_line_item_failed", {
+      itemId,
+      error: error.message,
+      status: "error",
+    });
+    return false;
+  }
+
+  return true;
+}

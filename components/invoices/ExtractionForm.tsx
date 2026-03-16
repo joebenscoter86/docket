@@ -9,6 +9,7 @@ import {
 } from "./extraction-form-reducer";
 import { formatCurrency, parseCurrencyInput } from "@/lib/utils/currency";
 import type { ExtractedDataRow } from "@/lib/types/invoice";
+import LineItemEditor from "./LineItemEditor";
 
 interface ExtractionFormProps {
   extractedData: ExtractedDataRow;
@@ -146,6 +147,29 @@ export default function ExtractionForm({
       value: rawValue === "" ? null : rawValue,
     });
   }, []);
+
+  const handleSubtotalChange = useCallback(
+    async (newSubtotal: number) => {
+      const rounded = Math.round(newSubtotal * 100) / 100;
+      dispatch({ type: "SET_VALUE", field: "subtotal", value: rounded });
+      const saved = await saveField("subtotal", rounded);
+      if (saved) {
+        dispatch({ type: "MARK_SAVED", field: "subtotal", value: rounded });
+
+        // Cascade to total = subtotal + tax
+        const tax = state.values.tax_amount;
+        if (typeof tax === "number") {
+          const newTotal = Math.round((rounded + tax) * 100) / 100;
+          dispatch({ type: "SET_VALUE", field: "total_amount", value: newTotal });
+          const totalSaved = await saveField("total_amount", newTotal);
+          if (totalSaved) {
+            dispatch({ type: "MARK_SAVED", field: "total_amount", value: newTotal });
+          }
+        }
+      }
+    },
+    [saveField, state.values.tax_amount]
+  );
 
   const isChanged = (field: string) =>
     String(state.values[field] ?? "") !==
@@ -301,7 +325,18 @@ export default function ExtractionForm({
 
       <div className="border-t border-gray-200" />
 
-      {/* Section 2: Amounts */}
+      {/* Section 2: Line Items */}
+      <LineItemEditor
+        lineItems={extractedData.extracted_line_items ?? []}
+        invoiceId={invoiceId}
+        extractedDataId={extractedData.id}
+        currency={currency}
+        onSubtotalChange={handleSubtotalChange}
+      />
+
+      <div className="border-t border-gray-200" />
+
+      {/* Section 3: Amounts */}
       <div>
         <h3 className="text-xs font-semibold uppercase tracking-wide text-gray-400 mb-4">
           Amounts
