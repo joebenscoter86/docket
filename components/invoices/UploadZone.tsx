@@ -7,7 +7,11 @@ type UploadState = "idle" | "dragging" | "uploading" | "success";
 const ACCEPTED_TYPES = ["application/pdf", "image/jpeg", "image/png"];
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
 
-export default function UploadZone() {
+interface UploadZoneProps {
+  onUploadComplete?: (invoiceId: string) => void;
+}
+
+export default function UploadZone({ onUploadComplete }: UploadZoneProps) {
   const [state, setState] = useState<UploadState>("idle");
   const [error, setError] = useState<string | null>(null);
   const [progress, setProgress] = useState(0);
@@ -62,13 +66,17 @@ export default function UploadZone() {
         setProgress(100);
         setState("success");
         setStatusAnnouncement("Upload complete");
+        // Notify parent with invoiceId for realtime tracking
+        if (onUploadComplete && body.data?.invoiceId) {
+          onUploadComplete(body.data.invoiceId);
+        }
       } catch {
         setState("idle");
         setError("Upload failed. Please check your connection and try again.");
         setStatusAnnouncement("Upload failed");
       }
     },
-    []
+    [onUploadComplete]
   );
 
   const handleFiles = useCallback(
