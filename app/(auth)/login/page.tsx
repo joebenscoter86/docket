@@ -25,14 +25,16 @@ export default function LoginPage() {
 
     if (authError) {
       setLoading(false)
+      // DEBUG: show raw error + configured URL to diagnose connection issue
+      const debugUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '(not set)'
       if (authError.message.includes('Invalid login credentials')) {
         setError('Invalid email or password.')
       } else if (authError.message.includes('rate limit') || authError.message.includes('too many requests')) {
         setError('Too many attempts. Please wait a few minutes and try again.')
       } else if (authError.message.includes('Failed to fetch') || authError.message.includes('fetch')) {
-        setError('Unable to reach the server. Please check your connection and try again.')
+        setError(`Unable to reach server. URL: ${debugUrl} | Error: ${authError.message}`)
       } else {
-        setError(authError.message)
+        setError(`${authError.message} | URL: ${debugUrl}`)
       }
       return
     }
