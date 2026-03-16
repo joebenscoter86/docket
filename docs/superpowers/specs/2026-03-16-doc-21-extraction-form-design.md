@@ -10,15 +10,16 @@ The right panel of the review page shows all extracted invoice fields in an edit
 
 **`PATCH /api/invoices/[id]/extracted-data`**
 
-- **Auth:** Verify authenticated user via Supabase server client
-- **Ownership:** Verify the invoice belongs to the user's org before updating
+- **Auth:** Verify authenticated user via RLS-aware Supabase server client
+- **Ownership:** RLS-aware client ensures the user can only access their org's data. If the query returns no rows, return 404.
 - **Body:** `{ field: string, value: string | number | null }`
 - **Logic:**
   1. Validate `field` is in the editable fields allowlist (already enforced by `updateExtractedField()`)
-  2. Fetch current value of the field from `extracted_data`
-  3. Call `updateExtractedField(extractedDataId, field, value)`
-  4. If the new value differs from the original AI-extracted value, insert a row into `corrections` table
+  2. Fetch the `extracted_data` row by `invoice_id` (from URL params) using the RLS-aware server client. This yields the `extractedDataId`, the current field value (pre-update), and `invoice_id` for joining to get `org_id`. Return 404 if no extraction exists.
+  3. Call `updateExtractedField(extractedDataId, field, value)`. If it returns `null`, return `{ error: "Failed to update field", code: "INTERNAL_ERROR" }` with status 500.
+  4. If the new value differs from the pre-update value captured in step 2, call `recordCorrection(invoiceId, orgId, field, originalValue, newValue)`. The `orgId` is fetched by joining `invoices` via `extracted_data.invoice_id`.
   5. Return `{ data: { field, value, saved: true } }`
+- **Logging:** Structured JSON logging at entry and exit per CLAUDE.md rule 8: `update_field_start` (entry), `update_field_success` (success with `durationMs`), `update_field_failed` (error).
 - **Error responses:** Standard error format per CLAUDE.md (`{ error, code }`)
 
 ### Data Layer Addition
@@ -52,7 +53,7 @@ interface ExtractionFormProps {
     subtotal: number | null;
     tax_amount: number | null;
     total_amount: number | null;
-    confidence_score: "high" | "medium" | "low";
+    confidence_score: "high" | "medium" | "low" | null;
     extracted_line_items: Array<{
       id: string;
       description: string | null;
@@ -135,9 +136,11 @@ Fields where `values[field] !== originalValues[field]` get a `border-l-2 border-
 
 ### Total Auto-calculation
 
-When subtotal or tax_amount changes (on blur, after save succeeds):
+When subtotal or tax_amount saves successfully (in the save success callback, not via blur):
 - If both subtotal and tax_amount are valid numbers, auto-update total_amount to their sum
-- If the user has manually set total_amount to a different value, show an amber warning: "Total doesn't match subtotal + tax"
+- This programmatic update triggers its own save call immediately (not blur-triggered)
+- Auto-calculated total changes DO generate correction records if they differ from the original AI extraction — this is intentional, as the correction log should reflect the final state vs. original extraction regardless of how the change was triggered
+- If the user has manually set total_amount to a different value that doesn't match subtotal + tax, show an amber warning: "Total doesn't match subtotal + tax"
 - The warning is informational only — it does not block saving or approval
 
 ### Field Status Indicators
@@ -173,7 +176,9 @@ Formatting is handled by a simple helper function, not a library. Supports: `$` 
 
 ## ReviewLayout Integration
 
-`ReviewLayout.tsx` needs a minor update to pass `invoiceId` to ExtractionForm, since the form needs it for the API route URL.
+`ReviewLayout.tsx` needs two updates:
+1. Pass `invoiceId` to ExtractionForm (needed for the API route URL)
+2. Update the `ReviewLayoutProps.extractedData` type from the current loose index signature (`[key: string]: unknown`) to the fully-typed interface matching `ExtractionFormProps.extractedData`. This shared type should be defined in `lib/types/invoice.ts` to avoid duplication.
 
 ## Testing
 
@@ -187,6 +192,7 @@ Formatting is handled by a simple helper function, not a library. Supports: `$` 
 
 | File | Action | Purpose |
 |------|--------|---------|
+| `lib/types/invoice.ts` | Add types | `ExtractedDataRow` and `ExtractedLineItemRow` shared types |
 | `components/invoices/ExtractionForm.tsx` | Rewrite | Full form implementation |
 | `app/api/invoices/[id]/extracted-data/route.ts` | Create | PATCH endpoint for field updates |
 | `lib/extraction/data.ts` | Add function | `recordCorrection()` |
