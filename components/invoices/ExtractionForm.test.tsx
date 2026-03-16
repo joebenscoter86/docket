@@ -1,0 +1,155 @@
+import { render, screen, fireEvent } from "@testing-library/react";
+import { describe, it, expect, vi, beforeEach } from "vitest";
+import ExtractionForm from "./ExtractionForm";
+import type { ExtractedDataRow } from "@/lib/types/invoice";
+
+// Mock LineItemEditor to isolate ExtractionForm tests
+vi.mock("./LineItemEditor", () => ({
+  default: () => <div data-testid="line-item-editor" />,
+}));
+
+function makeExtractedData(
+  overrides: Partial<ExtractedDataRow> = {}
+): ExtractedDataRow {
+  return {
+    id: "ed-1",
+    invoice_id: "inv-1",
+    vendor_name: "Acme Corp",
+    vendor_address: "123 Main St",
+    invoice_number: "INV-001",
+    invoice_date: "2026-01-15",
+    due_date: "2026-02-15",
+    payment_terms: "Net 30",
+    currency: "USD",
+    subtotal: 100,
+    tax_amount: 10,
+    total_amount: 110,
+    confidence_score: null,
+    raw_ai_response: null,
+    model_version: null,
+    extraction_duration_ms: null,
+    extracted_at: "2026-01-15T00:00:00Z",
+    extracted_line_items: [],
+    ...overrides,
+  };
+}
+
+beforeEach(() => {
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(() => Promise.resolve({ ok: true, json: () => Promise.resolve({}) }))
+  );
+});
+
+describe("ExtractionForm confidence indicators", () => {
+  it.each(["high", "medium", "low"] as const)(
+    "renders confidence left border on fields when confidence is %s",
+    (level) => {
+      const { container } = render(
+        <ExtractionForm
+          extractedData={makeExtractedData({ confidence_score: level })}
+          invoiceId="inv-1"
+        />
+      );
+      const borderClass =
+        level === "high"
+          ? "border-green-500"
+          : level === "medium"
+            ? "border-amber-500"
+            : "border-red-500";
+      const fieldsWithBorder = container.querySelectorAll(`.${borderClass}`);
+      expect(fieldsWithBorder.length).toBeGreaterThan(0);
+    }
+  );
+
+  it.each(["high", "medium", "low"] as const)(
+    "renders confidence icon with aria-label for %s confidence",
+    (level) => {
+      render(
+        <ExtractionForm
+          extractedData={makeExtractedData({ confidence_score: level })}
+          invoiceId="inv-1"
+        />
+      );
+      const label =
+        level === "high"
+          ? "High confidence"
+          : level === "medium"
+            ? "Medium confidence"
+            : "Low confidence";
+      const icons = screen.getAllByLabelText(label);
+      expect(icons.length).toBeGreaterThan(0);
+    }
+  );
+
+  it("renders low-confidence banner when confidence is low", () => {
+    render(
+      <ExtractionForm
+        extractedData={makeExtractedData({ confidence_score: "low" })}
+        invoiceId="inv-1"
+      />
+    );
+    expect(
+      screen.getByText("Some fields may need extra attention. Please review carefully.")
+    ).toBeDefined();
+  });
+
+  it("does not render banner for high confidence", () => {
+    render(
+      <ExtractionForm
+        extractedData={makeExtractedData({ confidence_score: "high" })}
+        invoiceId="inv-1"
+      />
+    );
+    expect(
+      screen.queryByText("Some fields may need extra attention. Please review carefully.")
+    ).toBeNull();
+  });
+
+  it("does not render banner for medium confidence", () => {
+    render(
+      <ExtractionForm
+        extractedData={makeExtractedData({ confidence_score: "medium" })}
+        invoiceId="inv-1"
+      />
+    );
+    expect(
+      screen.queryByText("Some fields may need extra attention. Please review carefully.")
+    ).toBeNull();
+  });
+
+  it("renders no confidence indicators when confidence_score is null", () => {
+    render(
+      <ExtractionForm
+        extractedData={makeExtractedData({ confidence_score: null })}
+        invoiceId="inv-1"
+      />
+    );
+    expect(screen.queryByLabelText("High confidence")).toBeNull();
+    expect(screen.queryByLabelText("Medium confidence")).toBeNull();
+    expect(screen.queryByLabelText("Low confidence")).toBeNull();
+  });
+
+  it("clears confidence indicator on a field when user types in it", () => {
+    const { container } = render(
+      <ExtractionForm
+        extractedData={makeExtractedData({ confidence_score: "medium" })}
+        invoiceId="inv-1"
+      />
+    );
+
+    // Vendor name field should have amber border initially
+    const vendorInput = screen.getByDisplayValue("Acme Corp");
+    const vendorWrapper = vendorInput.closest(".border-amber-500");
+    expect(vendorWrapper).not.toBeNull();
+
+    // Type in the field to change its value
+    fireEvent.change(vendorInput, { target: { value: "Acme Corp Updated" } });
+
+    // Now the vendor wrapper should have blue border (changed), not amber
+    const updatedWrapper = vendorInput.closest(".border-blue-500");
+    expect(updatedWrapper).not.toBeNull();
+    const amberWrapper = vendorInput.closest(".border-amber-500");
+    expect(amberWrapper).toBeNull();
+  });
+});
