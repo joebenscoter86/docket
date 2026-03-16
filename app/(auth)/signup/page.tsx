@@ -39,8 +39,12 @@ export default function SignupPage() {
       setLoading(false)
       if (authError.message.includes('already registered')) {
         setError('An account with this email already exists.')
-      } else if (authError.message.includes('valid email')) {
+      } else if (authError.message.includes('valid email') || authError.message.includes('email_address_invalid')) {
         setError('Please enter a valid email address.')
+      } else if (authError.message.includes('rate limit') || authError.message.includes('too many requests')) {
+        setError('Too many attempts. Please wait a few minutes and try again.')
+      } else if (authError.message.includes('Failed to fetch') || authError.message.includes('fetch')) {
+        setError('Unable to reach the server. Please check your connection and try again.')
       } else {
         setError(authError.message)
       }
