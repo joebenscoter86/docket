@@ -1,5 +1,4 @@
-import { NextResponse } from "next/server";
-import { cookies } from "next/headers";
+import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { generateState, getAuthorizationUrl } from "@/lib/quickbooks/auth";
 import { logger } from "@/lib/utils/logger";
@@ -11,7 +10,7 @@ import { authError, internalError } from "@/lib/utils/errors";
  * Initiates the QBO OAuth2 flow. Generates a CSRF state parameter,
  * stores it in an httpOnly cookie, and redirects to Intuit's authorization page.
  */
-export async function GET() {
+export async function GET(request: NextRequest) {
   const startTime = Date.now();
 
   try {
@@ -23,27 +22,27 @@ export async function GET() {
       return authError("You must be logged in to connect QuickBooks.");
     }
 
-    // Generate CSRF state and store in cookie
+    // Generate CSRF state and store in cookie on the redirect response
     const state = generateState();
+    const authUrl = getAuthorizationUrl(state);
 
-    const cookieStore = cookies();
-    cookieStore.set("qbo_oauth_state", state, {
+    // NextResponse.redirect requires absolute URL
+    const response = NextResponse.redirect(new URL(authUrl));
+
+    response.cookies.set("qbo_oauth_state", state, {
       httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
+      secure: request.nextUrl.protocol === "https:",
       sameSite: "lax",
       maxAge: 600, // 10 minutes — plenty for OAuth flow
       path: "/",
     });
-
-    // Build authorization URL and redirect
-    const authUrl = getAuthorizationUrl(state);
 
     logger.info("qbo.oauth_initiated", {
       userId: user.id,
       durationMs: Date.now() - startTime,
     });
 
-    return NextResponse.redirect(authUrl);
+    return response;
   } catch (error) {
     logger.error("qbo.oauth_initiate_failed", {
       error: error instanceof Error ? error.message : "Unknown error",

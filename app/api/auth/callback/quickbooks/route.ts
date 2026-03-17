@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from "next/server";
-import { cookies } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { exchangeCodeForTokens, storeConnection } from "@/lib/quickbooks/auth";
@@ -43,24 +42,20 @@ export async function GET(request: NextRequest) {
     );
   }
 
-  // CSRF validation: compare state param with cookie
-  const cookieStore = cookies();
-  const savedState = cookieStore.get("qbo_oauth_state")?.value;
+  // CSRF validation: read state from cookie via request
+  const savedState = request.cookies.get("qbo_oauth_state")?.value;
 
   if (!savedState || savedState !== state) {
     logger.error("qbo.oauth_csrf_mismatch", {
       hasSavedState: String(!!savedState),
       stateMatch: String(savedState === state),
     });
-    // Clear the cookie
-    cookieStore.delete("qbo_oauth_state");
-    return NextResponse.redirect(
+    const response = NextResponse.redirect(
       `${baseUrl}/settings?qbo_error=${encodeURIComponent("Connection failed. Please try again.")}`
     );
+    response.cookies.delete("qbo_oauth_state");
+    return response;
   }
-
-  // Clear the state cookie (used once)
-  cookieStore.delete("qbo_oauth_state");
 
   try {
     // Verify user is authenticated
@@ -103,9 +98,12 @@ export async function GET(request: NextRequest) {
       durationMs: Date.now() - startTime,
     });
 
-    return NextResponse.redirect(
+    // Redirect to settings with success, and clear the state cookie
+    const response = NextResponse.redirect(
       `${baseUrl}/settings?qbo_success=${encodeURIComponent("QuickBooks connected successfully!")}`
     );
+    response.cookies.delete("qbo_oauth_state");
+    return response;
   } catch (err) {
     logger.error("qbo.oauth_callback_failed", {
       error: err instanceof Error ? err.message : "Unknown error",
