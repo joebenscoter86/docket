@@ -48,7 +48,7 @@ export async function PATCH(
   const { data: extractedData, error: edError } = await client
     .from("extracted_data")
     .select(
-      "id, invoice_id, vendor_name, vendor_address, invoice_number, invoice_date, due_date, payment_terms, currency, subtotal, tax_amount, total_amount"
+      "id, invoice_id, vendor_name, vendor_address, invoice_number, invoice_date, due_date, payment_terms, currency, subtotal, tax_amount, total_amount, vendor_ref"
     )
     .eq("invoice_id", invoiceId)
     .single();
