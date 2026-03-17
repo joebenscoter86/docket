@@ -1,9 +1,12 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import {
   encodeCursor,
   decodeCursor,
   validateListParams,
+  fetchInvoiceCounts,
+  fetchInvoiceList,
 } from "./queries";
+import { SupabaseClient } from "@supabase/supabase-js";
 
 describe("encodeCursor", () => {
   it("encodes sort value and id into base64 JSON", () => {
@@ -146,5 +149,130 @@ describe("validateListParams", () => {
       const result = validateListParams({ direction });
       expect(result.direction).toBe(direction);
     });
+  });
+});
+
+// Mock Supabase client
+function createMockSupabase(
+  overrides: {
+    countData?: { status: string; count: number }[];
+    countError?: { message: string };
+    listData?: Record<string, unknown>[];
+    listError?: { message: string };
+  } = {}
+) {
+  const mockRpc = vi.fn().mockResolvedValue({
+    data: overrides.countData ?? [
+      { status: "pending_review", count: 3 },
+      { status: "approved", count: 5 },
+      { status: "synced", count: 10 },
+      { status: "error", count: 1 },
+      { status: "uploading", count: 1 },
+    ],
+    error: overrides.countError ?? null,
+  });
+
+  const mockQuery = {
+    select: vi.fn().mockReturnThis(),
+    eq: vi.fn().mockReturnThis(),
+    order: vi.fn().mockReturnThis(),
+    limit: vi.fn().mockReturnThis(),
+    lt: vi.fn().mockReturnThis(),
+    gt: vi.fn().mockReturnThis(),
+    or: vi.fn().mockReturnThis(),
+    is: vi.fn().mockReturnThis(),
+    then: vi.fn(),
+  };
+
+  const listResult = {
+    data: overrides.listData ?? [],
+    error: overrides.listError ?? null,
+  };
+
+  mockQuery.limit.mockImplementation(() => ({
+    ...mockQuery,
+    then: (resolve: (value: typeof listResult) => void) => resolve(listResult),
+  }));
+
+  const mockFrom = vi.fn().mockReturnValue(mockQuery);
+
+  return {
+    client: { from: mockFrom, rpc: mockRpc } as unknown as SupabaseClient,
+    mocks: { from: mockFrom, query: mockQuery, rpc: mockRpc },
+  };
+}
+
+describe("fetchInvoiceCounts", () => {
+  it("returns counts grouped by status with computed all", async () => {
+    const { client } = createMockSupabase();
+    const counts = await fetchInvoiceCounts(client);
+    expect(counts).toEqual({
+      all: 20,
+      pending_review: 3,
+      approved: 5,
+      synced: 10,
+      error: 1,
+    });
+  });
+
+  it("returns zero counts on error", async () => {
+    const { client } = createMockSupabase({ countError: { message: "fail" } });
+    const counts = await fetchInvoiceCounts(client);
+    expect(counts).toEqual({
+      all: 0,
+      pending_review: 0,
+      approved: 0,
+      synced: 0,
+      error: 0,
+    });
+  });
+});
+
+describe("fetchInvoiceList", () => {
+  it("calls from with invoices table and selects joined fields", async () => {
+    const { client, mocks } = createMockSupabase();
+    await fetchInvoiceList(client, {
+      status: "all",
+      sort: "uploaded_at",
+      direction: "desc",
+      limit: 25,
+    });
+    expect(mocks.from).toHaveBeenCalledWith("invoices");
+    expect(mocks.query.select).toHaveBeenCalledWith(
+      expect.stringContaining("extracted_data")
+    );
+  });
+
+  it("applies status filter when not 'all'", async () => {
+    const { client, mocks } = createMockSupabase();
+    await fetchInvoiceList(client, {
+      status: "approved",
+      sort: "uploaded_at",
+      direction: "desc",
+      limit: 25,
+    });
+    expect(mocks.query.eq).toHaveBeenCalledWith("status", "approved");
+  });
+
+  it("does not apply status filter for 'all'", async () => {
+    const { client, mocks } = createMockSupabase();
+    await fetchInvoiceList(client, {
+      status: "all",
+      sort: "uploaded_at",
+      direction: "desc",
+      limit: 25,
+    });
+    expect(mocks.query.eq).not.toHaveBeenCalled();
+  });
+
+  it("fetches limit + 1 rows to detect next page", async () => {
+    const { client, mocks } = createMockSupabase();
+    await fetchInvoiceList(client, {
+      status: "all",
+      sort: "uploaded_at",
+      direction: "desc",
+      limit: 25,
+    });
+    expect(mocks.query.limit).toHaveBeenCalledWith(26);
   });
 });

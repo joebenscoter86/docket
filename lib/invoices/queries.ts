@@ -1,4 +1,7 @@
+import { SupabaseClient } from "@supabase/supabase-js";
 import {
+  InvoiceListItem,
+  InvoiceListCounts,
   InvoiceListParams,
   VALID_STATUSES,
   VALID_SORTS,
@@ -87,4 +90,163 @@ export function validateListParams(params: InvoiceListParams) {
     cursor: params.cursor,
     limit,
   };
+}
+
+// --- Sort column mapping ---
+
+const SORT_COLUMN_MAP: Record<
+  string,
+  { column: string; table: "invoices" | "extracted_data" }
+> = {
+  uploaded_at: { column: "uploaded_at", table: "invoices" },
+  invoice_date: { column: "invoice_date", table: "extracted_data" },
+  vendor_name: { column: "vendor_name", table: "extracted_data" },
+  total_amount: { column: "total_amount", table: "extracted_data" },
+};
+
+// --- Fetch counts ---
+
+export async function fetchInvoiceCounts(
+  supabase: SupabaseClient
+): Promise<InvoiceListCounts> {
+  const { data, error } = await supabase.rpc("invoice_counts_by_status");
+
+  if (error || !data) {
+    return { all: 0, pending_review: 0, approved: 0, synced: 0, error: 0 };
+  }
+
+  const counts: InvoiceListCounts = {
+    all: 0,
+    pending_review: 0,
+    approved: 0,
+    synced: 0,
+    error: 0,
+  };
+  let total = 0;
+
+  for (const row of data as { status: string; count: number }[]) {
+    total += row.count;
+    if (row.status in counts && row.status !== "all") {
+      counts[row.status as keyof Omit<InvoiceListCounts, "all">] = row.count;
+    }
+  }
+
+  counts.all = total;
+  return counts;
+}
+
+// --- Fetch invoice list ---
+
+interface ValidatedParams {
+  status: string;
+  sort: string;
+  direction: string;
+  cursor?: string;
+  limit: number;
+}
+
+export async function fetchInvoiceList(
+  supabase: SupabaseClient,
+  params: ValidatedParams
+): Promise<{ invoices: InvoiceListItem[]; nextCursor: string | null }> {
+  const { status, sort, direction, cursor, limit } = params;
+  const sortConfig = SORT_COLUMN_MAP[sort] ?? SORT_COLUMN_MAP.uploaded_at;
+
+  let query = supabase.from("invoices").select(`
+      id,
+      file_name,
+      status,
+      uploaded_at,
+      extracted_data (
+        vendor_name,
+        invoice_number,
+        invoice_date,
+        total_amount
+      )
+    `);
+
+  // Status filter
+  if (status !== "all") {
+    query = query.eq("status", status);
+  }
+
+  // Cursor pagination — always keyed on (uploaded_at, id) regardless of display sort.
+  const decodedCursor = decodeCursor(cursor);
+  if (decodedCursor) {
+    const { sortValue, id } = decodedCursor;
+    const ascending = direction === "asc";
+
+    if (ascending) {
+      query = query.or(
+        `uploaded_at.gt.${sortValue},and(uploaded_at.eq.${sortValue},id.gt.${id})`
+      );
+    } else {
+      query = query.or(
+        `uploaded_at.lt.${sortValue},and(uploaded_at.eq.${sortValue},id.lt.${id})`
+      );
+    }
+  }
+
+  // Sort order
+  if (sortConfig.table === "invoices") {
+    query = query.order(sortConfig.column, {
+      ascending: direction === "asc",
+    });
+  } else {
+    query = query.order(sortConfig.column, {
+      ascending: direction === "asc",
+      referencedTable: "extracted_data",
+      nullsFirst: direction === "asc",
+    });
+    query = query.order("uploaded_at", { ascending: false });
+  }
+
+  // Always add id as final tiebreaker for stable ordering
+  query = query.order("id", { ascending: direction === "asc" });
+
+  // Fetch limit + 1 to detect next page
+  query = query.limit(limit + 1);
+
+  const { data, error } = await query;
+
+  if (error || !data) {
+    return { invoices: [], nextCursor: null };
+  }
+
+  const hasNextPage = data.length > limit;
+  const rows = hasNextPage ? data.slice(0, limit) : data;
+
+  const invoices: InvoiceListItem[] = rows.map(
+    (row: Record<string, unknown>) => {
+      const extracted = Array.isArray(row.extracted_data)
+        ? (row.extracted_data[0] ?? null)
+        : (row.extracted_data ?? null);
+
+      return {
+        id: row.id as string,
+        file_name: row.file_name as string,
+        status: row.status as InvoiceListItem["status"],
+        uploaded_at: row.uploaded_at as string,
+        extracted_data: extracted
+          ? {
+              vendor_name: (extracted as Record<string, unknown>).vendor_name as string | null,
+              invoice_number: (extracted as Record<string, unknown>).invoice_number as string | null,
+              invoice_date: (extracted as Record<string, unknown>).invoice_date as string | null,
+              total_amount: (extracted as Record<string, unknown>).total_amount as number | null,
+            }
+          : null,
+      };
+    }
+  );
+
+  let nextCursor: string | null = null;
+  if (hasNextPage) {
+    const lastInvoice = rows[rows.length - 1] as Record<string, unknown>;
+    nextCursor = encodeCursor(
+      lastInvoice.uploaded_at as string,
+      lastInvoice.id as string
+    );
+  }
+
+  return { invoices, nextCursor };
 }
