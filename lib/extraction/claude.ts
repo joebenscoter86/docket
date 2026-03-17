@@ -142,6 +142,7 @@ export class ClaudeExtractionProvider implements ExtractionProvider {
 
   constructor() {
     this.client = new Anthropic({
+      apiKey: process.env.ANTHROPIC_API_KEY,
       timeout: TIMEOUT_MS,
       maxRetries: MAX_RETRIES,
     });
