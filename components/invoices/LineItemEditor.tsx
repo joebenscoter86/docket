@@ -9,6 +9,8 @@ import {
 } from "./line-items-reducer";
 import { formatCurrency, parseCurrencyInput } from "@/lib/utils/currency";
 import type { ExtractedLineItemRow } from "@/lib/types/invoice";
+import type { AccountOption } from "@/lib/types/qbo";
+import GlAccountSelect from "./GlAccountSelect";
 
 interface LineItemEditorProps {
   lineItems: ExtractedLineItemRow[];
@@ -16,6 +18,10 @@ interface LineItemEditorProps {
   extractedDataId: string;
   currency: string;
   onSubtotalChange: (newSubtotal: number) => void;
+  accounts: AccountOption[];
+  accountsLoading: boolean;
+  qboConnected: boolean;
+  disabled?: boolean;
 }
 
 const STATUS_BORDER: Record<string, string> = {
@@ -31,6 +37,10 @@ export default function LineItemEditor({
   extractedDataId,
   currency,
   onSubtotalChange,
+  accounts,
+  accountsLoading,
+  qboConnected,
+  disabled = false,
 }: LineItemEditorProps) {
   const [state, dispatch] = useReducer(lineItemsReducer, lineItems, initLineItemsState);
   const savedTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
@@ -209,6 +219,18 @@ export default function LineItemEditor({
     [invoiceId, state.items, onSubtotalChange, calculateSubtotal]
   );
 
+  const handleGlAccountSelect = useCallback(
+    async (itemId: string, accountId: string | null): Promise<boolean> => {
+      dispatch({ type: "SET_ITEM_VALUE", itemId, field: "gl_account_id", value: accountId });
+      const ok = await saveField(itemId, "gl_account_id", accountId);
+      if (ok) {
+        dispatch({ type: "MARK_ITEM_SAVED", itemId, field: "gl_account_id", value: accountId });
+      }
+      return ok;
+    },
+    [saveField]
+  );
+
   const inputBase =
     "w-full border border-gray-200 rounded-md px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500";
 
@@ -243,11 +265,12 @@ export default function LineItemEditor({
       </h3>
 
       {/* Table header */}
-      <div className="grid grid-cols-[1fr_70px_100px_100px_32px] gap-x-2 items-center mb-1">
+      <div className="grid grid-cols-[1fr_70px_100px_100px_140px_32px] gap-x-2 items-center mb-1">
         <span className="text-xs font-medium text-gray-500 uppercase">Description</span>
         <span className="text-xs font-medium text-gray-500 uppercase text-right">Qty</span>
         <span className="text-xs font-medium text-gray-500 uppercase text-right">Unit Price</span>
         <span className="text-xs font-medium text-gray-500 uppercase text-right">Amount</span>
+        <span className="text-xs font-medium text-gray-500 uppercase">GL Account</span>
         <span />
       </div>
 
@@ -256,7 +279,7 @@ export default function LineItemEditor({
         {state.items.map((item) => (
           <div key={item.id}>
           <div
-            className="grid grid-cols-[1fr_70px_100px_100px_32px] gap-x-2 items-center"
+            className="grid grid-cols-[1fr_70px_100px_100px_140px_32px] gap-x-2 items-center"
           >
             {/* Description */}
             <div className={STATUS_BORDER[item.fieldStatus.description ?? "idle"]}>
@@ -363,6 +386,16 @@ export default function LineItemEditor({
                 }}
               />
             </div>
+
+            {/* GL Account */}
+            <GlAccountSelect
+              accounts={accounts}
+              loading={accountsLoading}
+              connected={qboConnected}
+              currentAccountId={item.values.gl_account_id as string | null}
+              onSelect={(accountId) => handleGlAccountSelect(item.id, accountId)}
+              disabled={disabled}
+            />
 
             {/* Remove button */}
             <div className="flex items-center justify-center">

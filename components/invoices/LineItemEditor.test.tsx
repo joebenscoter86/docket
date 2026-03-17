@@ -34,6 +34,9 @@ const defaultProps = {
   extractedDataId: "ed-1",
   currency: "USD",
   onSubtotalChange: vi.fn(),
+  accounts: [],
+  accountsLoading: false,
+  qboConnected: false,
 };
 
 describe("LineItemEditor", () => {
