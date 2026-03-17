@@ -3,7 +3,18 @@
 import { useState } from "react";
 import Link from "next/link";
 import InvoiceStatusBadge from "./InvoiceStatusBadge";
-import PdfViewer from "./PdfViewer";
+import dynamic from "next/dynamic";
+
+const PdfViewer = dynamic(() => import("./PdfViewer"), {
+  ssr: false,
+  loading: () => (
+    <div className="flex h-full items-center justify-center">
+      <div className="text-center animate-pulse">
+        <p className="text-sm text-gray-400">Loading document viewer...</p>
+      </div>
+    </div>
+  ),
+});
 import ExtractionForm from "./ExtractionForm";
 import type { InvoiceStatus, ExtractedDataRow } from "@/lib/types/invoice";
 
