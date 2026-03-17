@@ -13,6 +13,7 @@ export const EDITABLE_FIELDS = new Set([
   "total_amount",
   "currency",
   "payment_terms",
+  "vendor_ref",
 ]);
 
 /**
@@ -127,6 +128,7 @@ export const LINE_ITEM_EDITABLE_FIELDS = new Set([
   "quantity",
   "unit_price",
   "amount",
+  "gl_account_id",
 ]);
 
 export async function createLineItem(extractedDataId: string) {
