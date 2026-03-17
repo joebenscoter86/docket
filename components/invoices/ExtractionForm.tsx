@@ -71,6 +71,11 @@ export default function ExtractionForm({
     extractedData.vendor_ref ?? null
   );
 
+  // Track how many line items are missing a GL account (initialized from server data, updated via callback)
+  const [lineItemsMissingGl, setLineItemsMissingGl] = useState(() =>
+    (extractedData.extracted_line_items ?? []).filter((li) => !li.gl_account_id).length
+  );
+
   const handleVendorSelect = useCallback(
     async (vendorRefValue: string | null): Promise<boolean> => {
       try {
@@ -241,11 +246,8 @@ export default function ExtractionForm({
   // Compute sync blockers for SyncBar
   const syncBlockers: string[] = [];
   if (!vendorRef) syncBlockers.push("Select a QuickBooks vendor");
-  const lineItemsMissingAccount = (extractedData.extracted_line_items ?? []).filter(
-    (li) => !li.gl_account_id
-  );
-  if (lineItemsMissingAccount.length > 0) {
-    syncBlockers.push(`${lineItemsMissingAccount.length} line item(s) need a GL account`);
+  if (lineItemsMissingGl > 0) {
+    syncBlockers.push(`${lineItemsMissingGl} line item(s) need a GL account`);
   }
 
   function renderField(field: FormField) {
@@ -427,6 +429,7 @@ export default function ExtractionForm({
         extractedDataId={extractedData.id}
         currency={currency}
         onSubtotalChange={handleSubtotalChange}
+        onMissingGlCountChange={setLineItemsMissingGl}
         accounts={qboOptions.accounts}
         accountsLoading={qboOptions.loading}
         qboConnected={qboOptions.connected}

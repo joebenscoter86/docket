@@ -18,6 +18,7 @@ interface LineItemEditorProps {
   extractedDataId: string;
   currency: string;
   onSubtotalChange: (newSubtotal: number) => void;
+  onMissingGlCountChange?: (count: number) => void;
   accounts: AccountOption[];
   accountsLoading: boolean;
   qboConnected: boolean;
@@ -37,6 +38,7 @@ export default function LineItemEditor({
   extractedDataId,
   currency,
   onSubtotalChange,
+  onMissingGlCountChange,
   accounts,
   accountsLoading,
   qboConnected,
@@ -187,6 +189,12 @@ export default function LineItemEditor({
         item: { id: data.id, sortOrder: data.sort_order },
       });
 
+      // New items have no GL account — increment missing count
+      if (onMissingGlCountChange) {
+        const currentMissing = state.items.filter((i) => !i.values.gl_account_id).length;
+        onMissingGlCountChange(currentMissing + 1);
+      }
+
       // Focus the new row's description input after render
       setTimeout(() => {
         descriptionRefs.current[data.id]?.focus();
@@ -208,6 +216,11 @@ export default function LineItemEditor({
       const remaining = state.items.filter((i) => i.id !== itemId);
       onSubtotalChange(calculateSubtotal(remaining));
 
+      // Update missing GL count after removal
+      if (onMissingGlCountChange) {
+        onMissingGlCountChange(remaining.filter((i) => !i.values.gl_account_id).length);
+      }
+
       try {
         await fetch(`/api/invoices/${invoiceId}/line-items/${itemId}`, {
           method: "DELETE",
@@ -225,10 +238,18 @@ export default function LineItemEditor({
       const ok = await saveField(itemId, "gl_account_id", accountId);
       if (ok) {
         dispatch({ type: "MARK_ITEM_SAVED", itemId, field: "gl_account_id", value: accountId });
+        // Notify parent of updated missing GL count so sync blockers stay in sync
+        if (onMissingGlCountChange) {
+          const missingCount = state.items.filter((item) => {
+            const glVal = item.id === itemId ? accountId : item.values.gl_account_id;
+            return !glVal;
+          }).length;
+          onMissingGlCountChange(missingCount);
+        }
       }
       return ok;
     },
-    [saveField]
+    [saveField, state.items, onMissingGlCountChange]
   );
 
   const inputBase =
