@@ -21,6 +21,7 @@ export interface ExtractedDataRow {
   invoice_id: string;
   vendor_name: string | null;
   vendor_address: string | null;
+  vendor_ref: string | null;
   invoice_number: string | null;
   invoice_date: string | null;
   due_date: string | null;
