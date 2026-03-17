@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import type { VendorOption, AccountOption } from "@/lib/types/qbo";
 
 interface QboOptionsState {
@@ -11,7 +11,7 @@ interface QboOptionsState {
   error: string | null;
 }
 
-export function useQboOptions(): QboOptionsState {
+export function useQboOptions(): QboOptionsState & { addVendor: (vendor: VendorOption) => void } {
   const [state, setState] = useState<QboOptionsState>({
     vendors: [],
     accounts: [],
@@ -80,5 +80,12 @@ export function useQboOptions(): QboOptionsState {
     };
   }, []);
 
-  return state;
+  const addVendor = useCallback((vendor: VendorOption) => {
+    setState((prev) => ({
+      ...prev,
+      vendors: [...prev.vendors, vendor].sort((a, b) => a.label.localeCompare(b.label)),
+    }));
+  }, []);
+
+  return { ...state, addVendor };
 }
