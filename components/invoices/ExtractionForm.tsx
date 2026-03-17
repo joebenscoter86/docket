@@ -406,6 +406,8 @@ export default function ExtractionForm({
             vendorName={state.values.vendor_name as string | null}
             onSelect={handleVendorSelect}
             disabled={currentStatus === "synced"}
+            vendorAddress={state.values.vendor_address as string | null}
+            onVendorCreated={qboOptions.addVendor}
           />
           {renderField("vendor_address")}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
