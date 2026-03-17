@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useRef, useCallback, useEffect } from "react";
-import { useRouter } from "next/navigation";
 
 type ApproveBarState = "idle" | "confirming" | "submitting" | "approved";
 
@@ -16,7 +15,6 @@ export default function ApproveBar({
   vendorName,
   totalAmount,
 }: ApproveBarProps) {
-  const router = useRouter();
   const [barState, setBarState] = useState<ApproveBarState>("idle");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const confirmTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -77,9 +75,9 @@ export default function ApproveBar({
         }
 
         setBarState("approved");
-        // Redirect after showing success
+        // Hard navigate after showing success — router.push uses stale client cache
         redirectTimer.current = setTimeout(() => {
-          router.push("/invoices");
+          window.location.href = "/invoices";
         }, 2000);
       } catch (err) {
         setBarState("idle");
@@ -91,7 +89,7 @@ export default function ApproveBar({
         }, 5000);
       }
     }
-  }, [barState, invoiceId, router]);
+  }, [barState, invoiceId]);
 
   // Button config by state
   const buttonConfig = {
