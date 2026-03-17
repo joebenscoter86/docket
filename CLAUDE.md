@@ -170,6 +170,7 @@ docket/
 │   ├── extraction/
 │   │   ├── provider.ts                     # Provider-agnostic interface
 │   │   ├── claude.ts                       # Claude Vision implementation
+│   │   ├── run.ts                          # Extraction orchestration (shared)
 │   │   └── types.ts                        # ExtractedInvoice type
 │   ├── quickbooks/
 │   │   ├── auth.ts                         # OAuth2 helpers (token refresh, etc.)
@@ -604,11 +605,20 @@ All four checks must pass before a PR can be merged. No exceptions.
 *(This section grows with every session. Every time you learn something the hard way, add it here.)*
 
 **QuickBooks Online:**
-- OAuth access tokens expire in 1 hour. Refresh tokens last 100 days. Always auto-refresh before expiry.
+- OAuth access tokens expire in 1 hour. Refresh tokens last ~101 days (8726400s). Always auto-refresh before expiry.
 - Creating bills (POST) is free/unlimited. Reading data (GET) is metered under the App Partner Program.
 - Builder tier: 500K CorePlus credits/month. Enough for ~100 active users.
-- VendorRef and AccountRef require the QBO internal ID (`value`), not the display name.
-- Attaching a PDF to a bill is a separate API call via the Attachable endpoint, after bill creation.
+- VendorRef and AccountRef require the QBO internal ID (`value`), not the display name. Only send `{ value }` on write; QBO fills in `name` in the response.
+- Attaching a PDF to a bill is a separate API call via the `/upload` endpoint (multipart form-data), after bill creation. Parts: `file_metadata_0` (JSON) + `file_content_0` (binary).
+- Bill creation returns status 200 (not 201). Don't check for 201.
+- All QBO IDs are strings, even though they look numeric. Always type as `string`.
+- Error response casing is INCONSISTENT: auth errors (401) use lowercase `fault.error`, validation errors (400) use uppercase `Fault.Error`. Error parser must handle both.
+- Validation errors include `element` field naming the offending field — map back to UI fields.
+- `SyncToken` is required for updates (PUT) but not creates (POST). Must read before updating.
+- Sandbox base URL: `https://sandbox-quickbooks.api.intuit.com/v3/company/{companyId}`
+- Production base URL: `https://quickbooks.api.intuit.com/v3/company/{companyId}`
+- Use `DisplayName` for vendor display (most reliable). `CompanyName` is optional on some vendors.
+- For GL account dropdowns, filter `AccountType = 'Expense'`. Use `FullyQualifiedName` for display when `SubAccount: true`.
 
 **Xero (Phase 2, document findings from FND-10 here):**
 - Bills are created via PUT (not POST) to the Invoices endpoint with Type "ACCPAY"
@@ -627,6 +637,13 @@ All four checks must pass before a PR can be merged. No exceptions.
 **Vercel:**
 - Preview deploys on PR, production on push to `main`.
 - "Add Domain" with the redirect checkbox adds both apex + www in one step.
+- Env vars must be set in Vercel Dashboard (Settings → Environment Variables). They are NOT auto-synced from `.env.local`.
+- New env vars require a **new deployment** to take effect — existing preview deploys won't pick them up. Push a new commit or hit "Redeploy" in the dashboard.
+- **Env var environment strategy:** Most vars (Supabase, Anthropic, Encryption) can use "All Environments" during dev since they're all sandbox/dev credentials. Exceptions:
+  - `QBO_ENVIRONMENT`: set per-environment (`sandbox` for Preview, `production` for Production)
+  - `QBO_REDIRECT_URI`: different per environment (preview URL vs production URL)
+  - Stripe keys: different per environment (`sk_test_*` for Preview, `sk_live_*` for Production)
+  - When going to production, swap all credentials to production-grade values per-environment.
 
 **DNS:**
 - Always copy-paste verification codes. Characters like uppercase I, lowercase l, and 1 are visually ambiguous.
@@ -636,6 +653,7 @@ All four checks must pass before a PR can be merged. No exceptions.
 - Resend has a direct GoDaddy integration for auto-configuring DNS records.
 - Fire-and-forget for non-critical operations: email failures must never fail the parent operation.
 - Zsh glob quoting: paths with parentheses like `app/(tabs)/advisor.tsx` must be quoted in shell commands.
+- **Invoice list uses server-side rendering with URL-based state (Approach A).** If users report sluggish filter/sort interactions (200ms+ delay), or invoice volume exceeds ~500/org, upgrade to hybrid approach (server initial load, client-side for subsequent filter/sort/pagination). The API route stays the same — just wrap the table in a client component that fetches directly. A few hours of work.
 
 ---
 
@@ -698,6 +716,8 @@ Run these before declaring any issue done:
 
 | Date | Decision | Rationale | Issue |
 |------|----------|-----------|-------|
+| 2026-03-15 | Provider interface uses `fileBuffer + mimeType` instead of `fileUrl` | Decouples provider from Supabase Storage — future providers (Google Doc AI) won't need signed URLs. Orchestration layer handles file fetching. | DOC-14 |
+| 2026-03-15 | Added `lib/extraction/run.ts` orchestration layer | Separates DB writes and status management from both the API route and the provider. Single shared function for upload auto-trigger and manual retry. | DOC-14 |
 | 2026-03-15 | org_memberships join table instead of owner_id-only RLS | Prevents full RLS rewrite in Phase 3 (team accounts). Supports bookkeepers managing multiple businesses. 30 min extra in foundation. | Plan Review |
 | 2026-03-15 | AES-256-GCM for token encryption, key rotation deferred to Phase 2 | Industry standard. Random IV per encryption prevents pattern analysis. Single key is fine for <10 users. | Plan Review |
 | 2026-03-15 | Vitest + MSW for testing, Playwright deferred to Phase 2 | Vitest is fastest for Next.js. MSW mocks external APIs cleanly. E2E adds too much CI time for MVP. | Plan Review |
@@ -712,6 +732,7 @@ Run these before declaring any issue done:
 | 2026-03-15 | Claude Vision API as primary extractor, provider-agnostic interface | Best accuracy for invoice extraction. Abstraction allows swapping to Google Doc AI or future providers without rewrite. | Architecture |
 | 2026-03-15 | Per-phase Linear prefixes (FND, EXT, REV, QBO, BIL) | Phases have distinct domains. Prefix makes branch names and commits immediately identifiable by domain. | Scaffold |
 | 2026-03-15 | First 10 customers free (design partners, not revenue) | Need real invoice data and real feedback before optimizing for revenue. Capped at 100 invoices/month. | Business |
+| 2026-03-16 | Invoice list: server-side rendering with URL state (Approach A) | Simplest pattern, bookmarkable URLs, fast at MVP scale. Upgrade to hybrid (server initial + client subsequent) when filter latency >200ms or invoice volume >500/org. | DOC-25 |
 | 2026-03-15 | Single pricing tier for MVP ($99/mo Growth) | One price, one plan, zero decision paralysis for early users. Tiered pricing comes with Phase 2+. | Business |
 
 ---
@@ -763,11 +784,23 @@ NEXT_PUBLIC_SENTRY_DSN=
 
 *(Populated after FND-9, FND-10, FND-11. Paste key findings from scripts/sandbox/sandbox-notes.md here so every session has them.)*
 
-### QBO Sandbox (FND-9)
-TBD
+### QBO Sandbox (FND-9) — Validated 2026-03-15
+- All 5 API operations confirmed working: query vendors, query accounts, create bill, attach PDF, error handling
+- Full findings in `scripts/sandbox/sandbox-notes.md`
+- Key surprise: error response casing inconsistent between auth (lowercase) and validation (uppercase) errors
+- Key surprise: bill creation returns 200, not 201
+- Key surprise: all IDs are strings, not numbers
+- Attachment is a two-step process (create bill, then upload attachment separately)
+- Multipart upload uses `file_metadata_0` + `file_content_0` part names
 
 ### Xero Sandbox (FND-10)
-TBD
+Deferred to Phase 2. Xero requires a paid org for API testing. Key differences documented from docs review.
 
-### AI Extraction (FND-11)
-TBD
+### AI Extraction (FND-11) — Validated 2026-03-15
+- Claude Sonnet via document type (base64 PDF) — 100% accuracy on 5 synthetic invoices
+- Cost: ~$0.011/invoice (~$1.11/month at 100 invoices). Negligible.
+- Response time: ~3.8 seconds average. Acceptable for synchronous UX with loading spinner.
+- Prompt returns structured JSON: vendor, dates, line items, totals, confidence score
+- Dates in ISO YYYY-MM-DD, numbers without currency symbols, null for missing fields
+- Real invoices (scans, messy layouts) will be lower accuracy — target 80%+ on typed invoices
+- Full prompt text and results in `scripts/sandbox/fixtures/extraction-results.json`

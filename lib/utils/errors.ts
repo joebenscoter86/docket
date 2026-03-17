@@ -6,6 +6,7 @@ export type ErrorCode =
   | "NOT_FOUND"
   | "CONFLICT"
   | "RATE_LIMITED"
+  | "UNPROCESSABLE"
   | "INTERNAL_ERROR"
   | "NOT_IMPLEMENTED";
 
@@ -31,6 +32,10 @@ export function authError(message = "Unauthorized") {
   return apiError({ error: message, code: "AUTH_ERROR", status: 401 });
 }
 
+export function forbiddenError(message = "Forbidden") {
+  return apiError({ error: message, code: "AUTH_ERROR", status: 403 });
+}
+
 export function notFound(message = "Resource not found") {
   return apiError({ error: message, code: "NOT_FOUND", status: 404 });
 }
@@ -43,6 +48,14 @@ export function rateLimited(message = "Too many requests") {
   return apiError({ error: message, code: "RATE_LIMITED", status: 429 });
 }
 
+export function unprocessableEntity(message: string) {
+  return apiError({ error: message, code: "UNPROCESSABLE", status: 422 });
+}
+
 export function internalError(message = "Internal server error") {
   return apiError({ error: message, code: "INTERNAL_ERROR", status: 500 });
+}
+
+export function apiSuccess<T>(data: T) {
+  return NextResponse.json({ data });
 }

@@ -31,6 +31,7 @@ yarn-error.log*
 
 # claude code
 .claude/
+.superpowers/
 
 # embedded repos
 /nocode-to-nextjs
@@ -41,3 +42,9 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+.gstack/
+
+# sandbox test artifacts
+scripts/sandbox/test-invoice.pdf
+scripts/sandbox/fixtures/*.pdf
+scripts/sandbox/fixtures/extraction-results.json
