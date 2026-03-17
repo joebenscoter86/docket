@@ -11,6 +11,8 @@ interface SyncBarProps {
   isRetry?: boolean;
   /** Called after successful sync to refresh parent state */
   onSyncComplete?: () => void;
+  /** List of reasons sync cannot proceed (e.g., missing vendor, missing GL accounts) */
+  syncBlockers?: string[];
 }
 
 export default function SyncBar({
@@ -18,6 +20,7 @@ export default function SyncBar({
   invoiceStatus,
   isRetry = false,
   onSyncComplete,
+  syncBlockers = [],
 }: SyncBarProps) {
   const [barState, setBarState] = useState<SyncBarState>("idle");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -33,8 +36,8 @@ export default function SyncBar({
     };
   }, []);
 
-  // Only show for approved invoices
-  const canSync = invoiceStatus === "approved";
+  // Only allow sync for approved invoices with no blockers
+  const canSync = invoiceStatus === "approved" && syncBlockers.length === 0;
 
   const handleSync = useCallback(async () => {
     if (!canSync) return;
@@ -103,14 +106,16 @@ export default function SyncBar({
     );
   }
 
-  if (!canSync) return null;
+  if (invoiceStatus !== "approved") return null;
 
   // Button config by state
   const buttonConfig: Record<SyncBarState, { label: string; className: string; disabled: boolean }> = {
     idle: {
       label: isRetry ? "Retry Sync to QuickBooks" : "Sync to QuickBooks",
-      className: "bg-blue-600 text-white hover:bg-blue-700",
-      disabled: false,
+      className: syncBlockers.length > 0
+        ? "bg-gray-300 text-gray-500 cursor-not-allowed"
+        : "bg-blue-600 text-white hover:bg-blue-700",
+      disabled: syncBlockers.length > 0,
     },
     confirming: {
       label: isRetry ? "Confirm Retry" : "Confirm Sync",
@@ -129,8 +134,10 @@ export default function SyncBar({
     },
     failed: {
       label: "Retry Sync",
-      className: "bg-red-600 text-white hover:bg-red-700",
-      disabled: false,
+      className: syncBlockers.length > 0
+        ? "bg-gray-300 text-gray-500 cursor-not-allowed"
+        : "bg-red-600 text-white hover:bg-red-700",
+      disabled: syncBlockers.length > 0,
     },
   };
 
@@ -138,6 +145,19 @@ export default function SyncBar({
 
   return (
     <div className="bg-white px-6 py-4 space-y-2">
+      {syncBlockers.length > 0 && (
+        <div className="flex items-start gap-2 bg-amber-50 border border-amber-200 rounded-md p-2.5">
+          <svg className="h-4 w-4 text-amber-500 shrink-0 mt-0.5" viewBox="0 0 20 20" fill="currentColor">
+            <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+          </svg>
+          <div className="text-xs text-amber-800">
+            <p className="font-medium mb-1">Before syncing:</p>
+            <ul className="list-disc list-inside space-y-0.5">
+              {syncBlockers.map((b, i) => <li key={i}>{b}</li>)}
+            </ul>
+          </div>
+        </div>
+      )}
       <div className="flex items-center justify-between gap-4">
         {/* Left side: status message */}
         <div className="text-sm flex items-center gap-2 min-w-0">
