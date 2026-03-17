@@ -653,6 +653,7 @@ All four checks must pass before a PR can be merged. No exceptions.
 - Resend has a direct GoDaddy integration for auto-configuring DNS records.
 - Fire-and-forget for non-critical operations: email failures must never fail the parent operation.
 - Zsh glob quoting: paths with parentheses like `app/(tabs)/advisor.tsx` must be quoted in shell commands.
+- **Invoice list uses server-side rendering with URL-based state (Approach A).** If users report sluggish filter/sort interactions (200ms+ delay), or invoice volume exceeds ~500/org, upgrade to hybrid approach (server initial load, client-side for subsequent filter/sort/pagination). The API route stays the same — just wrap the table in a client component that fetches directly. A few hours of work.
 
 ---
 
@@ -731,6 +732,7 @@ Run these before declaring any issue done:
 | 2026-03-15 | Claude Vision API as primary extractor, provider-agnostic interface | Best accuracy for invoice extraction. Abstraction allows swapping to Google Doc AI or future providers without rewrite. | Architecture |
 | 2026-03-15 | Per-phase Linear prefixes (FND, EXT, REV, QBO, BIL) | Phases have distinct domains. Prefix makes branch names and commits immediately identifiable by domain. | Scaffold |
 | 2026-03-15 | First 10 customers free (design partners, not revenue) | Need real invoice data and real feedback before optimizing for revenue. Capped at 100 invoices/month. | Business |
+| 2026-03-16 | Invoice list: server-side rendering with URL state (Approach A) | Simplest pattern, bookmarkable URLs, fast at MVP scale. Upgrade to hybrid (server initial + client subsequent) when filter latency >200ms or invoice volume >500/org. | DOC-25 |
 | 2026-03-15 | Single pricing tier for MVP ($99/mo Growth) | One price, one plan, zero decision paralysis for early users. Tiered pricing comes with Phase 2+. | Business |
 
 ---
