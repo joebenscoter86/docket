@@ -35,6 +35,12 @@ export default async function InvoicesPage({ searchParams }: InvoicesPageProps) 
     fetchInvoiceCounts(supabase),
   ]);
 
+  // If the RPC for counts failed but we actually have invoices,
+  // ensure counts.all reflects reality so the empty state doesn't hide data.
+  if (counts.all === 0 && listResult.invoices.length > 0) {
+    counts.all = listResult.invoices.length;
+  }
+
   return (
     <div className="p-6">
       <div className="flex items-center justify-between mb-6">
