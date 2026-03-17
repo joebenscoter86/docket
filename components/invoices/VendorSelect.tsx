@@ -12,6 +12,8 @@ interface VendorSelectProps {
   vendorName: string | null;
   onSelect: (vendorRef: string | null) => Promise<boolean>;
   disabled?: boolean;
+  vendorAddress?: string | null;
+  onVendorCreated?: (vendor: VendorOption) => void;
 }
 
 export default function VendorSelect({
@@ -23,6 +25,8 @@ export default function VendorSelect({
   vendorName,
   onSelect,
   disabled = false,
+  vendorAddress = null,
+  onVendorCreated,
 }: VendorSelectProps) {
   const [search, setSearch] = useState("");
   const [isOpen, setIsOpen] = useState(false);
@@ -33,6 +37,9 @@ export default function VendorSelect({
   const inputRef = useRef<HTMLInputElement>(null);
   const savedTimer = useRef<ReturnType<typeof setTimeout>>();
   const autoMatchedRef = useRef(false);
+  const [creating, setCreating] = useState(false);
+  const [createError, setCreateError] = useState<string | null>(null);
+  const createErrorTimer = useRef<ReturnType<typeof setTimeout>>();
 
   // Auto-match on first load: if no vendor_ref but vendor_name matches a QBO vendor
   useEffect(() => {
@@ -112,6 +119,50 @@ export default function VendorSelect({
       savedTimer.current = setTimeout(() => setSaveStatus("idle"), 2000);
     }
   }, [onSelect]);
+
+  const handleCreateVendor = useCallback(async () => {
+    if (!vendorName || creating) return;
+
+    setCreating(true);
+    setCreateError(null);
+
+    try {
+      const res = await fetch("/api/quickbooks/vendors", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          displayName: vendorName.trim(),
+          address: vendorAddress,
+        }),
+      });
+
+      const json = await res.json();
+
+      if (!res.ok) {
+        setCreateError(json.error ?? "Failed to create vendor.");
+        if (createErrorTimer.current) clearTimeout(createErrorTimer.current);
+        createErrorTimer.current = setTimeout(() => setCreateError(null), 10000);
+        setCreating(false);
+        return;
+      }
+
+      const newVendor: VendorOption = json.data;
+
+      // Notify parent to add to vendor list
+      onVendorCreated?.(newVendor);
+
+      // Auto-select the new vendor
+      setCreating(false);
+      setIsOpen(false);
+      setSearch("");
+      await handleSelect(newVendor.value);
+    } catch {
+      setCreateError("Failed to create vendor. Please try again.");
+      if (createErrorTimer.current) clearTimeout(createErrorTimer.current);
+      createErrorTimer.current = setTimeout(() => setCreateError(null), 10000);
+      setCreating(false);
+    }
+  }, [vendorName, vendorAddress, creating, onVendorCreated, handleSelect]);
 
   // Not connected state
   if (!connected && !loading) {
@@ -196,11 +247,17 @@ export default function VendorSelect({
             ref={inputRef}
             type="text"
             className="w-full border border-gray-200 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-            placeholder={vendors.length === 0 ? "No vendors found in QuickBooks" : "Search vendors..."}
+            placeholder={
+              vendors.length === 0 && connected
+                ? "Type to search or create a vendor..."
+                : vendors.length === 0
+                  ? "No vendors found in QuickBooks"
+                  : "Search vendors..."
+            }
             value={search}
             onChange={(e) => { setSearch(e.target.value); setIsOpen(true); }}
             onFocus={() => setIsOpen(true)}
-            disabled={disabled || vendors.length === 0}
+            disabled={disabled || (vendors.length === 0 && !connected)}
           />
         )}
 
@@ -219,9 +276,36 @@ export default function VendorSelect({
           </ul>
         )}
 
-        {isOpen && search && filtered.length === 0 && (
-          <div className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-md shadow-lg px-3 py-2 text-sm text-gray-400">
-            No vendors match &quot;{search}&quot;
+        {isOpen && filtered.length === 0 && (
+          <div className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-md shadow-lg px-3 py-2">
+            {search && (
+              <p className="text-sm text-gray-400">
+                No vendors match &quot;{search}&quot;
+              </p>
+            )}
+            {vendorName && connected && (
+              <button
+                type="button"
+                onClick={handleCreateVendor}
+                disabled={creating}
+                className="mt-1 w-full text-left text-sm text-blue-600 hover:text-blue-700 font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 py-1"
+              >
+                {creating ? (
+                  <>
+                    <svg className="h-3.5 w-3.5 animate-spin" viewBox="0 0 24 24" fill="none">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                    </svg>
+                    Creating...
+                  </>
+                ) : (
+                  <>+ Create &quot;{vendorName.trim()}&quot; in QuickBooks</>
+                )}
+              </button>
+            )}
+            {createError && (
+              <p className="mt-1 text-xs text-red-600">{createError}</p>
+            )}
           </div>
         )}
       </div>
