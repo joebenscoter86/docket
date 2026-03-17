@@ -32,8 +32,7 @@ export async function GET(request: NextRequest) {
       fetchInvoiceCounts(supabase),
     ]);
 
-    logger.info({
-      action: "list_invoices",
+    logger.info("list_invoices", {
       userId: user.id,
       status: "success",
       durationMs: Date.now() - startTime,
@@ -45,8 +44,7 @@ export async function GET(request: NextRequest) {
       counts,
     });
   } catch (err) {
-    logger.error({
-      action: "list_invoices",
+    logger.error("list_invoices", {
       status: "error",
       error: err instanceof Error ? err.message : "Unknown error",
       durationMs: Date.now() - startTime,
