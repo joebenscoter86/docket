@@ -180,6 +180,90 @@ export async function getVendorOptions(
     .sort((a, b) => a.label.localeCompare(b.label));
 }
 
+/**
+ * Parse an address string into QBO BillAddr fields.
+ * Expects "street, city, state zip" format.
+ * Falls back to Line1-only if unparseable.
+ */
+export function parseAddress(
+  address: string | null | undefined
+): { Line1: string; City?: string; CountrySubDivisionCode?: string; PostalCode?: string } | undefined {
+  if (!address || !address.trim()) return undefined;
+
+  const parts = address.split(",").map((p) => p.trim());
+
+  if (parts.length < 3) {
+    return { Line1: address.trim() };
+  }
+
+  const line1 = parts[0];
+  const city = parts[1];
+  // Last part should be "ST 12345" or just state
+  const stateZipPart = parts.slice(2).join(",").trim();
+  const stateZipMatch = stateZipPart.match(/^([A-Za-z]{2})\s+(\d{5}(?:-\d{4})?)$/);
+
+  if (stateZipMatch) {
+    return {
+      Line1: line1,
+      City: city,
+      CountrySubDivisionCode: stateZipMatch[1].toUpperCase(),
+      PostalCode: stateZipMatch[2],
+    };
+  }
+
+  // Couldn't parse state/zip — fall back to Line1 only
+  return { Line1: address.trim() };
+}
+
+interface QBOVendorCreateResponse {
+  Vendor: QBOVendor;
+  time: string;
+}
+
+/**
+ * Create a new vendor in QBO.
+ * Returns the new vendor formatted as a VendorOption.
+ */
+export async function createVendor(
+  supabase: ReturnType<typeof import("@/lib/supabase/admin").createAdminClient>,
+  orgId: string,
+  displayName: string,
+  address?: string | null
+): Promise<VendorOption> {
+  const startTime = Date.now();
+
+  const body: Record<string, unknown> = {
+    DisplayName: displayName,
+  };
+
+  const billAddr = parseAddress(address);
+  if (billAddr) {
+    body.BillAddr = billAddr;
+  }
+
+  const response = await qboFetch<QBOVendorCreateResponse>(
+    supabase,
+    orgId,
+    "/vendor",
+    {
+      method: "POST",
+      body,
+    }
+  );
+
+  logger.info("qbo.vendor_created", {
+    orgId,
+    vendorId: response.Vendor.Id,
+    displayName: response.Vendor.DisplayName,
+    durationMs: Date.now() - startTime,
+  });
+
+  return {
+    value: response.Vendor.Id,
+    label: response.Vendor.DisplayName,
+  };
+}
+
 // ─── Account Operations ───
 
 /**
