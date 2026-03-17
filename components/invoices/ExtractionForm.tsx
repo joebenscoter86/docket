@@ -14,6 +14,8 @@ import LineItemEditor from "./LineItemEditor";
 import ApproveBar from "./ApproveBar";
 import SyncBar from "./SyncBar";
 import SyncStatusPanel from "./SyncStatusPanel";
+import { useQboOptions } from "./hooks/useQboOptions";
+import VendorSelect from "./VendorSelect";
 
 interface ExtractionFormProps {
   extractedData: ExtractedDataRow;
@@ -63,6 +65,29 @@ export default function ExtractionForm({
   const [syncKey, setSyncKey] = useState(0);
   const [currentStatus, setCurrentStatus] = useState(invoiceStatus);
   const confidenceScore = extractedData.confidence_score;
+
+  const qboOptions = useQboOptions();
+  const [vendorRef, setVendorRef] = useState<string | null>(
+    extractedData.vendor_ref ?? null
+  );
+
+  const handleVendorSelect = useCallback(
+    async (vendorRefValue: string | null): Promise<boolean> => {
+      try {
+        const res = await fetch(`/api/invoices/${invoiceId}/extracted-data`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ field: "vendor_ref", value: vendorRefValue }),
+        });
+        if (!res.ok) return false;
+        setVendorRef(vendorRefValue);
+        return true;
+      } catch {
+        return false;
+      }
+    },
+    [invoiceId]
+  );
 
   const handleSyncComplete = useCallback(() => {
     setSyncKey((k) => k + 1);
@@ -213,6 +238,16 @@ export default function ExtractionForm({
 
   const currency = (state.values.currency as string) ?? "USD";
 
+  // Compute sync blockers for SyncBar
+  const syncBlockers: string[] = [];
+  if (!vendorRef) syncBlockers.push("Select a QuickBooks vendor");
+  const lineItemsMissingAccount = (extractedData.extracted_line_items ?? []).filter(
+    (li) => !li.gl_account_id
+  );
+  if (lineItemsMissingAccount.length > 0) {
+    syncBlockers.push(`${lineItemsMissingAccount.length} line item(s) need a GL account`);
+  }
+
   function renderField(field: FormField) {
     const config = FIELD_CONFIG[field];
     const value = state.values[field];
@@ -360,6 +395,16 @@ export default function ExtractionForm({
         </h3>
         <div className="space-y-4">
           {renderField("vendor_name")}
+          <VendorSelect
+            vendors={qboOptions.vendors}
+            loading={qboOptions.loading}
+            connected={qboOptions.connected}
+            error={qboOptions.error}
+            currentVendorRef={vendorRef}
+            vendorName={state.values.vendor_name as string | null}
+            onSelect={handleVendorSelect}
+            disabled={currentStatus === "synced"}
+          />
           {renderField("vendor_address")}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {renderField("invoice_number")}
@@ -382,6 +427,10 @@ export default function ExtractionForm({
         extractedDataId={extractedData.id}
         currency={currency}
         onSubtotalChange={handleSubtotalChange}
+        accounts={qboOptions.accounts}
+        accountsLoading={qboOptions.loading}
+        qboConnected={qboOptions.connected}
+        disabled={currentStatus === "synced"}
       />
 
       <div className="border-t border-gray-200" />
@@ -421,6 +470,7 @@ export default function ExtractionForm({
             invoiceStatus={currentStatus}
             isRetry={!!initialErrorMessage?.startsWith("Sync failed")}
             onSyncComplete={handleSyncComplete}
+            syncBlockers={syncBlockers}
           />
         </>
       )}

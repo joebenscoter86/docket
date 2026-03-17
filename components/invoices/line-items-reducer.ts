@@ -7,6 +7,7 @@ export interface LineItemValues {
   quantity: number | null;
   unit_price: number | null;
   amount: number | null;
+  gl_account_id: string | null;
 }
 
 export interface LineItemState {
@@ -24,7 +25,7 @@ export interface LineItemsState {
   items: LineItemState[];
 }
 
-const LINE_ITEM_FIELDS = ["description", "quantity", "unit_price", "amount"] as const;
+const LINE_ITEM_FIELDS = ["description", "quantity", "unit_price", "amount", "gl_account_id"] as const;
 export type LineItemField = (typeof LINE_ITEM_FIELDS)[number];
 
 // --- Init ---
@@ -35,6 +36,7 @@ function extractValues(item: ExtractedLineItemRow): LineItemValues {
     quantity: item.quantity,
     unit_price: item.unit_price,
     amount: item.amount,
+    gl_account_id: item.gl_account_id,
   };
 }
 
@@ -127,6 +129,7 @@ export function lineItemsReducer(
         quantity: null,
         unit_price: null,
         amount: null,
+        gl_account_id: null,
       };
       const newItem: LineItemState = {
         id: action.item.id,

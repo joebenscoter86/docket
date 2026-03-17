@@ -37,6 +37,7 @@ const defaultProps = {
     invoice_id: "inv-1",
     vendor_name: "Acme Corp",
     vendor_address: null,
+    vendor_ref: null,
     invoice_number: "INV-001",
     invoice_date: "2024-01-15",
     due_date: null,

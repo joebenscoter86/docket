@@ -19,6 +19,7 @@ function makeExtractedData(
     invoice_id: "inv-1",
     vendor_name: "Acme Corp",
     vendor_address: "123 Main St",
+    vendor_ref: null,
     invoice_number: "INV-001",
     invoice_date: "2026-01-15",
     due_date: "2026-02-15",
