@@ -10,6 +10,13 @@
 
 **Spec:** `docs/superpowers/specs/2026-03-16-doc-25-invoice-list-design.md`
 
+**Pre-existing dependencies (from prior issues):**
+- `lib/utils/currency.ts` — `formatCurrency()`, `parseCurrencyInput()` (DOC-21)
+- `lib/utils/errors.ts` — `apiSuccess()`, `authError()`, `internalError()` (DOC-3)
+- `lib/utils/logger.ts` — structured logger (DOC-3)
+- `components/invoices/InvoiceStatusBadge.tsx` — status badge component (DOC-18)
+- `lib/types/invoice.ts` — `InvoiceStatus` type (DOC-14)
+
 ---
 
 ## Chunk 1: Types, Query Logic, and Date Utility
@@ -686,7 +693,7 @@ git commit -m "feat(DOC-25): add fetchInvoiceCounts and fetchInvoiceList query f
 **Files:**
 - Create: `supabase/migrations/YYYYMMDDHHMMSS_invoice_counts_rpc.sql`
 
-The counts query uses an RPC function so RLS is respected and the query is efficient.
+The counts query uses an RPC function with `SECURITY DEFINER` (bypasses RLS) and its own `org_memberships` join to scope by user. This is intentional — RLS on `invoices` requires the calling context to have a session, but RPC with explicit auth.uid() check is more predictable for aggregate queries.
 
 - [ ] **Step 1: Create the migration file**
 
