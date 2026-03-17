@@ -1,4 +1,6 @@
 import Anthropic from "@anthropic-ai/sdk";
+import { readFileSync } from "fs";
+import { join } from "path";
 import type {
   ExtractionProvider,
   ExtractionResult,
@@ -10,6 +12,36 @@ const MODEL = "claude-sonnet-4-20250514";
 const MAX_TOKENS = 2048;
 const TIMEOUT_MS = 60_000;
 const MAX_RETRIES = 3;
+
+/**
+ * Resolve the Anthropic API key.
+ *
+ * Next.js / dotenv will NOT override a variable that already exists in the
+ * process environment — even if it is an empty string.  Tools like Claude Code
+ * export `ANTHROPIC_API_KEY=` (empty) in the shell profile, which shadows the
+ * real key stored in `.env.local`.
+ *
+ * Fallback order:
+ *   1. process.env.ANTHROPIC_API_KEY  (if non-empty)
+ *   2. Value parsed directly from .env.local
+ */
+function getAnthropicApiKey(): string | undefined {
+  const fromEnv = process.env.ANTHROPIC_API_KEY;
+  if (fromEnv) return fromEnv;
+
+  // Fallback: read .env.local directly
+  try {
+    const envPath = join(process.cwd(), ".env.local");
+    const content = readFileSync(envPath, "utf8");
+    const match = content.match(/^ANTHROPIC_API_KEY=(.+)$/m);
+    if (match?.[1]) return match[1].trim();
+  } catch {
+    // .env.local not found or unreadable — acceptable in production
+    // where the real env var should be set.
+  }
+
+  return undefined;
+}
 
 const EXTRACTION_PROMPT = `You are an invoice data extraction system. Extract structured data from the provided invoice document.
 
@@ -141,8 +173,14 @@ export class ClaudeExtractionProvider implements ExtractionProvider {
   private client: Anthropic;
 
   constructor() {
+    const apiKey = getAnthropicApiKey();
+    if (!apiKey) {
+      throw new Error(
+        "ANTHROPIC_API_KEY is not configured. Set it in .env.local or the system environment."
+      );
+    }
     this.client = new Anthropic({
-      apiKey: process.env.ANTHROPIC_API_KEY,
+      apiKey,
       timeout: TIMEOUT_MS,
       maxRetries: MAX_RETRIES,
     });
