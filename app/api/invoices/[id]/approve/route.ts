@@ -1,3 +1,4 @@
+import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import {
@@ -102,6 +103,9 @@ export async function POST(
     });
     return internalError("Failed to update invoice status");
   }
+
+  // Bust the server component cache so the invoice list shows updated status
+  revalidatePath("/invoices");
 
   logger.info("invoice.approve.success", {
     invoiceId,

@@ -4,6 +4,10 @@ import { POST } from "./route";
 
 // --- Mocks ---
 
+vi.mock("next/cache", () => ({
+  revalidatePath: vi.fn(),
+}));
+
 const mockGetUser = vi.fn();
 const mockInvoiceSelect = vi.fn();
 const mockExtractedDataSelect = vi.fn();
