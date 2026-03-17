@@ -12,11 +12,14 @@ import type { ExtractedDataRow } from "@/lib/types/invoice";
 import type { InvoiceStatus } from "@/lib/types/invoice";
 import LineItemEditor from "./LineItemEditor";
 import ApproveBar from "./ApproveBar";
+import SyncBar from "./SyncBar";
+import SyncStatusPanel from "./SyncStatusPanel";
 
 interface ExtractionFormProps {
   extractedData: ExtractedDataRow;
   invoiceId: string;
   invoiceStatus: InvoiceStatus;
+  errorMessage?: string | null;
 }
 
 const FIELD_CONFIG: Record<
@@ -47,6 +50,7 @@ export default function ExtractionForm({
   extractedData,
   invoiceId,
   invoiceStatus,
+  errorMessage: initialErrorMessage,
 }: ExtractionFormProps) {
   const [state, dispatch] = useReducer(
     formReducer,
@@ -56,7 +60,14 @@ export default function ExtractionForm({
 
   const savedTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
   const [focusedField, setFocusedField] = useState<string | null>(null);
+  const [syncKey, setSyncKey] = useState(0);
+  const [currentStatus, setCurrentStatus] = useState(invoiceStatus);
   const confidenceScore = extractedData.confidence_score;
+
+  const handleSyncComplete = useCallback(() => {
+    setSyncKey((k) => k + 1);
+    setCurrentStatus("synced");
+  }, []);
 
   const saveField = useCallback(
     async (field: string, value: string | number | null) => {
@@ -397,6 +408,31 @@ export default function ExtractionForm({
             invoiceId={invoiceId}
             vendorName={state.values.vendor_name}
             totalAmount={state.values.total_amount}
+          />
+        </>
+      )}
+
+      {/* Sync bar — shown for approved invoices */}
+      {(currentStatus === "approved" || currentStatus === "synced") && (
+        <>
+          <div className="border-t border-gray-200" />
+          <SyncBar
+            invoiceId={invoiceId}
+            invoiceStatus={currentStatus}
+            isRetry={!!initialErrorMessage?.startsWith("Sync failed")}
+            onSyncComplete={handleSyncComplete}
+          />
+        </>
+      )}
+
+      {/* Sync status panel — shows sync history for approved/synced invoices */}
+      {(currentStatus === "approved" || currentStatus === "synced") && (
+        <>
+          <div className="border-t border-gray-200" />
+          <SyncStatusPanel
+            key={syncKey}
+            invoiceId={invoiceId}
+            invoiceStatus={currentStatus}
           />
         </>
       )}

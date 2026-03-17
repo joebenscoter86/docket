@@ -13,6 +13,7 @@ interface ReviewLayoutProps {
     fileName: string;
     fileType: string;
     status: InvoiceStatus;
+    errorMessage?: string | null;
   };
   signedUrl: string;
   extractedData: ExtractedDataRow | null;
@@ -129,7 +130,7 @@ export default function ReviewLayout({
         >
           <div className="flex-1 p-4 md:p-6">
             {extractedData ? (
-              <ExtractionForm extractedData={extractedData} invoiceId={invoice.id} invoiceStatus={invoice.status} />
+              <ExtractionForm extractedData={extractedData} invoiceId={invoice.id} invoiceStatus={invoice.status} errorMessage={invoice.errorMessage} />
             ) : (
               <div className="flex items-center justify-center h-full text-sm text-gray-400">
                 <div className="text-center">

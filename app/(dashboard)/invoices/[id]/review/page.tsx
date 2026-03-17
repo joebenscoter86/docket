@@ -81,6 +81,7 @@ export default async function ReviewPage({
         fileName: invoice.file_name,
         fileType: invoice.file_type,
         status: invoice.status as InvoiceStatus,
+        errorMessage: invoice.error_message,
       }}
       signedUrl={signedUrlResult.data.signedUrl}
       // getExtractedData returns Supabase-inferred types where confidence_score
