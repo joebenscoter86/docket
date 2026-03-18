@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { InvoiceListItem, InvoiceListCounts } from "@/lib/invoices/types";
 import InvoiceStatusBadge from "./InvoiceStatusBadge";
+import Button from "@/components/ui/Button";
 import { formatCurrency } from "@/lib/utils/currency";
 import { formatRelativeTime } from "@/lib/utils/date";
 
@@ -75,14 +76,11 @@ export default function InvoiceList({
   if (counts.all === 0) {
     return (
       <div className="text-center py-16">
-        <p className="text-gray-500 text-sm mb-4">
+        <p className="text-muted text-sm mb-4">
           No invoices yet. Upload your first invoice to get started.
         </p>
-        <Link
-          href="/upload"
-          className="inline-block bg-blue-600 text-white px-4 py-2 rounded-md font-medium text-sm hover:bg-blue-700"
-        >
-          Upload Invoice
+        <Link href="/upload">
+          <Button variant="primary">Upload Invoice</Button>
         </Link>
       </div>
     );
@@ -104,20 +102,20 @@ export default function InvoiceList({
                 status: tab.key === "all" ? undefined : tab.key,
                 cursor: undefined,
               })}
-              className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px flex items-center gap-2 ${
+              className={`px-4 py-2 text-sm border-b-2 -mb-px flex items-center gap-2 ${
                 isActive
-                  ? "border-blue-600 text-blue-600"
-                  : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
+                  ? "text-primary border-primary font-bold"
+                  : "text-muted hover:text-text border-transparent"
               }`}
             >
               {tab.label}
               <span
                 className={`text-xs px-1.5 py-0.5 rounded-full ${
                   isPendingReview
-                    ? "bg-blue-600 text-white"
+                    ? "bg-primary text-white"
                     : isActive
-                    ? "bg-blue-100 text-blue-600"
-                    : "bg-gray-100 text-gray-600"
+                    ? "bg-[#DBEAFE] text-primary"
+                    : "bg-[#F1F5F9] text-muted"
                 }`}
               >
                 {count}
@@ -164,7 +162,7 @@ export default function InvoiceList({
       {/* Filter empty state */}
       {invoices.length === 0 ? (
         <div className="text-center py-16">
-          <p className="text-gray-500 text-sm">No invoices match this filter.</p>
+          <p className="text-muted text-sm">No invoices match this filter.</p>
         </div>
       ) : (
         <>
@@ -172,47 +170,47 @@ export default function InvoiceList({
           <div className="hidden md:block">
             <table className="w-full">
               <thead>
-                <tr className="border-b border-gray-200">
-                  <th className="text-left py-3 px-4 text-xs font-medium text-gray-500 uppercase">File Name</th>
-                  <th className="text-left py-3 px-4 text-xs font-medium text-gray-500 uppercase">Vendor</th>
-                  <th className="text-left py-3 px-4 text-xs font-medium text-gray-500 uppercase">Invoice #</th>
-                  <th className="text-left py-3 px-4 text-xs font-medium text-gray-500 uppercase">Invoice Date</th>
-                  <th className="text-right py-3 px-4 text-xs font-medium text-gray-500 uppercase">Amount</th>
-                  <th className="text-left py-3 px-4 text-xs font-medium text-gray-500 uppercase">Status</th>
-                  <th className="text-left py-3 px-4 text-xs font-medium text-gray-500 uppercase">Uploaded</th>
+                <tr className="border-b border-[#F1F5F9]">
+                  <th className="text-left text-[11px] font-bold uppercase tracking-wider text-muted py-2.5 px-3">File Name</th>
+                  <th className="text-left text-[11px] font-bold uppercase tracking-wider text-muted py-2.5 px-3">Vendor</th>
+                  <th className="text-left text-[11px] font-bold uppercase tracking-wider text-muted py-2.5 px-3">Invoice #</th>
+                  <th className="text-left text-[11px] font-bold uppercase tracking-wider text-muted py-2.5 px-3">Invoice Date</th>
+                  <th className="text-right text-[11px] font-bold uppercase tracking-wider text-muted py-2.5 px-3">Amount</th>
+                  <th className="text-left text-[11px] font-bold uppercase tracking-wider text-muted py-2.5 px-3">Status</th>
+                  <th className="text-left text-[11px] font-bold uppercase tracking-wider text-muted py-2.5 px-3">Uploaded</th>
                 </tr>
               </thead>
               <tbody>
                 {invoices.map((invoice) => (
-                  <tr key={invoice.id} className="border-b border-gray-100 hover:bg-gray-50 group">
+                  <tr key={invoice.id} className="border-b border-[#F1F5F9] transition-all duration-150 ease-in-out hover:bg-background group">
                     <td colSpan={7} className="p-0">
                       <Link
                         href={`/invoices/${invoice.id}/review`}
                         className="grid grid-cols-[1fr_1fr_auto_auto_auto_auto_auto] w-full"
                       >
-                        <span className="py-3 px-4 text-sm text-slate-800 truncate max-w-[200px]">
+                        <span className="py-3.5 px-3 text-[14px] text-text truncate max-w-[200px]">
                           {invoice.file_name}
                         </span>
-                        <span className="py-3 px-4 text-sm">
+                        <span className="py-3.5 px-3 text-[14px] font-medium text-text">
                           {invoice.extracted_data?.vendor_name ?? (
-                            <span className="text-gray-400">Pending</span>
+                            <span className="text-muted">Pending</span>
                           )}
                         </span>
-                        <span className="py-3 px-4 text-sm font-mono text-gray-600">
+                        <span className="py-3.5 px-3 font-mono text-[13px] text-[#475569]">
                           {invoice.extracted_data?.invoice_number ?? "\u2014"}
                         </span>
-                        <span className="py-3 px-4 text-sm text-gray-600">
+                        <span className="py-3.5 px-3 font-mono text-[13px] text-[#475569]">
                           {formatDate(invoice.extracted_data?.invoice_date ?? null)}
                         </span>
-                        <span className="py-3 px-4 text-sm text-right font-mono">
+                        <span className="py-3.5 px-3 text-[14px] text-right font-mono">
                           {invoice.extracted_data?.total_amount != null
                             ? formatCurrency(invoice.extracted_data.total_amount, null)
                             : "\u2014"}
                         </span>
-                        <span className="py-3 px-4">
+                        <span className="py-3.5 px-3">
                           <InvoiceStatusBadge status={invoice.status} />
                         </span>
-                        <span className="py-3 px-4 text-sm text-gray-500">
+                        <span className="py-3.5 px-3 text-[14px] text-muted group-hover:opacity-100 opacity-70 transition-opacity">
                           {formatRelativeTime(invoice.uploaded_at)}
                         </span>
                       </Link>
@@ -229,20 +227,20 @@ export default function InvoiceList({
               <Link
                 key={invoice.id}
                 href={`/invoices/${invoice.id}/review`}
-                className="block bg-white border border-gray-200 rounded-lg p-4 hover:border-gray-300"
+                className="block bg-surface border border-border rounded-lg p-4 hover:border-primary/30 transition-all duration-150"
               >
                 <div className="flex items-center justify-between mb-1">
-                  <span className="text-sm font-medium text-slate-800 truncate max-w-[200px]">
+                  <span className="text-sm font-medium text-text truncate max-w-[200px]">
                     {invoice.file_name}
                   </span>
                   <InvoiceStatusBadge status={invoice.status} />
                 </div>
-                <div className="text-sm text-gray-600 mb-1">
+                <div className="text-sm text-muted mb-1">
                   {invoice.extracted_data?.vendor_name ?? (
-                    <span className="text-gray-400">Pending</span>
+                    <span className="text-muted">Pending</span>
                   )}
                   {invoice.extracted_data?.invoice_number && (
-                    <span className="text-gray-400 ml-2 font-mono">
+                    <span className="text-muted ml-2 font-mono text-[13px]">
                       #{invoice.extracted_data.invoice_number}
                     </span>
                   )}
@@ -253,7 +251,7 @@ export default function InvoiceList({
                       ? formatCurrency(invoice.extracted_data.total_amount, null)
                       : "\u2014"}
                   </span>
-                  <span className="text-gray-400 text-xs">
+                  <span className="text-muted text-xs">
                     {formatRelativeTime(invoice.uploaded_at)}
                   </span>
                 </div>
@@ -262,26 +260,24 @@ export default function InvoiceList({
           </div>
 
           {/* Pagination */}
-          <div className="flex items-center justify-between mt-6 pt-4 border-t border-gray-200">
-            <div className="text-sm text-gray-500">
-              {counts[currentStatus as keyof InvoiceListCounts] ?? counts.all} total
+          <div className="flex items-center justify-between mt-6 pt-4 border-t border-[#F1F5F9]">
+            <div className="text-[13px] text-muted">
+              Showing {invoices.length} of {counts[currentStatus as keyof InvoiceListCounts] ?? counts.all} invoices
               {hasCursor && " \u00b7 Page 2+"}
             </div>
             <div className="flex gap-2">
               {hasCursor && (
                 <Link
                   href={buildUrl(pathname, searchParams, { cursor: undefined })}
-                  className="border border-gray-300 text-gray-700 hover:bg-gray-50 px-4 py-2 rounded-md font-medium text-sm"
                 >
-                  Previous page
+                  <Button variant="outline">Previous</Button>
                 </Link>
               )}
               {nextCursor && (
                 <Link
                   href={buildUrl(pathname, searchParams, { cursor: nextCursor })}
-                  className="border border-gray-300 text-gray-700 hover:bg-gray-50 px-4 py-2 rounded-md font-medium text-sm"
                 >
-                  Next page
+                  <Button variant="outline">Next</Button>
                 </Link>
               )}
             </div>

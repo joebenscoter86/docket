@@ -1,7 +1,9 @@
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
+import Link from "next/link";
 import { validateListParams, fetchInvoiceList, fetchInvoiceCounts } from "@/lib/invoices/queries";
 import InvoiceList from "@/components/invoices/InvoiceList";
+import Button from "@/components/ui/Button";
 
 interface InvoicesPageProps {
   searchParams: Promise<{
@@ -43,8 +45,16 @@ export default async function InvoicesPage({ searchParams }: InvoicesPageProps) 
 
   return (
     <div className="p-6">
-      <div className="flex items-center justify-between mb-6">
-        <h1 className="text-2xl font-semibold text-slate-800">Invoices</h1>
+      <div className="flex items-center justify-between mb-8">
+        <h1 className="font-headings font-bold text-[32px] text-text tracking-tight">Invoices</h1>
+        <Link href="/upload">
+          <Button variant="primary">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="h-4 w-4 mr-2">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+            </svg>
+            Upload New
+          </Button>
+        </Link>
       </div>
       <InvoiceList
         invoices={listResult.invoices}
