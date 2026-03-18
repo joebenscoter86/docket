@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import Sidebar from './Sidebar'
+import Footer from './Footer'
 
 interface AppShellProps {
   userEmail: string
@@ -37,6 +38,7 @@ export default function AppShell({ userEmail, userName, orgName, children }: App
         <main className="flex-1 overflow-y-auto p-6 md:p-8 lg:p-10">
           {children}
         </main>
+        <Footer />
       </div>
     </div>
   )
