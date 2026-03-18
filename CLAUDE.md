@@ -417,7 +417,7 @@ CREATE POLICY "org_memberships_self_access" ON org_memberships
 
 ### Phase 5 Build Sequence
 
-DOC-35 (Stripe account setup) is **backlogged** — Joe's LLC is being filed. All billing code builds against Stripe test mode with placeholder env vars. Plug in real credentials when LLC is ready.
+DOC-35 (Stripe account setup) is **unblocked** — LLC (JB Technologies LLC, California) is filed as of 2026-03-18. Stripe account can now be set up with real credentials. All billing code currently builds against Stripe test mode with placeholder env vars.
 
 | Tier | Issue | Title | Notes |
 |------|-------|-------|-------|
@@ -638,6 +638,9 @@ All four checks must pass before a PR can be merged. No exceptions.
 - Production base URL: `https://quickbooks.api.intuit.com/v3/company/{companyId}`
 - Use `DisplayName` for vendor display (most reliable). `CompanyName` is optional on some vendors.
 - For GL account dropdowns, filter `AccountType = 'Expense'`. Use `FullyQualifiedName` for display when `SubAccount: true`.
+- **Production app review:** Apps using only Accounting API with basic scopes (bills, vendors, accounts) get auto-approved via questionnaire. No manual review wait time.
+- **Production redirect URI must be registered separately.** The sandbox app and production app have independent redirect URI lists in the Intuit developer portal. Add `https://dockett.app/api/auth/callback/quickbooks` to the production app's Redirect URIs tab — forgetting this causes "redirect_uri is invalid" error on OAuth.
+- **Preview and production share the same Supabase database currently.** This means sandbox QBO tokens and production QBO tokens coexist in `accounting_connections`. Disconnect sandbox connection before connecting production to avoid stale token issues.
 
 **Xero (Phase 2, document findings from FND-10 here):**
 - Bills are created via PUT (not POST) to the Invoices endpoint with Type "ACCPAY"
@@ -764,6 +767,11 @@ Run these before declaring any issue done:
 | 2026-03-18 | `UNIQUE(org_id, provider)` on `accounting_connections` | delete+insert had a race condition causing duplicate rows. Upsert with `onConflict` is atomic. | DOC-49 |
 | 2026-03-18 | Date-only strings parsed as local time, not UTC | `new Date("2026-03-01")` → UTC midnight → wrong day in US timezones. Append `T00:00:00` for local parsing. | DOC-50 |
 | 2026-03-18 | Dev server pinned to port 3000 | QBO OAuth redirect URI must match Intuit's registered URI exactly. Auto-incrementing ports break the callback. | DOC-51 |
+| 2026-03-18 | LLC filed as JB Technologies LLC (California) | Unblocks Stripe live mode (DOC-35), legal pages, and Intuit production app review. | DOC-77 |
+| 2026-03-18 | Privacy Policy + Terms of Service at `/privacy` and `/terms` | Required for Intuit production app review. Static pages in `app/(legal)/` route group with shared Footer component. Governed by California law. | DOC-77 |
+| 2026-03-18 | QBO production app approved by Intuit (auto-approved via questionnaire) | Apps using only Accounting API with basic scopes get auto-approved. No manual review needed. | DOC-77 |
+| 2026-03-18 | Vercel env vars split per environment for QBO | Production env uses production QBO credentials, Preview+Dev uses sandbox. Two entries per var scoped to different environments. | DOC-77 |
+| 2026-03-18 | Production QBO smoke test passed | Full flow confirmed on dockett.app: connect real QBO account, upload invoice, extract, approve, sync → bill created in real QuickBooks. | DOC-77 |
 
 ---
 
@@ -789,11 +797,11 @@ SUPABASE_SERVICE_ROLE_KEY=
 # Claude API
 ANTHROPIC_API_KEY=
 
-# QuickBooks
-QBO_CLIENT_ID=
-QBO_CLIENT_SECRET=
-QBO_REDIRECT_URI=              # Production: https://dockett.app/api/auth/callback/quickbooks
-QBO_ENVIRONMENT=sandbox    # sandbox | production
+# QuickBooks (per-environment in Vercel as of 2026-03-18)
+QBO_CLIENT_ID=                 # Sandbox value for Preview+Dev, Production value for Production
+QBO_CLIENT_SECRET=             # Sandbox value for Preview+Dev, Production value for Production
+QBO_REDIRECT_URI=              # Preview: https://dockett.app/api/auth/callback/quickbooks | Production: same
+QBO_ENVIRONMENT=sandbox        # Preview: sandbox | Production: production
 
 # Stripe
 STRIPE_SECRET_KEY=
