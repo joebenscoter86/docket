@@ -52,7 +52,10 @@ function buildUrl(
 
 function formatDate(dateString: string | null): string {
   if (!dateString) return "\u2014";
-  return new Date(dateString).toLocaleDateString("en-US", {
+  // Append T00:00:00 so date-only strings (YYYY-MM-DD) are parsed as local time,
+  // not UTC — prevents off-by-one day in US timezones.
+  const date = new Date(dateString.includes("T") ? dateString : `${dateString}T00:00:00`);
+  return date.toLocaleDateString("en-US", {
     month: "short",
     day: "numeric",
     year: "numeric",
