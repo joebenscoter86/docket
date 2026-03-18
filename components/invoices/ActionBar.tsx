@@ -17,7 +17,6 @@ interface ActionBarProps {
   currentStatus: InvoiceStatus;
   vendorName: string | number | null;
   totalAmount: string | number | null;
-  vendorRef: string | null;
   syncBlockers: string[];
   isRetry?: boolean;
   onStatusChange: (newStatus: InvoiceStatus) => void;
@@ -28,7 +27,6 @@ export default function ActionBar({
   currentStatus,
   vendorName,
   totalAmount,
-  vendorRef,
   syncBlockers,
   isRetry = false,
   onStatusChange,
@@ -314,11 +312,9 @@ export default function ActionBar({
             <>
               <span className="h-2 w-2 rounded-full bg-primary shrink-0" />
               <span className="text-muted">
-                {barState === "failed"
+                {barState === "failed" || isRetry
                   ? "Previous sync failed. Ready to retry."
-                  : isRetry
-                    ? "Previous sync failed. Ready to retry."
-                    : "Ready to sync to QuickBooks."}
+                  : "Ready to sync to QuickBooks."}
               </span>
             </>
           )}
