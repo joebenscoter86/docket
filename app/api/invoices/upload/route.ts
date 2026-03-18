@@ -1,12 +1,14 @@
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { validateFileMagicBytes, validateFileSize } from "@/lib/upload/validate";
+import { checkInvoiceAccess } from "@/lib/billing/access";
 import {
   authError,
   forbiddenError,
   validationError,
   internalError,
   apiSuccess,
+  subscriptionRequired,
 } from "@/lib/utils/errors";
 import { logger } from "@/lib/utils/logger";
 import { runExtraction } from "@/lib/extraction/run";
@@ -41,6 +43,23 @@ export async function POST(request: Request) {
       return forbiddenError("No organization found. Please contact support.");
     }
     orgId = membership.org_id;
+
+    // 2b. Subscription check
+    const access = await checkInvoiceAccess(user.id);
+    if (!access.allowed) {
+      logger.warn("invoice_upload_access_denied", {
+        action: "upload",
+        userId: user.id,
+        orgId,
+        reason: access.reason,
+        subscriptionStatus: access.subscriptionStatus,
+        trialExpired: access.trialExpired,
+      });
+      return subscriptionRequired("Subscription required to upload invoices.", {
+        subscriptionStatus: access.subscriptionStatus,
+        trialExpired: access.trialExpired,
+      });
+    }
 
     // 3. Parse form data
     const formData = await request.formData();
