@@ -186,20 +186,16 @@ export async function POST(request: Request) {
       status: "success",
     });
 
-    // 9. Auto-trigger extraction
-    let extractionStatus: "pending_review" | "error" = "error";
-    let extractedData = null;
-    try {
-      const extractionResult = await runExtraction({
-        invoiceId,
-        orgId: orgId!,
-        userId: userId!,
-        filePath: storagePath,
-        fileType,
-      });
-      extractionStatus = "pending_review";
-      extractedData = extractionResult.data;
-    } catch {
+    // 9. Auto-trigger extraction (fire-and-forget)
+    // Extraction progress is tracked via realtime subscription on the client.
+    // Don't block the upload response — return immediately so the progress bar completes.
+    runExtraction({
+      invoiceId,
+      orgId: orgId!,
+      userId: userId!,
+      filePath: storagePath,
+      fileType,
+    }).catch(() => {
       // Extraction failure is non-fatal for the upload response.
       // Invoice status is already set to 'error' by runExtraction.
       // User can retry via the extract endpoint.
@@ -209,14 +205,12 @@ export async function POST(request: Request) {
         invoiceId,
         status: "extraction_failed",
       });
-    }
+    });
 
     return apiSuccess({
       invoiceId,
       fileName,
       signedUrl: signedUrlData?.signedUrl || null,
-      extractionStatus,
-      extractedData,
     });
   } catch (error) {
     const durationMs = Date.now() - startTime;

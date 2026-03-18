@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, useEffect } from "react";
 import Button from "@/components/ui/Button";
 
 type UploadState = "idle" | "dragging" | "uploading" | "success";
@@ -22,6 +22,34 @@ export default function UploadZone({ onUploadComplete }: UploadZoneProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   const dragCounterRef = useRef(0);
   const zoneRef = useRef<HTMLDivElement>(null);
+  const progressIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  // Animate progress smoothly while uploading
+  useEffect(() => {
+    if (state === "uploading") {
+      progressIntervalRef.current = setInterval(() => {
+        setProgress((prev) => {
+          // Ease toward 90% but never reach it — the final jump to 100%
+          // happens when the API responds
+          if (prev >= 90) return prev;
+          // Fast at first, slows down as it approaches 90
+          const increment = Math.max(0.5, (90 - prev) * 0.08);
+          return Math.min(90, prev + increment);
+        });
+      }, 100);
+    } else {
+      if (progressIntervalRef.current) {
+        clearInterval(progressIntervalRef.current);
+        progressIntervalRef.current = null;
+      }
+    }
+    return () => {
+      if (progressIntervalRef.current) {
+        clearInterval(progressIntervalRef.current);
+        progressIntervalRef.current = null;
+      }
+    };
+  }, [state]);
 
   const validateFile = useCallback(
     (file: File): string | null => {
@@ -47,8 +75,6 @@ export default function UploadZone({ onUploadComplete }: UploadZoneProps) {
       try {
         const formData = new FormData();
         formData.append("file", file);
-
-        setProgress(30);
 
         const response = await fetch("/api/invoices/upload", {
           method: "POST",
