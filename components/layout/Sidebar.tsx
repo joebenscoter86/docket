@@ -1,5 +1,6 @@
 'use client'
 
+import Image from 'next/image'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
@@ -38,9 +39,22 @@ const navItems = [
 interface SidebarProps {
   isOpen: boolean
   onClose: () => void
+  userName?: string
+  userEmail?: string
 }
 
-export default function Sidebar({ isOpen, onClose }: SidebarProps) {
+function getInitials(userName?: string, userEmail?: string): string {
+  if (userName) {
+    const words = userName.trim().split(/\s+/)
+    return words.map((w) => w[0]).join('').toUpperCase().slice(0, 2)
+  }
+  if (userEmail) {
+    return userEmail[0].toUpperCase()
+  }
+  return '?'
+}
+
+export default function Sidebar({ isOpen, onClose, userName, userEmail }: SidebarProps) {
   const pathname = usePathname()
   const router = useRouter()
 
@@ -51,15 +65,28 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
     router.refresh()
   }
 
+  const initials = getInitials(userName, userEmail)
+  const displayName = userName || userEmail || 'User'
+
   const sidebarContent = (
-    <div className="flex h-full flex-col bg-slate-800">
+    <div className="flex h-full flex-col bg-surface border-r border-border">
       {/* Logo */}
-      <div className="flex h-14 items-center justify-between border-b border-slate-700 px-4">
-        <span className="text-lg font-semibold text-white">Docket</span>
+      <div className="flex items-center gap-3 px-5 pt-6 pb-8">
+        <Image
+          src="/dockett_logo.png"
+          alt="Docket logo"
+          width={36}
+          height={36}
+          className="h-9 w-9"
+        />
+        <div className="flex flex-col">
+          <span className="font-headings text-lg font-bold text-text">Docket</span>
+          <span className="text-xs text-muted font-body">Automated Invoicing</span>
+        </div>
         {/* Close button - mobile only */}
         <button
           onClick={onClose}
-          className="rounded-md p-1 text-slate-400 hover:text-white md:hidden"
+          className="ml-auto rounded-md p-1.5 text-muted hover:text-text hover:bg-background md:hidden"
         >
           <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="h-5 w-5">
             <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
@@ -76,10 +103,10 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
               key={item.href}
               href={item.href}
               onClick={onClose}
-              className={`flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors ${
+              className={`flex items-center gap-3 rounded-brand-md px-3 py-2.5 text-sm font-body transition-all duration-150 ease-in-out ${
                 isActive
-                  ? 'bg-slate-700 text-white'
-                  : 'text-slate-400 hover:bg-slate-700/50 hover:text-white'
+                  ? 'bg-nav-active text-primary font-bold'
+                  : 'text-muted hover:bg-background hover:text-text'
               }`}
             >
               {item.icon}
@@ -89,17 +116,28 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
         })}
       </nav>
 
-      {/* Sign out */}
-      <div className="border-t border-slate-700 px-3 py-4">
-        <button
-          onClick={handleSignOut}
-          className="flex w-full items-center gap-3 rounded-md px-3 py-2 text-sm font-medium text-slate-400 transition-colors hover:bg-slate-700/50 hover:text-white"
-        >
-          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="h-5 w-5">
-            <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0 0 13.5 3h-6a2.25 2.25 0 0 0-2.25 2.25v13.5A2.25 2.25 0 0 0 7.5 21h6a2.25 2.25 0 0 0 2.25-2.25V15m3 0 3-3m0 0-3-3m3 3H9" />
-          </svg>
-          Sign out
-        </button>
+      {/* User badge + sign out */}
+      <div className="border-t border-border px-4 py-4">
+        <div className="flex items-center gap-3">
+          <div className="flex h-9 w-9 items-center justify-center rounded-full bg-nav-active text-primary font-body font-bold text-sm">
+            {initials}
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="truncate text-sm font-body font-semibold text-text">{displayName}</p>
+            {userName && userEmail && (
+              <p className="truncate text-xs font-body text-muted">{userEmail}</p>
+            )}
+          </div>
+          <button
+            onClick={handleSignOut}
+            className="rounded-md p-1.5 text-muted hover:text-text hover:bg-background"
+            title="Sign out"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="h-5 w-5">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0 0 13.5 3h-6a2.25 2.25 0 0 0-2.25 2.25v13.5A2.25 2.25 0 0 0 7.5 21h6a2.25 2.25 0 0 0 2.25-2.25V15m3 0 3-3m0 0-3-3m3 3H9" />
+            </svg>
+          </button>
+        </div>
       </div>
     </div>
   )
@@ -107,7 +145,7 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
   return (
     <>
       {/* Desktop sidebar - static */}
-      <aside className="hidden md:flex md:w-64 md:flex-shrink-0">
+      <aside className="hidden md:flex md:w-[280px] md:flex-shrink-0">
         {sidebarContent}
       </aside>
 
@@ -122,7 +160,7 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
         />
         {/* Sidebar panel */}
         <aside
-          className={`relative flex h-full w-64 flex-col transition-transform duration-200 ${isOpen ? 'translate-x-0' : '-translate-x-full'}`}
+          className={`relative flex h-full w-[280px] flex-col transition-transform duration-200 ${isOpen ? 'translate-x-0' : '-translate-x-full'}`}
         >
           {sidebarContent}
         </aside>
