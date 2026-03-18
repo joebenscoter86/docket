@@ -11,8 +11,7 @@ import { formatCurrency, parseCurrencyInput } from "@/lib/utils/currency";
 import type { ExtractedDataRow } from "@/lib/types/invoice";
 import type { InvoiceStatus } from "@/lib/types/invoice";
 import LineItemEditor from "./LineItemEditor";
-import ApproveBar from "./ApproveBar";
-import SyncBar from "./SyncBar";
+import ActionBar from "./ActionBar";
 import SyncStatusPanel from "./SyncStatusPanel";
 import { useQboOptions } from "./hooks/useQboOptions";
 import VendorSelect from "./VendorSelect";
@@ -94,9 +93,11 @@ export default function ExtractionForm({
     [invoiceId]
   );
 
-  const handleSyncComplete = useCallback(() => {
-    setSyncKey((k) => k + 1);
-    setCurrentStatus("synced");
+  const handleStatusChange = useCallback((newStatus: InvoiceStatus) => {
+    setCurrentStatus(newStatus);
+    if (newStatus === "synced") {
+      setSyncKey((k) => k + 1);
+    }
   }, []);
 
   const saveField = useCallback(
@@ -243,7 +244,7 @@ export default function ExtractionForm({
 
   const currency = (state.values.currency as string) ?? "USD";
 
-  // Compute sync blockers for SyncBar
+  // Compute sync blockers for ActionBar
   const syncBlockers: string[] = [];
   if (!vendorRef) syncBlockers.push("Select a QuickBooks vendor");
   if (lineItemsMissingGl > 0) {
@@ -454,28 +455,18 @@ export default function ExtractionForm({
         </div>
       </div>
 
-      {/* Approve bar — only shown for pending_review invoices */}
-      {invoiceStatus === "pending_review" && (
+      {/* Action bar — shown for pending_review, approved, and synced invoices */}
+      {(currentStatus === "pending_review" || currentStatus === "approved" || currentStatus === "synced") && (
         <>
           <div className="border-t border-border" />
-          <ApproveBar
+          <ActionBar
             invoiceId={invoiceId}
+            currentStatus={currentStatus}
             vendorName={state.values.vendor_name}
             totalAmount={state.values.total_amount}
-          />
-        </>
-      )}
-
-      {/* Sync bar — shown for approved invoices */}
-      {(currentStatus === "approved" || currentStatus === "synced") && (
-        <>
-          <div className="border-t border-border" />
-          <SyncBar
-            invoiceId={invoiceId}
-            invoiceStatus={currentStatus}
-            isRetry={!!initialErrorMessage?.startsWith("Sync failed")}
-            onSyncComplete={handleSyncComplete}
             syncBlockers={syncBlockers}
+            isRetry={!!initialErrorMessage?.startsWith("Sync failed")}
+            onStatusChange={handleStatusChange}
           />
         </>
       )}

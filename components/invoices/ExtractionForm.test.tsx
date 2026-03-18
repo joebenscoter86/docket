@@ -3,12 +3,12 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import ExtractionForm from "./ExtractionForm";
 import type { ExtractedDataRow } from "@/lib/types/invoice";
 
-// Mock LineItemEditor and ApproveBar to isolate ExtractionForm tests
+// Mock LineItemEditor and ActionBar to isolate ExtractionForm tests
 vi.mock("./LineItemEditor", () => ({
   default: () => <div data-testid="line-item-editor" />,
 }));
-vi.mock("./ApproveBar", () => ({
-  default: () => <div data-testid="approve-bar" />,
+vi.mock("./ActionBar", () => ({
+  default: () => <div data-testid="action-bar" />,
 }));
 
 function makeExtractedData(
