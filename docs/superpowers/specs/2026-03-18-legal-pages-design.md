@@ -44,7 +44,7 @@ Sections in order:
 1. **Introduction** — JB Technologies LLC ("we") operates Docket at dockett.app
 2. **Information We Collect**
    - Account info: email address, name
-   - Invoice data: uploaded documents (PDF, JPG, PNG), AI-extracted structured data (vendor, amounts, dates, line items)
+   - Invoice data: uploaded documents (PDF, JPG, PNG), AI-extracted structured data (vendor, amounts, dates, line items), correction history (original vs. corrected values, used to improve accuracy)
    - Accounting connection: QuickBooks Online OAuth tokens (encrypted at rest with AES-256-GCM)
    - Billing: managed by Stripe — we do not store credit card numbers
    - Usage data: page views, feature usage (via analytics when added)
@@ -56,7 +56,7 @@ Sections in order:
    - Send transactional emails (via Resend)
 4. **Third-Party Services**
    - Supabase (database, file storage, authentication)
-   - Anthropic / Claude (AI invoice extraction — invoice content sent for processing)
+   - Anthropic / Claude (AI invoice extraction — invoice content sent for processing only; not used for AI model training per Anthropic's API data usage policy)
    - Intuit / QuickBooks Online (accounting sync)
    - Stripe (subscription billing)
    - Vercel (hosting)
@@ -67,22 +67,30 @@ Sections in order:
    - OAuth tokens encrypted at rest (AES-256-GCM)
    - Row Level Security on all database tables
    - All traffic over HTTPS
-6. **Data Retention**
+6. **Data Processing Location**
+   - Data is processed and stored in the United States via our cloud infrastructure providers
+7. **Data Retention**
    - Invoice data retained while your account is active
    - On account deletion request, all invoices, extracted data, and connection tokens are deleted
    - Billing records retained as required by law
-7. **Your Rights**
+8. **Your Rights**
    - Access your data
    - Correct inaccurate extracted data
    - Request deletion of your account and data
    - Disconnect third-party integrations at any time
-   - Contact: privacy@dockett.app (or a general contact email)
-8. **Cookies**
+   - Contact: support@dockett.app
+9. **California Privacy Rights (CCPA)**
+   - We do not sell personal information
+   - California residents may request disclosure of data collected and request deletion
+   - To exercise these rights, contact support@dockett.app
+10. **Children's Privacy**
+    - Docket is not directed at children under 18. We do not knowingly collect personal information from minors.
+11. **Cookies**
    - Authentication session cookies only (functional, not tracking)
    - Analytics cookies disclosed when analytics is added
-9. **Changes to This Policy**
-   - We may update this policy; users notified via email for material changes
-10. **Contact** — Email address for privacy inquiries
+12. **Changes to This Policy**
+    - We may update this policy; users notified via email for material changes
+13. **Contact** — support@dockett.app
 
 ## Terms of Service Content
 
@@ -107,6 +115,7 @@ Sections in order:
    - Docket is a tool to assist your workflow, not a replacement for professional accounting judgment
 7. **Third-Party Integrations**
    - QuickBooks Online connection is governed by Intuit's own terms of service
+   - We access your QuickBooks data to: (a) read your vendor list and chart of accounts for invoice mapping, (b) create bills from approved invoices, and (c) attach source documents to created bills. We do not read or modify other QuickBooks data.
    - Stripe billing is governed by Stripe's terms
    - We facilitate these connections but do not guarantee third-party uptime or accuracy
 8. **Billing & Subscription**
@@ -117,13 +126,17 @@ Sections in order:
    - Service provided "as is"
    - Not liable for errors in AI extraction, QuickBooks sync failures, or accounting decisions made based on extracted data
    - Total liability limited to fees paid in the prior 12 months
-10. **Termination**
+10. **Indemnification**
+    - You agree to indemnify JB Technologies LLC against claims arising from: (a) your use of the service, (b) data you approve and sync to QuickBooks, (c) your violation of these terms
+11. **Termination**
     - Either party may terminate at any time
     - On termination, you may request deletion of your data
     - We may suspend accounts that violate these terms
-11. **Governing Law** — State of registration for JB Technologies LLC
-12. **Changes to Terms** — Material changes notified via email, continued use = acceptance
-13. **Contact** — Email for legal inquiries
+12. **Dispute Resolution**
+    - Disputes resolved by binding arbitration (individual, not class action) with a small claims court carve-out
+    - Governed by the laws of the State of California
+13. **Changes to Terms** — Material changes notified via email, continued use = acceptance
+14. **Contact** — support@dockett.app
 
 ## Implementation Notes
 
@@ -131,7 +144,8 @@ Sections in order:
 - Shared layout: minimal header with Docket logo linking to `/`, centered prose container (`max-w-3xl mx-auto`), footer with links to both legal pages
 - Styling consistent with landing page aesthetic
 - No database, no API calls, no auth — pure static content
-- Add footer links to landing page (`app/page.tsx`) and signup page (`app/(auth)/signup/page.tsx`)
+- Each page displays "Last updated: March 18, 2026" under the title
+- Add footer links to landing page (`app/page.tsx`), signup page (`app/(auth)/signup/page.tsx`), and dashboard layout (`app/(dashboard)/layout.tsx`)
 
 ## Contact Email
 
