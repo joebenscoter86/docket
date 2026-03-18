@@ -58,10 +58,10 @@ describe("ExtractionForm confidence indicators", () => {
       );
       const borderClass =
         level === "high"
-          ? "border-green-500"
+          ? "border-accent"
           : level === "medium"
-            ? "border-amber-500"
-            : "border-red-500";
+            ? "border-warning"
+            : "border-error";
       const fieldsWithBorder = container.querySelectorAll(`.${borderClass}`);
       expect(fieldsWithBorder.length).toBeGreaterThan(0);
     }
@@ -151,16 +151,16 @@ describe("ExtractionForm confidence indicators", () => {
 
     // Vendor name field should have amber border initially
     const vendorInput = screen.getByDisplayValue("Acme Corp");
-    const vendorWrapper = vendorInput.closest(".border-amber-500");
+    const vendorWrapper = vendorInput.closest(".border-warning");
     expect(vendorWrapper).not.toBeNull();
 
     // Type in the field to change its value
     fireEvent.change(vendorInput, { target: { value: "Acme Corp Updated" } });
 
-    // Now the vendor wrapper should have blue border (changed), not amber
-    const updatedWrapper = vendorInput.closest(".border-blue-500");
+    // Now the vendor wrapper should have primary border (changed), not warning
+    const updatedWrapper = vendorInput.closest(".border-primary");
     expect(updatedWrapper).not.toBeNull();
-    const amberWrapper = vendorInput.closest(".border-amber-500");
-    expect(amberWrapper).toBeNull();
+    const warningWrapper = vendorInput.closest(".border-warning");
+    expect(warningWrapper).toBeNull();
   });
 });

@@ -168,10 +168,10 @@ export default function VendorSelect({
   if (!connected && !loading) {
     return (
       <div className="mt-2">
-        <label className="flex items-center gap-2 text-sm font-medium text-gray-700 mb-1">
+        <label className="flex items-center gap-2 text-sm font-medium text-text mb-1">
           QuickBooks Vendor
         </label>
-        <p className="text-sm text-amber-600">
+        <p className="text-sm text-warning">
           {error ?? "Connect QuickBooks in Settings to map vendors."}
         </p>
       </div>
@@ -182,10 +182,10 @@ export default function VendorSelect({
   if (loading) {
     return (
       <div className="mt-2">
-        <label className="flex items-center gap-2 text-sm font-medium text-gray-700 mb-1">
+        <label className="flex items-center gap-2 text-sm font-medium text-text mb-1">
           QuickBooks Vendor
         </label>
-        <div className="flex items-center gap-2 text-sm text-gray-400">
+        <div className="flex items-center gap-2 text-sm text-muted">
           <svg className="h-3.5 w-3.5 animate-spin" viewBox="0 0 24 24" fill="none">
             <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
             <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
@@ -198,21 +198,21 @@ export default function VendorSelect({
 
   return (
     <div className="mt-2" ref={containerRef}>
-      <label className="flex items-center gap-2 text-sm font-medium text-gray-700 mb-1">
+      <label className="flex items-center gap-2 text-sm font-medium text-text mb-1">
         QuickBooks Vendor
         {saving && (
-          <svg className="h-3.5 w-3.5 animate-spin text-gray-400" viewBox="0 0 24 24" fill="none">
+          <svg className="h-3.5 w-3.5 animate-spin text-muted" viewBox="0 0 24 24" fill="none">
             <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
             <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
           </svg>
         )}
         {saveStatus === "saved" && (
-          <svg className="h-3.5 w-3.5 text-green-500" viewBox="0 0 20 20" fill="currentColor">
+          <svg className="h-3.5 w-3.5 text-accent" viewBox="0 0 20 20" fill="currentColor">
             <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
           </svg>
         )}
         {saveStatus === "error" && (
-          <svg className="h-3.5 w-3.5 text-red-500" viewBox="0 0 20 20" fill="currentColor">
+          <svg className="h-3.5 w-3.5 text-error" viewBox="0 0 20 20" fill="currentColor">
             <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
           </svg>
         )}
@@ -222,11 +222,11 @@ export default function VendorSelect({
         {/* Selected display / search input */}
         {selectedRef && !isOpen ? (
           <div
-            className={`w-full border border-gray-200 rounded-md px-3 py-2 text-sm flex items-center justify-between ${disabled ? "bg-gray-100 cursor-not-allowed" : "cursor-pointer hover:border-gray-300"}`}
+            className={`w-full border border-border rounded-md px-3 py-2 text-sm flex items-center justify-between ${disabled ? "bg-background cursor-not-allowed" : "cursor-pointer hover:border-muted"}`}
             onClick={() => { if (!disabled) { setIsOpen(true); setTimeout(() => inputRef.current?.focus(), 0); } }}
           >
             <span className="flex items-center gap-2">
-              <svg className="h-3.5 w-3.5 text-green-500 shrink-0" viewBox="0 0 20 20" fill="currentColor">
+              <svg className="h-3.5 w-3.5 text-accent shrink-0" viewBox="0 0 20 20" fill="currentColor">
                 <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
               </svg>
               {selectedLabel}
@@ -235,7 +235,7 @@ export default function VendorSelect({
               <button
                 type="button"
                 onClick={(e) => { e.stopPropagation(); handleClear(); }}
-                className="text-gray-400 hover:text-gray-600 text-xs"
+                className="text-muted hover:text-muted text-xs"
                 aria-label="Clear vendor selection"
               >
                 &times;
@@ -246,7 +246,7 @@ export default function VendorSelect({
           <input
             ref={inputRef}
             type="text"
-            className="w-full border border-gray-200 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            className="w-full border border-border rounded-md px-3 py-2 text-sm focus:outline-none focus-visible:ring-[3px] focus-visible:ring-[#BFDBFE] focus:border-primary"
             placeholder={
               vendors.length === 0 && connected
                 ? "Type to search or create a vendor..."
@@ -263,11 +263,11 @@ export default function VendorSelect({
 
         {/* Dropdown */}
         {isOpen && filtered.length > 0 && (
-          <ul className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-md shadow-lg max-h-48 overflow-y-auto">
+          <ul className="absolute z-10 w-full mt-1 bg-white border border-border rounded-md shadow-lg max-h-48 overflow-y-auto">
             {filtered.map((v) => (
               <li
                 key={v.value}
-                className={`px-3 py-2 text-sm cursor-pointer hover:bg-blue-50 ${v.value === selectedRef ? "bg-blue-50 font-medium" : ""}`}
+                className={`px-3 py-2 text-sm cursor-pointer hover:bg-primary/5 ${v.value === selectedRef ? "bg-primary/5 font-medium" : ""}`}
                 onClick={() => handleSelect(v.value)}
               >
                 {v.label}
@@ -277,9 +277,9 @@ export default function VendorSelect({
         )}
 
         {isOpen && filtered.length === 0 && (
-          <div className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-md shadow-lg px-3 py-2">
+          <div className="absolute z-10 w-full mt-1 bg-white border border-border rounded-md shadow-lg px-3 py-2">
             {search && (
-              <p className="text-sm text-gray-400">
+              <p className="text-sm text-muted">
                 No vendors match &quot;{search}&quot;
               </p>
             )}
@@ -288,7 +288,7 @@ export default function VendorSelect({
                 type="button"
                 onClick={handleCreateVendor}
                 disabled={creating}
-                className="mt-1 w-full text-left text-sm text-blue-600 hover:text-blue-700 font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 py-1"
+                className="mt-1 w-full text-left text-sm text-primary hover:text-primary-hover font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 py-1"
               >
                 {creating ? (
                   <>
@@ -304,14 +304,14 @@ export default function VendorSelect({
               </button>
             )}
             {createError && (
-              <p className="mt-1 text-xs text-red-600">{createError}</p>
+              <p className="mt-1 text-xs text-error">{createError}</p>
             )}
           </div>
         )}
       </div>
 
       {!selectedRef && vendors.length > 0 && !isOpen && (
-        <p className="mt-1 text-xs text-amber-600">
+        <p className="mt-1 text-xs text-warning">
           Select a QuickBooks vendor before syncing.
         </p>
       )}

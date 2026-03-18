@@ -155,7 +155,7 @@ describe("InvoiceList", () => {
         hasCursor={false}
       />
     );
-    expect(screen.getByRole("link", { name: /next page/i })).toBeInTheDocument();
+    expect(screen.getByText("Next")).toBeInTheDocument();
   });
 
   it("does not show next page button when nextCursor is null", () => {
@@ -170,7 +170,7 @@ describe("InvoiceList", () => {
         hasCursor={false}
       />
     );
-    expect(screen.queryByRole("link", { name: /next page/i })).not.toBeInTheDocument();
+    expect(screen.queryByText("Next")).not.toBeInTheDocument();
   });
 
   it("shows previous page link when hasCursor is true", () => {
@@ -185,6 +185,6 @@ describe("InvoiceList", () => {
         hasCursor={true}
       />
     );
-    expect(screen.getByRole("link", { name: /previous page/i })).toBeInTheDocument();
+    expect(screen.getByText("Previous")).toBeInTheDocument();
   });
 });

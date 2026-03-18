@@ -62,11 +62,11 @@ export default async function ReviewPage({
       status: "error",
     });
     return (
-      <div className="flex flex-col items-center justify-center py-16 text-sm text-gray-500">
+      <div className="flex flex-col items-center justify-center py-16 text-sm text-muted">
         <p>Could not load document. The file may have been deleted.</p>
         <Link
           href="/invoices"
-          className="mt-3 text-blue-600 hover:text-blue-700"
+          className="mt-3 text-primary hover:text-primary-hover"
         >
           Back to Invoices
         </Link>

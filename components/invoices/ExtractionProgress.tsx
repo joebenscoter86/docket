@@ -57,31 +57,31 @@ function StepIcon({ state }: { state: StepState }) {
   switch (state) {
     case "complete":
       return (
-        <div className={`${baseClasses} bg-green-100`} data-testid="step-icon">
-          <svg className="w-4 h-4 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+        <div className={`${baseClasses} bg-accent/10`} data-testid="step-icon">
+          <svg className="w-4 h-4 text-accent" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
           </svg>
         </div>
       );
     case "active":
       return (
-        <div className={`${baseClasses} bg-blue-100`} data-testid="step-icon">
+        <div className={`${baseClasses} bg-primary/10`} data-testid="step-icon">
           <span className="relative flex h-3 w-3">
-            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75" />
-            <span className="relative inline-flex rounded-full h-3 w-3 bg-blue-600" />
+            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary/60 opacity-75" />
+            <span className="relative inline-flex rounded-full h-3 w-3 bg-primary" />
           </span>
         </div>
       );
     case "pending":
       return (
-        <div className={`${baseClasses} bg-gray-100`} data-testid="step-icon">
-          <span className="h-2 w-2 rounded-full bg-gray-300" />
+        <div className={`${baseClasses} bg-background`} data-testid="step-icon">
+          <span className="h-2 w-2 rounded-full bg-muted" />
         </div>
       );
     case "error":
       return (
-        <div className={`${baseClasses} bg-red-100`} data-testid="step-icon">
-          <svg className="w-4 h-4 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+        <div className={`${baseClasses} bg-error/10`} data-testid="step-icon">
+          <svg className="w-4 h-4 text-error" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
           </svg>
         </div>
@@ -92,13 +92,13 @@ function StepIcon({ state }: { state: StepState }) {
 function getStepTextColor(state: StepState): string {
   switch (state) {
     case "complete":
-      return "text-green-700";
+      return "text-accent";
     case "active":
-      return "text-blue-700";
+      return "text-primary";
     case "error":
-      return "text-red-700";
+      return "text-error";
     case "pending":
-      return "text-gray-400";
+      return "text-muted";
   }
 }
 
@@ -106,7 +106,7 @@ function getConnectorColor(fromState: StepState, toState: StepState): string {
   if (fromState === "complete" && toState !== "pending") {
     return "bg-green-400";
   }
-  return "bg-gray-200";
+  return "bg-border";
 }
 
 const isCompletionStatus = (status: InvoiceStatus | null): boolean =>
@@ -150,14 +150,14 @@ export default function ExtractionProgress({
       {status === "error" && (
         <div className="text-center space-y-3">
           {errorMessage && (
-            <p className="text-sm text-red-600">{errorMessage}</p>
+            <p className="text-sm text-error">{errorMessage}</p>
           )}
           {retryError && (
-            <p className="text-sm text-red-500">{retryError}</p>
+            <p className="text-sm text-error">{retryError}</p>
           )}
           <button
             onClick={onRetry}
-            className="px-4 py-2 rounded-md font-medium text-sm bg-red-600 text-white hover:bg-red-700 transition-colors duration-300"
+            className="px-4 py-2 rounded-md font-medium text-sm bg-error text-white hover:bg-red-700 transition-colors duration-300"
           >
             Retry
           </button>
@@ -167,7 +167,7 @@ export default function ExtractionProgress({
       {isCompletionStatus(status) && (
         <Link
           href={`/invoices/${invoiceId}/review`}
-          className="px-4 py-2 rounded-md font-medium text-sm bg-blue-600 text-white hover:bg-blue-700 transition-colors duration-300 animate-fade-in"
+          className="px-4 py-2 rounded-md font-medium text-sm bg-primary text-white hover:bg-primary-hover transition-colors duration-300 animate-fade-in"
         >
           Review Invoice
         </Link>
@@ -175,7 +175,7 @@ export default function ExtractionProgress({
 
       <button
         onClick={onUploadAnother}
-        className="text-sm text-gray-500 hover:text-gray-700 transition-colors duration-300"
+        className="text-sm text-muted hover:text-text transition-colors duration-300"
       >
         Upload another
       </button>

@@ -43,9 +43,9 @@ const FIELD_CONFIG: Record<
 const CURRENCY_OPTIONS = ["USD", "CAD", "EUR", "GBP", "AUD"];
 
 const CONFIDENCE_BORDER: Record<"high" | "medium" | "low", string> = {
-  high: "border-l-2 border-green-500 pl-3",
-  medium: "border-l-2 border-amber-500 pl-3",
-  low: "border-l-2 border-red-500 pl-3",
+  high: "border-l-2 border-accent pl-3",
+  medium: "border-l-2 border-warning pl-3",
+  low: "border-l-2 border-error pl-3",
 };
 
 export default function ExtractionForm({
@@ -260,21 +260,21 @@ export default function ExtractionForm({
 
     const wrapperClass = `relative ${
       changed
-        ? "border-l-2 border-blue-500 pl-3"
+        ? "border-l-2 border-primary pl-3"
         : confidenceScore !== null
           ? CONFIDENCE_BORDER[confidenceScore]
           : "pl-0"
     }`;
 
     const inputBase =
-      "w-full border rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500";
+      "w-full border rounded-md px-3 py-2 text-sm focus:outline-none focus-visible:ring-[3px] focus-visible:ring-[#BFDBFE] focus:border-primary";
     const inputClass = `${inputBase} ${
-      fieldError ? "border-red-500" : "border-gray-200"
+      fieldError ? "border-error" : "border-border"
     }`;
 
     return (
       <div key={field} className={wrapperClass}>
-        <label className="flex items-center gap-2 text-sm font-medium text-gray-700 mb-1">
+        <label className="flex items-center gap-2 text-sm font-medium text-text mb-1">
           {config.label}
           {!changed && confidenceScore !== null && <ConfidenceIcon level={confidenceScore} />}
           <FieldStatusIcon status={status} />
@@ -355,11 +355,11 @@ export default function ExtractionForm({
         )}
 
         {fieldError && (
-          <p className="mt-1 text-xs text-red-600">{fieldError}</p>
+          <p className="mt-1 text-xs text-error">{fieldError}</p>
         )}
 
         {field === "total_amount" && totalMismatch && (
-          <p className="mt-1 text-xs text-amber-600">
+          <p className="mt-1 text-xs text-warning">
             Total doesn&apos;t match subtotal + tax
           </p>
         )}
@@ -371,9 +371,9 @@ export default function ExtractionForm({
     <div className="space-y-6">
       {/* Low-confidence banner */}
       {confidenceScore === "low" && (
-        <div className="flex items-start gap-2 bg-amber-50 border border-amber-200 rounded-md p-3">
+        <div className="flex items-start gap-2 bg-warning/5 border border-warning/20 rounded-md p-3">
           <svg
-            className="h-5 w-5 text-amber-500 shrink-0 mt-0.5"
+            className="h-5 w-5 text-warning shrink-0 mt-0.5"
             viewBox="0 0 20 20"
             fill="currentColor"
             aria-hidden="true"
@@ -384,7 +384,7 @@ export default function ExtractionForm({
               clipRule="evenodd"
             />
           </svg>
-          <p className="text-sm text-amber-800">
+          <p className="text-sm text-warning">
             Some fields may need extra attention. Please review carefully.
           </p>
         </div>
@@ -392,7 +392,7 @@ export default function ExtractionForm({
 
       {/* Section 1: Invoice Details */}
       <div>
-        <h3 className="text-xs font-semibold uppercase tracking-wide text-gray-400 mb-4">
+        <h3 className="text-xs font-semibold uppercase tracking-wide text-muted mb-4">
           Invoice Details
         </h3>
         <div className="space-y-4">
@@ -422,7 +422,7 @@ export default function ExtractionForm({
         </div>
       </div>
 
-      <div className="border-t border-gray-200" />
+      <div className="border-t border-border" />
 
       {/* Section 2: Line Items */}
       <LineItemEditor
@@ -438,11 +438,11 @@ export default function ExtractionForm({
         disabled={currentStatus === "synced"}
       />
 
-      <div className="border-t border-gray-200" />
+      <div className="border-t border-border" />
 
       {/* Section 3: Amounts */}
       <div>
-        <h3 className="text-xs font-semibold uppercase tracking-wide text-gray-400 mb-4">
+        <h3 className="text-xs font-semibold uppercase tracking-wide text-muted mb-4">
           Amounts
         </h3>
         <div className="space-y-4">
@@ -457,7 +457,7 @@ export default function ExtractionForm({
       {/* Approve bar — only shown for pending_review invoices */}
       {invoiceStatus === "pending_review" && (
         <>
-          <div className="border-t border-gray-200" />
+          <div className="border-t border-border" />
           <ApproveBar
             invoiceId={invoiceId}
             vendorName={state.values.vendor_name}
@@ -469,7 +469,7 @@ export default function ExtractionForm({
       {/* Sync bar — shown for approved invoices */}
       {(currentStatus === "approved" || currentStatus === "synced") && (
         <>
-          <div className="border-t border-gray-200" />
+          <div className="border-t border-border" />
           <SyncBar
             invoiceId={invoiceId}
             invoiceStatus={currentStatus}
@@ -483,7 +483,7 @@ export default function ExtractionForm({
       {/* Sync status panel — shows sync history for approved/synced invoices */}
       {(currentStatus === "approved" || currentStatus === "synced") && (
         <>
-          <div className="border-t border-gray-200" />
+          <div className="border-t border-border" />
           <SyncStatusPanel
             key={syncKey}
             invoiceId={invoiceId}
@@ -503,7 +503,7 @@ function FieldStatusIcon({
   if (status === "saving") {
     return (
       <svg
-        className="h-3.5 w-3.5 animate-spin text-gray-400"
+        className="h-3.5 w-3.5 animate-spin text-muted"
         viewBox="0 0 24 24"
         fill="none"
       >
@@ -527,7 +527,7 @@ function FieldStatusIcon({
   if (status === "saved") {
     return (
       <svg
-        className="h-3.5 w-3.5 text-green-500 transition-opacity duration-300"
+        className="h-3.5 w-3.5 text-accent transition-opacity duration-300"
         viewBox="0 0 20 20"
         fill="currentColor"
       >
@@ -543,7 +543,7 @@ function FieldStatusIcon({
   if (status === "error") {
     return (
       <svg
-        className="h-3.5 w-3.5 text-red-500"
+        className="h-3.5 w-3.5 text-error"
         viewBox="0 0 20 20"
         fill="currentColor"
       >
@@ -563,7 +563,7 @@ function ConfidenceIcon({ level }: { level: "high" | "medium" | "low" }) {
   if (level === "high") {
     return (
       <svg
-        className="h-3.5 w-3.5 text-green-500"
+        className="h-3.5 w-3.5 text-accent"
         viewBox="0 0 20 20"
         fill="currentColor"
         aria-label="High confidence"
@@ -580,7 +580,7 @@ function ConfidenceIcon({ level }: { level: "high" | "medium" | "low" }) {
   if (level === "medium") {
     return (
       <svg
-        className="h-3.5 w-3.5 text-amber-500"
+        className="h-3.5 w-3.5 text-warning"
         viewBox="0 0 20 20"
         fill="currentColor"
         aria-label="Medium confidence"
@@ -597,7 +597,7 @@ function ConfidenceIcon({ level }: { level: "high" | "medium" | "low" }) {
   // low
   return (
     <svg
-      className="h-3.5 w-3.5 text-red-500"
+      className="h-3.5 w-3.5 text-error"
       viewBox="0 0 20 20"
       fill="currentColor"
       aria-label="Low confidence"

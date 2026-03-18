@@ -89,7 +89,7 @@ export default function InvoiceList({
   return (
     <div>
       {/* Filter Tabs */}
-      <div className="flex gap-1 border-b border-gray-200 mb-6">
+      <div className="flex gap-1 border-b border-border mb-6">
         {FILTER_TABS.map((tab) => {
           const isActive = currentStatus === tab.key;
           const count = counts[tab.key];
@@ -127,7 +127,7 @@ export default function InvoiceList({
 
       {/* Sort Controls */}
       <div className="flex items-center gap-2 mb-4">
-        <label htmlFor="sort-select" className="text-sm text-gray-500">
+        <label htmlFor="sort-select" className="text-sm text-muted">
           Sort by:
         </label>
         <select
@@ -139,7 +139,7 @@ export default function InvoiceList({
               cursor: undefined,
             }));
           }}
-          className="border border-gray-200 rounded-md px-2 py-1 text-sm text-gray-700"
+          className="border border-border rounded-md px-2 py-1 text-sm text-text"
         >
           {SORT_OPTIONS.map((opt) => (
             <option key={opt.value} value={opt.value}>
@@ -152,7 +152,7 @@ export default function InvoiceList({
             direction: currentDirection === "desc" ? "asc" : "desc",
             cursor: undefined,
           })}
-          className="p-1 text-gray-500 hover:text-gray-700"
+          className="p-1 text-muted hover:text-text"
           aria-label={`Sort ${currentDirection === "desc" ? "ascending" : "descending"}`}
         >
           {currentDirection === "desc" ? "\u2193" : "\u2191"}

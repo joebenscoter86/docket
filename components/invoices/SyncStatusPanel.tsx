@@ -68,7 +68,7 @@ export default function SyncStatusPanel({
 
   if (loading) {
     return (
-      <div className="flex items-center gap-2 text-sm text-gray-400 py-2">
+      <div className="flex items-center gap-2 text-sm text-muted py-2">
         <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none">
           <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
           <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
@@ -88,7 +88,7 @@ export default function SyncStatusPanel({
 
   return (
     <div className="space-y-3">
-      <h3 className="text-xs font-semibold uppercase tracking-wide text-gray-400">
+      <h3 className="text-xs font-semibold uppercase tracking-wide text-muted">
         Sync Status
       </h3>
 
@@ -96,17 +96,17 @@ export default function SyncStatusPanel({
       <div
         className={`rounded-md border p-3 ${
           latestLog.status === "success"
-            ? "border-green-200 bg-green-50"
-            : "border-red-200 bg-red-50"
+            ? "border-accent/20 bg-accent/5"
+            : "border-error/20 bg-error/5"
         }`}
       >
         <div className="flex items-start gap-2">
           {latestLog.status === "success" ? (
-            <svg className="h-5 w-5 text-green-600 shrink-0 mt-0.5" viewBox="0 0 20 20" fill="currentColor">
+            <svg className="h-5 w-5 text-accent shrink-0 mt-0.5" viewBox="0 0 20 20" fill="currentColor">
               <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
             </svg>
           ) : (
-            <svg className="h-5 w-5 text-red-600 shrink-0 mt-0.5" viewBox="0 0 20 20" fill="currentColor">
+            <svg className="h-5 w-5 text-error shrink-0 mt-0.5" viewBox="0 0 20 20" fill="currentColor">
               <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
             </svg>
           )}
@@ -114,26 +114,26 @@ export default function SyncStatusPanel({
             <div className="flex items-center justify-between gap-2">
               <span
                 className={`text-sm font-medium ${
-                  latestLog.status === "success" ? "text-green-800" : "text-red-800"
+                  latestLog.status === "success" ? "text-accent" : "text-error"
                 }`}
               >
                 {latestLog.status === "success"
                   ? "Synced to QuickBooks"
                   : "Sync Failed"}
               </span>
-              <span className="text-xs text-gray-500 shrink-0">
+              <span className="text-xs text-muted shrink-0">
                 {formatSyncTime(latestLog.synced_at)}
               </span>
             </div>
 
             {latestLog.status === "success" && latestLog.provider_bill_id && (
-              <p className="text-sm text-green-700 mt-1">
+              <p className="text-sm text-accent mt-1">
                 Bill ID: <span className="font-mono">{latestLog.provider_bill_id}</span>
               </p>
             )}
 
             {latestLog.status === "failed" && (
-              <p className="text-sm text-red-700 mt-1">
+              <p className="text-sm text-error mt-1">
                 {getErrorMessage(latestLog)}
               </p>
             )}
@@ -147,7 +147,7 @@ export default function SyncStatusPanel({
           <button
             type="button"
             onClick={() => setExpanded(!expanded)}
-            className="text-xs text-gray-500 hover:text-gray-700 flex items-center gap-1"
+            className="text-xs text-muted hover:text-text flex items-center gap-1"
           >
             <svg
               className={`h-3 w-3 transition-transform ${expanded ? "rotate-90" : ""}`}
@@ -158,7 +158,7 @@ export default function SyncStatusPanel({
             </svg>
             {previousLogs.length} previous attempt{previousLogs.length !== 1 ? "s" : ""}
             {hasFailures && !expanded && (
-              <span className="text-red-500 ml-1">
+              <span className="text-error ml-1">
                 ({logs.filter((l) => l.status === "failed").length} failed)
               </span>
             )}
@@ -171,32 +171,32 @@ export default function SyncStatusPanel({
                   key={log.id}
                   className={`text-sm rounded-md border px-3 py-2 ${
                     log.status === "success"
-                      ? "border-green-100 bg-green-50/50"
-                      : "border-red-100 bg-red-50/50"
+                      ? "border-accent/10 bg-accent/5"
+                      : "border-error/10 bg-error/5"
                   }`}
                 >
                   <div className="flex items-center justify-between gap-2">
                     <span className="flex items-center gap-1.5">
                       <span
                         className={`h-1.5 w-1.5 rounded-full ${
-                          log.status === "success" ? "bg-green-500" : "bg-red-500"
+                          log.status === "success" ? "bg-accent" : "bg-error"
                         }`}
                       />
-                      <span className={log.status === "success" ? "text-green-700" : "text-red-700"}>
+                      <span className={log.status === "success" ? "text-accent" : "text-error"}>
                         {log.status === "success" ? "Success" : "Failed"}
                       </span>
                       {log.provider_bill_id && (
-                        <span className="text-gray-500 font-mono text-xs">
+                        <span className="text-muted font-mono text-xs">
                           Bill {log.provider_bill_id}
                         </span>
                       )}
                     </span>
-                    <span className="text-xs text-gray-400">
+                    <span className="text-xs text-muted">
                       {formatSyncTime(log.synced_at)}
                     </span>
                   </div>
                   {log.status === "failed" && (
-                    <p className="text-xs text-red-600 mt-1 pl-4">
+                    <p className="text-xs text-error mt-1 pl-4">
                       {getErrorMessage(log)}
                     </p>
                   )}

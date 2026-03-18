@@ -27,9 +27,9 @@ interface LineItemEditorProps {
 
 const STATUS_BORDER: Record<string, string> = {
   idle: "border-b-2 border-transparent",
-  saving: "border-b-2 border-blue-400",
-  saved: "border-b-2 border-green-500",
-  error: "border-b-2 border-red-500",
+  saving: "border-b-2 border-primary/60",
+  saved: "border-b-2 border-accent",
+  error: "border-b-2 border-error",
 };
 
 export default function LineItemEditor({
@@ -253,27 +253,27 @@ export default function LineItemEditor({
   );
 
   const inputBase =
-    "w-full border border-gray-200 rounded-md px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500";
+    "w-full border border-border rounded-md px-2 py-1.5 text-sm focus:outline-none focus-visible:ring-[3px] focus-visible:ring-[#BFDBFE] focus:border-primary";
 
   // Empty state
   if (state.items.length === 0) {
     return (
       <div>
-        <h3 className="text-xs font-semibold uppercase tracking-wide text-gray-400 mb-4">
+        <h3 className="text-xs font-semibold uppercase tracking-wide text-muted mb-4">
           Line Items
         </h3>
         <div className="text-center py-6">
-          <p className="text-sm text-gray-400 mb-3">
+          <p className="text-sm text-muted mb-3">
             No line items were extracted. You can add them manually below.
           </p>
           <button
             onClick={handleAdd}
             disabled={adding}
-            className="text-sm text-blue-600 hover:text-blue-700 disabled:opacity-50"
+            className="text-sm text-primary hover:text-primary-hover disabled:opacity-50"
           >
             {adding ? "Adding..." : "+ Add line item"}
           </button>
-          {addError && <p className="mt-2 text-xs text-red-600">{addError}</p>}
+          {addError && <p className="mt-2 text-xs text-error">{addError}</p>}
         </div>
       </div>
     );
@@ -281,17 +281,17 @@ export default function LineItemEditor({
 
   return (
     <div>
-      <h3 className="text-xs font-semibold uppercase tracking-wide text-gray-400 mb-4">
+      <h3 className="text-xs font-semibold uppercase tracking-wide text-muted mb-4">
         Line Items
       </h3>
 
       {/* Table header */}
       <div className="grid grid-cols-[1fr_70px_100px_100px_140px_32px] gap-x-2 items-center mb-1">
-        <span className="text-xs font-medium text-gray-500 uppercase">Description</span>
-        <span className="text-xs font-medium text-gray-500 uppercase text-right">Qty</span>
-        <span className="text-xs font-medium text-gray-500 uppercase text-right">Unit Price</span>
-        <span className="text-xs font-medium text-gray-500 uppercase text-right">Amount</span>
-        <span className="text-xs font-medium text-gray-500 uppercase">GL Account</span>
+        <span className="text-xs font-medium text-muted uppercase">Description</span>
+        <span className="text-xs font-medium text-muted uppercase text-right">Qty</span>
+        <span className="text-xs font-medium text-muted uppercase text-right">Unit Price</span>
+        <span className="text-xs font-medium text-muted uppercase text-right">Amount</span>
+        <span className="text-xs font-medium text-muted uppercase">GL Account</span>
         <span />
       </div>
 
@@ -315,7 +315,7 @@ export default function LineItemEditor({
                 onBlur={() => handleBlur(item.id, "description")}
               />
               {item.fieldErrors.description && (
-                <p className="text-xs text-red-600 mt-0.5">{item.fieldErrors.description}</p>
+                <p className="text-xs text-error mt-0.5">{item.fieldErrors.description}</p>
               )}
             </div>
 
@@ -382,7 +382,7 @@ export default function LineItemEditor({
               <input
                 type="text"
                 inputMode="decimal"
-                className={`${inputBase} text-right bg-gray-50`}
+                className={`${inputBase} text-right bg-background`}
                 placeholder="$0.00"
                 value={
                   focusedCell === `${item.id}.amount`
@@ -428,7 +428,7 @@ export default function LineItemEditor({
                     handleRemove(item.id);
                   }
                 }}
-                className="text-gray-400 hover:text-red-500 transition-colors"
+                className="text-muted hover:text-error transition-colors"
                 aria-label="Remove line item"
               >
                 ×
@@ -438,17 +438,17 @@ export default function LineItemEditor({
 
           {/* Confirmation bar — full width below the row */}
           {confirmRemoveId === item.id && (
-            <div className="flex items-center justify-end gap-2 py-1.5 px-2 text-xs bg-red-50 rounded-md mt-0.5">
-              <span className="text-gray-600">Remove last item?</span>
+            <div className="flex items-center justify-end gap-2 py-1.5 px-2 text-xs bg-error/5 rounded-md mt-0.5">
+              <span className="text-muted">Remove last item?</span>
               <button
                 onClick={() => handleRemove(item.id)}
-                className="text-red-600 hover:text-red-700 font-medium"
+                className="text-error hover:text-error font-medium"
               >
                 Yes, remove
               </button>
               <button
                 onClick={() => setConfirmRemoveId(null)}
-                className="text-gray-500 hover:text-gray-700"
+                className="text-muted hover:text-text"
               >
                 Cancel
               </button>
@@ -463,11 +463,11 @@ export default function LineItemEditor({
         <button
           onClick={handleAdd}
           disabled={adding}
-          className="text-sm text-blue-600 hover:text-blue-700 disabled:opacity-50"
+          className="text-sm text-primary hover:text-primary-hover disabled:opacity-50"
         >
           {adding ? "Adding..." : "+ Add line item"}
         </button>
-        {addError && <p className="mt-1 text-xs text-red-600">{addError}</p>}
+        {addError && <p className="mt-1 text-xs text-error">{addError}</p>}
       </div>
     </div>
   );

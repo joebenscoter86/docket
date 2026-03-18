@@ -10,7 +10,7 @@ const PdfViewer = dynamic(() => import("./PdfViewer"), {
   loading: () => (
     <div className="flex h-full items-center justify-center">
       <div className="text-center animate-pulse">
-        <p className="text-sm text-gray-400">Loading document viewer...</p>
+        <p className="text-sm text-muted">Loading document viewer...</p>
       </div>
     </div>
   ),
@@ -33,9 +33,9 @@ interface ReviewLayoutProps {
 type MobileTab = "document" | "details";
 
 const CONFIDENCE_CONFIG = {
-  high: { dotClass: "bg-green-500", label: "High confidence" },
-  medium: { dotClass: "bg-amber-500", label: "Medium confidence" },
-  low: { dotClass: "bg-red-500", label: "Low confidence" },
+  high: { dotClass: "bg-accent", label: "High confidence" },
+  medium: { dotClass: "bg-warning", label: "Medium confidence" },
+  low: { dotClass: "bg-error", label: "Low confidence" },
 } as const;
 
 export default function ReviewLayout({
@@ -50,11 +50,11 @@ export default function ReviewLayout({
   return (
     <div className="flex flex-col h-full -m-6">
       {/* Page header */}
-      <div className="flex items-center gap-3 border-b border-gray-200 bg-white px-4 py-3 md:px-6">
+      <div className="flex items-center gap-3 border-b border-border bg-white px-4 py-3 md:px-6">
         {/* Back button */}
         <Link
           href="/invoices"
-          className="flex items-center gap-1 text-sm text-gray-500 hover:text-gray-700 transition-colors shrink-0"
+          className="flex items-center gap-1 text-sm text-muted hover:text-text transition-colors shrink-0"
         >
           <svg
             xmlns="http://www.w3.org/2000/svg"
@@ -71,7 +71,7 @@ export default function ReviewLayout({
         </Link>
 
         {/* File name */}
-        <span className="truncate text-sm font-medium text-slate-800 min-w-0">
+        <span className="truncate text-sm font-medium text-text min-w-0">
           {invoice.fileName}
         </span>
 
@@ -79,7 +79,7 @@ export default function ReviewLayout({
         <div className="ml-auto flex items-center gap-3 shrink-0">
           <InvoiceStatusBadge status={invoice.status} />
           {confidence && (
-            <span className="hidden md:flex items-center gap-1.5 text-xs text-gray-500">
+            <span className="hidden md:flex items-center gap-1.5 text-xs text-muted">
               <span className={`h-2 w-2 rounded-full ${CONFIDENCE_CONFIG[confidence].dotClass}`} />
               {CONFIDENCE_CONFIG[confidence].label}
             </span>
@@ -93,15 +93,15 @@ export default function ReviewLayout({
       </div>
 
       {/* Mobile tab bar */}
-      <div className="flex border-b border-gray-200 bg-white md:hidden" role="tablist">
+      <div className="flex border-b border-border bg-white md:hidden" role="tablist">
         <button
           role="tab"
           aria-selected={activeTab === "document"}
           onClick={() => setActiveTab("document")}
           className={`flex-1 py-2.5 text-sm font-medium text-center transition-colors ${
             activeTab === "document"
-              ? "text-blue-600 border-b-2 border-blue-600"
-              : "text-gray-500 hover:text-gray-700"
+              ? "text-primary border-b-2 border-primary"
+              : "text-muted hover:text-text"
           }`}
         >
           Document
@@ -112,8 +112,8 @@ export default function ReviewLayout({
           onClick={() => setActiveTab("details")}
           className={`flex-1 py-2.5 text-sm font-medium text-center transition-colors ${
             activeTab === "details"
-              ? "text-blue-600 border-b-2 border-blue-600"
-              : "text-gray-500 hover:text-gray-700"
+              ? "text-primary border-b-2 border-primary"
+              : "text-muted hover:text-text"
           }`}
         >
           Details
@@ -126,7 +126,7 @@ export default function ReviewLayout({
         <div
           className={`${
             activeTab === "document" ? "flex" : "hidden"
-          } md:flex w-full md:w-1/2 overflow-y-auto md:border-r md:border-gray-200`}
+          } md:flex w-full md:w-1/2 overflow-y-auto md:border-r md:border-border`}
         >
           <div className="flex-1">
             <PdfViewer signedUrl={signedUrl} fileType={invoice.fileType} />
@@ -143,13 +143,13 @@ export default function ReviewLayout({
             {extractedData ? (
               <ExtractionForm extractedData={extractedData} invoiceId={invoice.id} invoiceStatus={invoice.status} errorMessage={invoice.errorMessage} />
             ) : (
-              <div className="flex items-center justify-center h-full text-sm text-gray-400">
+              <div className="flex items-center justify-center h-full text-sm text-muted">
                 <div className="text-center">
                   <p>No extraction data found.</p>
                   <p className="mt-1">Please retry extraction.</p>
                   <Link
                     href="/invoices"
-                    className="mt-3 inline-block text-blue-600 hover:text-blue-700 text-sm"
+                    className="mt-3 inline-block text-primary hover:text-primary-hover text-sm"
                   >
                     Back to Invoices
                   </Link>

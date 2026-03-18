@@ -56,10 +56,10 @@ describe("UploadZone", () => {
   });
 
   describe("Idle state", () => {
-    it('renders "Drag & drop your invoice" and "or click to browse"', () => {
+    it('renders "Drag & drop invoices here" and "Browse Files" button', () => {
       render(<UploadZone />);
-      expect(screen.getByText("Drag & drop your invoice")).toBeInTheDocument();
-      expect(screen.getByText("or click to browse")).toBeInTheDocument();
+      expect(screen.getByText("Drag & drop invoices here")).toBeInTheDocument();
+      expect(screen.getByText("Browse Files")).toBeInTheDocument();
     });
   });
 
@@ -207,7 +207,7 @@ describe("UploadZone", () => {
       fireEvent.click(screen.getByText("Upload Another"));
 
       expect(
-        screen.getByText("Drag & drop your invoice")
+        screen.getByText("Drag & drop invoices here")
       ).toBeInTheDocument();
     });
   });
@@ -298,7 +298,7 @@ describe("UploadZone", () => {
 
       fireEvent.dragLeave(zone);
       expect(
-        screen.getByText("Drag & drop your invoice")
+        screen.getByText("Drag & drop invoices here")
       ).toBeInTheDocument();
     });
 
