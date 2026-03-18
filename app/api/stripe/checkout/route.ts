@@ -1,5 +1,101 @@
-import { NextResponse } from "next/server";
+import { createClient } from "@/lib/supabase/server";
+import { stripe } from "@/lib/stripe/client";
+import { getOrCreateStripeCustomer } from "@/lib/stripe/helpers";
+import {
+  authError,
+  validationError,
+  conflict,
+  internalError,
+  apiSuccess,
+} from "@/lib/utils/errors";
+import { logger } from "@/lib/utils/logger";
 
-export async function POST() {
-  return NextResponse.json({ error: "Not implemented", code: "NOT_IMPLEMENTED" }, { status: 501 });
+export async function POST(request: Request) {
+  const start = Date.now();
+
+  // 1. Auth
+  const supabase = createClient();
+  const {
+    data: { user },
+    error: authErr,
+  } = await supabase.auth.getUser();
+
+  if (authErr || !user) {
+    return authError();
+  }
+
+  logger.info("stripe_checkout.start", { userId: user.id });
+
+  try {
+    // 2. Fetch org membership
+    const { data: membership } = await supabase
+      .from("org_memberships")
+      .select("org_id")
+      .eq("user_id", user.id)
+      .limit(1)
+      .single();
+
+    const orgId = membership?.org_id ?? "";
+
+    // 3. Guard: check design partner and subscription status
+    const { data: userData, error: userErr } = await supabase
+      .from("users")
+      .select("is_design_partner, subscription_status")
+      .eq("id", user.id)
+      .single();
+
+    if (userErr || !userData) {
+      return internalError("Failed to fetch user data");
+    }
+
+    if (userData.is_design_partner) {
+      return validationError("Design partners don't need a subscription.");
+    }
+
+    if (userData.subscription_status === "active") {
+      return conflict("Subscription already active.");
+    }
+
+    // 4. Get or create Stripe customer
+    const stripeCustomerId = await getOrCreateStripeCustomer(
+      user.id,
+      user.email!
+    );
+
+    // 5. Create Checkout Session
+    const origin = new URL(request.url).origin;
+    const session = await stripe.checkout.sessions.create({
+      mode: "subscription",
+      line_items: [
+        {
+          price: process.env.STRIPE_GROWTH_PRICE_ID!,
+          quantity: 1,
+        },
+      ],
+      customer: stripeCustomerId,
+      success_url: `${origin}/app/settings?subscribed=true`,
+      cancel_url: `${origin}/app/settings`,
+      client_reference_id: user.id,
+      subscription_data: {
+        metadata: { userId: user.id, orgId },
+      },
+    });
+
+    logger.info("stripe_checkout.success", {
+      userId: user.id,
+      orgId,
+      status: "success",
+      durationMs: Date.now() - start,
+    });
+
+    return apiSuccess({ sessionUrl: session.url });
+  } catch (err) {
+    logger.error("stripe_checkout.error", {
+      userId: user.id,
+      status: "error",
+      error: err instanceof Error ? err.message : "Unknown error",
+      durationMs: Date.now() - start,
+    });
+    return internalError("Failed to create checkout session");
+  }
 }
