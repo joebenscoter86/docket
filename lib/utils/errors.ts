@@ -7,6 +7,7 @@ export type ErrorCode =
   | "CONFLICT"
   | "RATE_LIMITED"
   | "UNPROCESSABLE"
+  | "SUBSCRIPTION_REQUIRED"
   | "INTERNAL_ERROR"
   | "NOT_IMPLEMENTED";
 
@@ -50,6 +51,10 @@ export function rateLimited(message = "Too many requests") {
 
 export function unprocessableEntity(message: string) {
   return apiError({ error: message, code: "UNPROCESSABLE", status: 422 });
+}
+
+export function subscriptionRequired(message: string, details?: Record<string, unknown>) {
+  return apiError({ error: message, code: "SUBSCRIPTION_REQUIRED", status: 402, details });
 }
 
 export function internalError(message = "Internal server error") {
