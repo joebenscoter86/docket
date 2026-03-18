@@ -70,12 +70,12 @@ export default function Sidebar({ isOpen, onClose, userName, userEmail }: Sideba
   const sidebarContent = (
     <div className="flex h-full flex-col bg-surface border-r border-border">
       {/* Logo */}
-      <div className="flex items-center px-5 pt-6 pb-8">
+      <div className="flex items-center px-4 pt-6 pb-8">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src="/dockett_logo.png"
           alt="Docket"
-          className="h-10 w-auto"
+          className="w-[75%]"
         />
         {/* Close button - mobile only */}
         <button
