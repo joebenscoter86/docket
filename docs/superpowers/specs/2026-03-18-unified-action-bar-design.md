@@ -64,16 +64,40 @@ interface ActionBarProps {
 
 ### Internal state
 
+These are **UI-level states** within the ActionBar, distinct from the invoice status (`currentStatus` prop) that drives which phase of the bar is shown.
+
 ```typescript
 type ActionBarState =
   | "idle"           // Ready to show primary action
   | "approving"      // Approve API call in flight
-  | "approved"       // Brief success flash before transitioning to sync
-  | "confirming"     // Sync confirm gate (3s timeout)
+  | "approved"       // Brief success flash (500ms) before transitioning to sync
+  | "confirming"     // Sync confirm gate (3s timeout back to idle)
   | "syncing"        // Sync API call in flight
   | "synced"         // Sync success
-  | "failed";        // Sync failed, can retry
+  | "failed";        // Sync failed — can retry via confirm gate
 ```
+
+**State transitions:**
+
+```
+[When currentStatus === "pending_review"]
+  idle → (click Approve) → approving → approved → (500ms) → idle
+    ↑                                                         ↓
+    └─────── (approve error) ──────────────────────────────────┘
+  (onStatusChange("approved") called, parent updates currentStatus)
+
+[When currentStatus === "approved"]
+  idle → (click Sync) → confirming → (click Confirm) → syncing → synced
+    ↑         ↑              ↓ (3s timeout)                ↓
+    │         └──────────────┘                             failed
+    │                                                       ↓
+    └───────────────────── (click Retry) ─────────── confirming
+  (onStatusChange("synced") called on success)
+```
+
+**Note:** `failed` only applies to sync, not approve. Approve errors return to `idle`.
+
+The ActionBar does **not** render for `uploading`, `extracting`, or `error` invoice statuses — only for `pending_review`, `approved`, and `synced`.
 
 ### Approve flow
 
@@ -85,12 +109,13 @@ type ActionBarState =
 
 ### Sync flow
 
-1. User clicks "Sync to QuickBooks"
-2. Bar enters "confirming" state — button text changes to "Confirm Sync" (3s timeout back to idle)
-3. User clicks "Confirm Sync"
-4. `POST /api/invoices/{id}/sync`
+1. User clicks "Sync to QuickBooks" (or "Retry Sync" after a failure)
+2. Bar enters "confirming" state — button text changes to "Confirm Sync" (or "Confirm Retry" if `isRetry`) with 3s timeout back to idle
+3. User clicks "Confirm Sync" / "Confirm Retry"
+4. Endpoint selection: `isRetry` → `POST /api/invoices/{id}/sync/retry`, otherwise `POST /api/invoices/{id}/sync`
 5. On success: call `onStatusChange("synced")`, bar shows success state
 6. Attachment warning surfaces inline if PDF attach failed
+7. **Retry from failed state:** clicking "Retry Sync" enters the confirm gate (failed → confirming), same as a fresh sync attempt
 
 ### Validation
 
@@ -135,7 +160,18 @@ Replace the two conditional rendering blocks (lines 457-481 in current Extractio
 )}
 ```
 
-The `handleSyncComplete` callback is replaced by `onStatusChange` — the ActionBar calls `onStatusChange("approved")` or `onStatusChange("synced")` and ExtractionForm's `setCurrentStatus` handles the rest.
+The `handleSyncComplete` callback is replaced by a new `handleStatusChange` that does both jobs the old callback did:
+
+```typescript
+const handleStatusChange = useCallback((newStatus: InvoiceStatus) => {
+  setCurrentStatus(newStatus);
+  if (newStatus === "synced") {
+    setSyncKey((k) => k + 1); // refresh SyncStatusPanel
+  }
+}, []);
+```
+
+This is passed as `onStatusChange={handleStatusChange}` to the ActionBar.
 
 ### What gets deleted
 
