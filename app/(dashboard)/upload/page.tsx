@@ -35,12 +35,13 @@ export default function UploadPage() {
 
   return (
     <div className="mx-auto max-w-2xl">
-      <h1 className="text-lg font-semibold text-primary">Upload Invoice</h1>
+      <h1 className="font-headings font-bold text-[32px] text-text tracking-tight">Upload Invoices</h1>
+      <p className="font-body text-[15px] text-muted mt-2">Drop your PDF or image files — AI will extract the data automatically.</p>
       <div className="mt-6">
         {!invoiceId ? (
           <UploadZone onUploadComplete={handleUploadComplete} />
         ) : (
-          <div className="rounded-lg border border-gray-200 bg-white p-8">
+          <div className="rounded-brand-lg border border-border bg-surface p-8">
             <ExtractionProgress
               invoiceId={invoiceId}
               status={status}

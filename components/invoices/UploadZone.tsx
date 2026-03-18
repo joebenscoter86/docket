@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef, useCallback } from "react";
+import Button from "@/components/ui/Button";
 
 type UploadState = "idle" | "dragging" | "uploading" | "success";
 
@@ -210,17 +211,17 @@ export default function UploadZone({ onUploadComplete }: UploadZoneProps) {
         aria-describedby={error ? "upload-error" : undefined}
         className={`
           relative flex flex-col items-center justify-center
-          min-h-[200px] md:min-h-[300px]
-          rounded-lg border-2 border-dashed
-          transition-colors duration-200
+          w-[80%] mx-auto min-h-[360px]
+          rounded-brand-lg border-2 border-dashed
+          shadow-soft
           focus:outline-none focus:ring-2 focus:ring-accent focus:ring-offset-2
           p-4 md:p-8
           ${
             isDragging
-              ? "border-accent bg-blue-50"
+              ? "border-primary border-solid bg-[#EFF6FF] scale-[1.02] transition-all duration-150 ease-in-out"
               : isUploading || isSuccess
-              ? "border-gray-300 bg-white"
-              : "border-gray-300 bg-white hover:border-accent cursor-pointer"
+              ? "border-border bg-surface transition-all duration-150 ease-in-out"
+              : "border-[#CBD5E1] bg-surface hover:border-primary cursor-pointer transition-all duration-150 ease-in-out"
           }
         `}
         onClick={handleClick}
@@ -240,9 +241,9 @@ export default function UploadZone({ onUploadComplete }: UploadZoneProps) {
 
         {/* Idle state */}
         {state === "idle" && (
-          <div className="flex flex-col items-center gap-3">
+          <div className="flex flex-col items-center gap-4">
             <svg
-              className="h-12 w-12 text-gray-400"
+              className="h-14 w-14 text-muted"
               fill="none"
               viewBox="0 0 24 24"
               stroke="currentColor"
@@ -254,21 +255,30 @@ export default function UploadZone({ onUploadComplete }: UploadZoneProps) {
                 d="M12 16.5V9.75m0 0l3 3m-3-3l-3 3M6.75 19.5a4.5 4.5 0 01-1.41-8.775 5.25 5.25 0 0110.338-2.32 4.502 4.502 0 013.516 5.307A4.5 4.5 0 0118 19.5H6.75z"
               />
             </svg>
-            <p className="text-sm font-medium text-gray-700">
-              Drag & drop your invoice
+            <p className="font-headings font-bold text-2xl text-text">
+              Drag & drop invoices here
             </p>
-            <p className="text-sm text-gray-500">or click to browse</p>
-            <p className="text-xs text-gray-400">
-              PDF, JPG, or PNG up to 10MB
+            <p className="font-body text-sm text-muted">
+              PDF, PNG, JPG up to 10MB
             </p>
+            <Button
+              variant="primary"
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                inputRef.current?.click();
+              }}
+            >
+              Browse Files
+            </Button>
           </div>
         )}
 
         {/* Dragging state */}
         {state === "dragging" && (
-          <div className="flex flex-col items-center gap-3">
+          <div className="flex flex-col items-center gap-4">
             <svg
-              className="h-12 w-12 text-accent"
+              className="h-14 w-14 text-primary"
               fill="none"
               viewBox="0 0 24 24"
               stroke="currentColor"
@@ -280,7 +290,7 @@ export default function UploadZone({ onUploadComplete }: UploadZoneProps) {
                 d="M12 16.5V9.75m0 0l3 3m-3-3l-3 3M6.75 19.5a4.5 4.5 0 01-1.41-8.775 5.25 5.25 0 0110.338-2.32 4.502 4.502 0 013.516 5.307A4.5 4.5 0 0118 19.5H6.75z"
               />
             </svg>
-            <p className="text-sm font-medium text-accent">
+            <p className="font-headings font-bold text-2xl text-primary">
               Drop your file here
             </p>
           </div>
@@ -289,22 +299,22 @@ export default function UploadZone({ onUploadComplete }: UploadZoneProps) {
         {/* Uploading state */}
         {state === "uploading" && (
           <div className="flex w-full flex-col items-center gap-3">
-            <p className="text-sm font-medium text-gray-700">{fileName}</p>
+            <p className="text-sm font-medium text-text">{fileName}</p>
             <div className="w-full max-w-xs">
               <div
                 role="progressbar"
                 aria-valuenow={progress}
                 aria-valuemin={0}
                 aria-valuemax={100}
-                className="h-2 w-full overflow-hidden rounded-full bg-gray-200"
+                className="h-2 w-full overflow-hidden rounded-full bg-background"
               >
                 <div
-                  className="h-full rounded-full bg-accent transition-all duration-300"
+                  className={`h-full rounded-full transition-all duration-300 ${progress >= 100 ? "bg-accent" : "bg-primary"}`}
                   style={{ width: `${progress}%` }}
                 />
               </div>
             </div>
-            <p className="text-xs text-gray-500">Uploading... {progress}%</p>
+            <p className="text-xs text-muted">Uploading... {progress}%</p>
           </div>
         )}
 
@@ -312,7 +322,7 @@ export default function UploadZone({ onUploadComplete }: UploadZoneProps) {
         {state === "success" && (
           <div className="flex flex-col items-center gap-3">
             <svg
-              className="h-12 w-12 text-success"
+              className="h-12 w-12 text-accent"
               fill="none"
               viewBox="0 0 24 24"
               stroke="currentColor"
@@ -324,21 +334,21 @@ export default function UploadZone({ onUploadComplete }: UploadZoneProps) {
                 d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
               />
             </svg>
-            <p className="text-sm font-medium text-gray-700">{fileName}</p>
+            <p className="text-accent font-medium text-sm">{fileName}</p>
             <div className="flex items-center gap-2">
               <span className="relative flex h-2 w-2">
                 <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-accent opacity-75" />
                 <span className="relative inline-flex h-2 w-2 rounded-full bg-accent" />
               </span>
-              <p className="text-xs text-gray-500">Processing...</p>
+              <p className="text-xs text-muted">Processing...</p>
             </div>
-            <button
+            <Button
+              variant="outline"
               type="button"
-              className="mt-2 rounded-md border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
               onClick={handleUploadAnother}
             >
               Upload Another
-            </button>
+            </Button>
           </div>
         )}
       </div>
