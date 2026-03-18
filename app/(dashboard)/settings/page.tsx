@@ -3,6 +3,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { loadConnection } from "@/lib/quickbooks/auth";
 import { QBOConnectionCard } from "@/components/settings/QBOConnectionCard";
 import { SettingsAlert } from "@/components/settings/SettingsAlert";
+import Button from "@/components/ui/Button";
 
 export default async function SettingsPage({
   searchParams,
@@ -46,10 +47,12 @@ export default async function SettingsPage({
   }
 
   return (
-    <div className="max-w-2xl space-y-6">
+    <div className="max-w-[600px] mx-auto space-y-9">
       <div>
-        <h1 className="text-xl font-semibold text-slate-800">Settings</h1>
-        <p className="mt-1 text-sm text-gray-500">
+        <h1 className="font-headings font-bold text-[32px] text-text tracking-tight">
+          Settings
+        </h1>
+        <p className="mt-1 font-body text-[15px] text-muted">
           Manage your account, connections, and billing.
         </p>
       </div>
@@ -62,30 +65,62 @@ export default async function SettingsPage({
         <SettingsAlert type="error" message={searchParams.qbo_error} />
       )}
 
-      {/* QuickBooks Connection */}
-      <QBOConnectionCard connection={qboConnection} />
+      {/* Connections Section */}
+      <div>
+        <p className="text-[13px] font-bold uppercase tracking-wider text-muted mb-3">
+          Connections
+        </p>
+        <QBOConnectionCard connection={qboConnection} />
+      </div>
 
-      {/* Account Info */}
-      <div className="rounded-lg border border-gray-200 bg-white p-6">
-        <h2 className="text-base font-semibold text-slate-800">Account</h2>
-        <div className="mt-4 space-y-3">
-          <div>
-            <label className="text-sm font-medium text-gray-700">Email</label>
-            <p className="mt-1 text-sm text-gray-900">{user?.email}</p>
-          </div>
-          <div>
-            <label className="text-sm font-medium text-gray-700">Organization</label>
-            <p className="mt-1 text-sm text-gray-900">{orgName || "—"}</p>
+      {/* Account Section */}
+      <div>
+        <p className="text-[13px] font-bold uppercase tracking-wider text-muted mb-3">
+          Account
+        </p>
+        <div className="bg-surface rounded-brand-lg shadow-soft px-6 py-6">
+          <div className="space-y-4">
+            <div>
+              <label className="text-sm font-medium text-muted block mb-1.5">
+                Email
+              </label>
+              <div className="bg-background rounded-brand-md px-3.5 py-2.5 text-[14px] text-text">
+                {user?.email}
+              </div>
+            </div>
+            <div>
+              <label className="text-sm font-medium text-muted block mb-1.5">
+                Organization
+              </label>
+              <div className="bg-background rounded-brand-md px-3.5 py-2.5 text-[14px] text-text">
+                {orgName || "—"}
+              </div>
+            </div>
           </div>
         </div>
       </div>
 
-      {/* Billing (placeholder for Stripe) */}
-      <div className="rounded-lg border border-gray-200 bg-white p-6">
-        <h2 className="text-base font-semibold text-slate-800">Billing</h2>
-        <p className="mt-2 text-sm text-gray-500">
-          Billing management coming soon.
+      {/* Billing Section */}
+      <div>
+        <p className="text-[13px] font-bold uppercase tracking-wider text-muted mb-3">
+          Billing
         </p>
+        <div className="bg-surface rounded-brand-lg shadow-soft px-6 py-6">
+          <div className="flex items-center gap-3 mb-2">
+            <h3 className="font-headings font-bold text-xl text-text">
+              Growth Plan
+            </h3>
+            <span className="inline-flex items-center px-3 py-1 rounded-full bg-[#FEF3C7] text-[#92400E] text-xs font-medium">
+              Design Partner
+            </span>
+          </div>
+          <p className="font-body text-sm text-muted mb-5">
+            You have free access to all MVP features as a design partner. Capped at 100 invoices/month.
+          </p>
+          <div className="flex justify-end">
+            <Button variant="outline">Manage Billing</Button>
+          </div>
+        </div>
       </div>
     </div>
   );
