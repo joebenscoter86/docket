@@ -71,18 +71,15 @@ export default function Sidebar({ isOpen, onClose, userName, userEmail }: Sideba
   const sidebarContent = (
     <div className="flex h-full flex-col bg-surface border-r border-border">
       {/* Logo */}
-      <div className="flex items-center gap-3 px-5 pt-6 pb-8">
+      <div className="flex items-center px-5 pt-6 pb-8">
         <Image
           src="/dockett_logo.png"
-          alt="Docket logo"
-          width={36}
-          height={36}
-          className="h-9 w-9"
+          alt="Docket"
+          width={180}
+          height={40}
+          className="h-10 w-auto"
+          priority
         />
-        <div className="flex flex-col">
-          <span className="font-headings text-lg font-bold text-text">Docket</span>
-          <span className="text-xs text-muted font-body">Automated Invoicing</span>
-        </div>
         {/* Close button - mobile only */}
         <button
           onClick={onClose}
