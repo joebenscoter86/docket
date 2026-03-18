@@ -1,6 +1,5 @@
 'use client'
 
-import Image from 'next/image'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
@@ -72,13 +71,11 @@ export default function Sidebar({ isOpen, onClose, userName, userEmail }: Sideba
     <div className="flex h-full flex-col bg-surface border-r border-border">
       {/* Logo */}
       <div className="flex items-center px-5 pt-6 pb-8">
-        <Image
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
           src="/dockett_logo.png"
           alt="Docket"
-          width={180}
-          height={40}
           className="h-10 w-auto"
-          priority
         />
         {/* Close button - mobile only */}
         <button
