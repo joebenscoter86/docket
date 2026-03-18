@@ -33,7 +33,7 @@ A web app where small businesses upload invoices (PDF, image, or email), AI extr
 |-------|-----------|
 | Frontend | Next.js 14 (App Router, TypeScript) |
 | Styling | Tailwind CSS (no component libraries) |
-| Hosting | Vercel |
+| Hosting | Vercel (`dockett.app`) |
 | Database | Supabase Postgres |
 | Auth | Supabase Auth (email/password) |
 | File Storage | Supabase Storage |
@@ -287,7 +287,8 @@ CREATE TABLE accounting_connections (
   refresh_token TEXT NOT NULL,   -- encrypted with AES-256-GCM
   token_expires_at TIMESTAMPTZ NOT NULL,
   company_id TEXT NOT NULL,      -- provider's company/tenant ID
-  connected_at TIMESTAMPTZ DEFAULT now()
+  connected_at TIMESTAMPTZ DEFAULT now(),
+  UNIQUE(org_id, provider)       -- one connection per org per provider (DOC-49)
 );
 
 CREATE TABLE invoices (
@@ -404,7 +405,7 @@ CREATE POLICY "org_memberships_self_access" ON org_memberships
 - **Workspace:** JKBTech
 - **Team:** Docket (key: `DOC`)
 - **Issue prefix:** Per-phase (FND, EXT, REV, QBO, BIL)
-- **Issue IDs in Linear:** DOC-1 through DOC-43
+- **Issue IDs in Linear:** DOC-1 through DOC-48
 
 | Project | Issues | Linear IDs | Timeline |
 |---------|--------|------------|----------|
@@ -412,7 +413,23 @@ CREATE POLICY "org_memberships_self_access" ON org_memberships
 | Upload & Extraction | 7 issues | DOC-12 to DOC-18 | Weeks 3-5 |
 | Review & Correction UI | 7 issues | DOC-19 to DOC-25 | Weeks 5-7 |
 | QuickBooks Integration | 9 issues | DOC-26 to DOC-34 | Weeks 7-9 |
-| Billing & Launch Prep | 9 issues | DOC-35 to DOC-43 | Weeks 9-11 |
+| Billing & Launch Prep | 10 issues | DOC-35 to DOC-43 + DOC-48 | Weeks 9-11 |
+
+### Phase 5 Build Sequence
+
+DOC-35 (Stripe account setup) is **backlogged** — Joe's LLC is being filed. All billing code builds against Stripe test mode with placeholder env vars. Plug in real credentials when LLC is ready.
+
+| Tier | Issue | Title | Notes |
+|------|-------|-------|-------|
+| 1 — Design Foundation | DOC-48 | UI Redesign (Precision Flow) | Goes first so all new screens inherit the design system |
+| 2 — Billing Infra | DOC-36 | Subscription flow (pricing, Checkout, webhooks) | Stripe test mode, placeholder keys |
+| 2 — Billing Infra | DOC-37 | Access gating (subscription check) | Depends on DOC-36 |
+| 2 — Billing Infra | DOC-39 | Usage tracking | Depends on DOC-36 |
+| 3 — User Experience | DOC-38 | Onboarding flow (3-step + design partner badge) | Full wizard, not banner nudge |
+| 3 — User Experience | DOC-40 | Settings page (account, billing, QBO) | Can parallel with DOC-38 |
+| 3 — User Experience | DOC-42 | Landing page | Copy to be workshopped with Joe |
+| 4 — Polish & Ship | DOC-41 | Error states & edge cases | Audit after everything is built |
+| 4 — Polish & Ship | DOC-43 | Beta launch prep (Sentry, analytics, prod checklist) | Final gate before first beta user |
 
 **Workflow:**
 1. Pull the next issue from Linear by ID (e.g., `DOC-5`)
@@ -590,13 +607,15 @@ All four checks must pass before a PR can be merged. No exceptions.
 |-------------|----------|--------|-----|--------|
 | Local dev | Dev project (local or remote) | `next dev` | Sandbox app | Test mode |
 | PR preview | Dev project | Preview deploy | Sandbox app | Test mode |
-| Production | Production project | Production deploy | Production app | Live mode |
+| Production | Production project | Production deploy (`dockett.app`) | Production app | Live mode |
 
+- **Production domain:** `dockett.app` (live on Vercel as of 2026-03-17)
 - Supabase dev and production are separate projects with separate credentials
 - Never use production Supabase credentials in local dev or preview deploys
 - QBO sandbox and production are separate apps with separate OAuth credentials
 - Stripe test mode uses `sk_test_*` keys; live mode uses `sk_live_*` keys
 - All environment variables are set in Vercel dashboard per-environment (Preview vs Production)
+- **Supabase Auth** Site URL must be `https://dockett.app` and redirect URLs must include `https://dockett.app/**`
 
 ---
 
@@ -641,7 +660,7 @@ All four checks must pass before a PR can be merged. No exceptions.
 - New env vars require a **new deployment** to take effect — existing preview deploys won't pick them up. Push a new commit or hit "Redeploy" in the dashboard.
 - **Env var environment strategy:** Most vars (Supabase, Anthropic, Encryption) can use "All Environments" during dev since they're all sandbox/dev credentials. Exceptions:
   - `QBO_ENVIRONMENT`: set per-environment (`sandbox` for Preview, `production` for Production)
-  - `QBO_REDIRECT_URI`: different per environment (preview URL vs production URL)
+  - `QBO_REDIRECT_URI`: `https://dockett.app/api/auth/callback/quickbooks` for Production, preview URL for Preview
   - Stripe keys: different per environment (`sk_test_*` for Preview, `sk_live_*` for Production)
   - When going to production, swap all credentials to production-grade values per-environment.
 
@@ -654,6 +673,9 @@ All four checks must pass before a PR can be merged. No exceptions.
 - Fire-and-forget for non-critical operations: email failures must never fail the parent operation.
 - Zsh glob quoting: paths with parentheses like `app/(tabs)/advisor.tsx` must be quoted in shell commands.
 - **Invoice list uses server-side rendering with URL-based state (Approach A).** If users report sluggish filter/sort interactions (200ms+ delay), or invoice volume exceeds ~500/org, upgrade to hybrid approach (server initial load, client-side for subsequent filter/sort/pagination). The API route stays the same — just wrap the table in a client component that fetches directly. A few hours of work.
+- **Date-only strings (DATE columns) must use `T00:00:00` suffix when constructing `new Date()`.** Without it, JS parses `"2026-03-01"` as UTC midnight, which displays as the previous day in US timezones. The `ExtractionForm` avoids this because `<input type="date">` handles `YYYY-MM-DD` natively.
+- **Supabase upsert requires a unique constraint on the conflict columns.** `onConflict: "col1,col2"` silently falls back to insert if no matching unique/exclusion constraint exists. Always add the DB constraint first.
+- **Dev server is pinned to port 3000** (`next dev --port 3000`). QBO OAuth redirect URI is registered as `localhost:3000` in Intuit's developer portal. If port 3000 is occupied, kill the process on that port rather than letting Next.js auto-increment.
 
 ---
 
@@ -732,8 +754,16 @@ Run these before declaring any issue done:
 | 2026-03-15 | Claude Vision API as primary extractor, provider-agnostic interface | Best accuracy for invoice extraction. Abstraction allows swapping to Google Doc AI or future providers without rewrite. | Architecture |
 | 2026-03-15 | Per-phase Linear prefixes (FND, EXT, REV, QBO, BIL) | Phases have distinct domains. Prefix makes branch names and commits immediately identifiable by domain. | Scaffold |
 | 2026-03-15 | First 10 customers free (design partners, not revenue) | Need real invoice data and real feedback before optimizing for revenue. Capped at 100 invoices/month. | Business |
+| 2026-03-17 | Production domain `dockett.app` live on Vercel | Custom domain purchased and deployed. QBO redirect URI, Supabase Auth Site URL, and Stripe webhook must use this domain in production. | Infra |
+| 2026-03-17 | UI redesign (DOC-48) goes first in Phase 5 | New screens (onboarding, landing, billing) get built in Precision Flow from day one instead of building twice. | Phase 5 |
+| 2026-03-17 | DOC-35 (Stripe account setup) backlogged until LLC filed | Build all billing infra against Stripe test mode with placeholder keys. Plug in real credentials when ready. | DOC-35 |
+| 2026-03-17 | Full onboarding wizard, not banner nudge | 3-step flow (Welcome → Connect QBO → Upload First Invoice). Design partners get visible badge per DOC-48 mockup. | DOC-38 |
+| 2026-03-17 | Landing page at dockett.app root, app at /app/* | Single Next.js deployment. Unauth → landing page, auth → redirect to /app/invoices. No separate marketing site. | DOC-42 |
 | 2026-03-16 | Invoice list: server-side rendering with URL state (Approach A) | Simplest pattern, bookmarkable URLs, fast at MVP scale. Upgrade to hybrid (server initial + client subsequent) when filter latency >200ms or invoice volume >500/org. | DOC-25 |
 | 2026-03-15 | Single pricing tier for MVP ($99/mo Growth) | One price, one plan, zero decision paralysis for early users. Tiered pricing comes with Phase 2+. | Business |
+| 2026-03-18 | `UNIQUE(org_id, provider)` on `accounting_connections` | delete+insert had a race condition causing duplicate rows. Upsert with `onConflict` is atomic. | DOC-49 |
+| 2026-03-18 | Date-only strings parsed as local time, not UTC | `new Date("2026-03-01")` → UTC midnight → wrong day in US timezones. Append `T00:00:00` for local parsing. | DOC-50 |
+| 2026-03-18 | Dev server pinned to port 3000 | QBO OAuth redirect URI must match Intuit's registered URI exactly. Auto-incrementing ports break the callback. | DOC-51 |
 
 ---
 
@@ -762,7 +792,7 @@ ANTHROPIC_API_KEY=
 # QuickBooks
 QBO_CLIENT_ID=
 QBO_CLIENT_SECRET=
-QBO_REDIRECT_URI=
+QBO_REDIRECT_URI=              # Production: https://dockett.app/api/auth/callback/quickbooks
 QBO_ENVIRONMENT=sandbox    # sandbox | production
 
 # Stripe
