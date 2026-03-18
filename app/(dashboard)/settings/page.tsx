@@ -3,12 +3,12 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { loadConnection } from "@/lib/quickbooks/auth";
 import { QBOConnectionCard } from "@/components/settings/QBOConnectionCard";
 import { SettingsAlert } from "@/components/settings/SettingsAlert";
-import Button from "@/components/ui/Button";
+import { BillingCard } from "@/components/settings/BillingCard";
 
 export default async function SettingsPage({
   searchParams,
 }: {
-  searchParams: { qbo_success?: string; qbo_error?: string };
+  searchParams: { qbo_success?: string; qbo_error?: string; subscribed?: string };
 }) {
   const supabase = createClient();
   const { data: { user } } = await supabase.auth.getUser();
@@ -24,6 +24,21 @@ export default async function SettingsPage({
   const orgId = membership?.org_id ?? "";
   const orgNameData = membership?.organizations as { name: string }[] | { name: string } | null;
   const orgName = Array.isArray(orgNameData) ? orgNameData[0]?.name ?? "" : orgNameData?.name ?? "";
+
+  // Fetch user billing data
+  const { data: userData } = await supabase
+    .from("users")
+    .select("id, stripe_customer_id, subscription_status, is_design_partner")
+    .eq("id", user!.id)
+    .single();
+
+  const billingUser = {
+    id: user!.id,
+    email: user!.email!,
+    stripe_customer_id: userData?.stripe_customer_id ?? null,
+    subscription_status: userData?.subscription_status ?? null,
+    is_design_partner: userData?.is_design_partner ?? false,
+  };
 
   // Check QBO connection status
   let qboConnection: {
@@ -63,6 +78,9 @@ export default async function SettingsPage({
       )}
       {searchParams.qbo_error && (
         <SettingsAlert type="error" message={searchParams.qbo_error} />
+      )}
+      {searchParams.subscribed === "true" && (
+        <SettingsAlert type="success" message="Subscription activated! You're on the Growth plan." />
       )}
 
       {/* Connections Section */}
@@ -105,22 +123,7 @@ export default async function SettingsPage({
         <p className="text-[13px] font-bold uppercase tracking-wider text-muted mb-3">
           Billing
         </p>
-        <div className="bg-surface rounded-brand-lg shadow-soft px-6 py-6">
-          <div className="flex items-center gap-3 mb-2">
-            <h3 className="font-headings font-bold text-xl text-text">
-              Growth Plan
-            </h3>
-            <span className="inline-flex items-center px-3 py-1 rounded-full bg-[#FEF3C7] text-[#92400E] text-xs font-medium">
-              Design Partner
-            </span>
-          </div>
-          <p className="font-body text-sm text-muted mb-5">
-            You have free access to all MVP features as a design partner. Capped at 100 invoices/month.
-          </p>
-          <div className="flex justify-end">
-            <Button variant="outline">Manage Billing</Button>
-          </div>
-        </div>
+        <BillingCard user={billingUser} />
       </div>
     </div>
   );
