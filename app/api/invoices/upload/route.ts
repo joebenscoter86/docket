@@ -12,6 +12,7 @@ import {
 } from "@/lib/utils/errors";
 import { logger } from "@/lib/utils/logger";
 import { runExtraction } from "@/lib/extraction/run";
+import { waitUntil } from "@vercel/functions";
 
 export async function POST(request: Request) {
   const startTime = Date.now();
@@ -186,26 +187,29 @@ export async function POST(request: Request) {
       status: "success",
     });
 
-    // 9. Auto-trigger extraction (fire-and-forget)
+    // 9. Auto-trigger extraction (fire-and-forget via waitUntil)
     // Extraction progress is tracked via realtime subscription on the client.
-    // Don't block the upload response — return immediately so the progress bar completes.
-    runExtraction({
-      invoiceId,
-      orgId: orgId!,
-      userId: userId!,
-      filePath: storagePath,
-      fileType,
-    }).catch(() => {
-      // Extraction failure is non-fatal for the upload response.
-      // Invoice status is already set to 'error' by runExtraction.
-      // User can retry via the extract endpoint.
-      logger.warn("invoice_upload_extraction_failed", {
-        userId,
-        orgId,
+    // waitUntil keeps the serverless function alive after the response is sent,
+    // so the extraction promise completes instead of being killed by Vercel.
+    waitUntil(
+      runExtraction({
         invoiceId,
-        status: "extraction_failed",
-      });
-    });
+        orgId: orgId!,
+        userId: userId!,
+        filePath: storagePath,
+        fileType,
+      }).catch(() => {
+        // Extraction failure is non-fatal for the upload response.
+        // Invoice status is already set to 'error' by runExtraction.
+        // User can retry via the extract endpoint.
+        logger.warn("invoice_upload_extraction_failed", {
+          userId,
+          orgId,
+          invoiceId,
+          status: "extraction_failed",
+        });
+      })
+    );
 
     return apiSuccess({
       invoiceId,
