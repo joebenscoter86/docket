@@ -244,7 +244,7 @@ export default function ExtractionForm({
 
   const currency = (state.values.currency as string) ?? "USD";
 
-  // Compute sync blockers for SyncBar
+  // Compute sync blockers for ActionBar
   const syncBlockers: string[] = [];
   if (!vendorRef) syncBlockers.push("Select a QuickBooks vendor");
   if (lineItemsMissingGl > 0) {

@@ -111,7 +111,7 @@ export default function ActionBar({
       setBarState("confirming");
       setErrorMessage(null);
       setWarning(null);
-      // Revert to idle on timeout (matches original SyncBar behavior)
+      // Revert to idle on timeout
       confirmTimer.current = setTimeout(() => {
         setBarState("idle");
       }, 3000);
