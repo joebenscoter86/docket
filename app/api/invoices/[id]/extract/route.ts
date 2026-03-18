@@ -1,7 +1,8 @@
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { runExtraction } from "@/lib/extraction/run";
-import { authError, notFound, conflict, internalError, apiSuccess } from "@/lib/utils/errors";
+import { authError, notFound, conflict, internalError, apiSuccess, subscriptionRequired } from "@/lib/utils/errors";
+import { checkInvoiceAccess } from "@/lib/billing/access";
 import { logger } from "@/lib/utils/logger";
 
 const BLOCKED_STATUSES = ["extracting", "approved", "synced"] as const;
@@ -22,6 +23,23 @@ export async function POST(
   }
 
   logger.info("extract_route_start", { action: "extract", invoiceId, userId: user.id });
+
+  // 1b. Subscription check
+  const access = await checkInvoiceAccess(user.id);
+  if (!access.allowed) {
+    logger.warn("extract_route_access_denied", {
+      action: "extract",
+      invoiceId,
+      userId: user.id,
+      reason: access.reason,
+      subscriptionStatus: access.subscriptionStatus,
+      trialExpired: access.trialExpired,
+    });
+    return subscriptionRequired("Subscription required to extract invoice data.", {
+      subscriptionStatus: access.subscriptionStatus,
+      trialExpired: access.trialExpired,
+    });
+  }
 
   // 2. Ownership check via server client (RLS enforces ownership)
   const { data: invoice, error: invoiceErr } = await client

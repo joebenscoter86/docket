@@ -43,6 +43,11 @@ vi.mock("@/lib/extraction/run", () => ({
   runExtraction: (...args: unknown[]) => mockRunExtraction(...args),
 }));
 
+const mockCheckInvoiceAccess = vi.fn().mockResolvedValue({ allowed: true, reason: "active_subscription" });
+vi.mock("@/lib/billing/access", () => ({
+  checkInvoiceAccess: (...args: unknown[]) => mockCheckInvoiceAccess(...args),
+}));
+
 // Helpers
 function makeRequest(invoiceId = "inv-1") {
   return {
@@ -96,6 +101,26 @@ describe("POST /api/invoices/[id]/extract", () => {
 
     expect(res.status).toBe(401);
     expect(body.code).toBe("AUTH_ERROR");
+  });
+
+  it("returns 402 when user does not have an active subscription", async () => {
+    mockGetUser.mockResolvedValue({
+      data: { user: { id: "user-1" } },
+      error: null,
+    });
+    mockCheckInvoiceAccess.mockResolvedValueOnce({
+      allowed: false,
+      reason: "no_subscription",
+      subscriptionStatus: "inactive",
+      trialExpired: true,
+    });
+
+    const { request, params } = makeRequest();
+    const res = await POST(request, { params });
+    const body = await res.json();
+
+    expect(res.status).toBe(402);
+    expect(body.code).toBe("SUBSCRIPTION_REQUIRED");
   });
 
   it("returns 404 when invoice is not found or not owned by user", async () => {
