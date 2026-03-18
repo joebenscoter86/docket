@@ -46,7 +46,10 @@ export default async function InvoicesPage({ searchParams }: InvoicesPageProps) 
   return (
     <div className="p-6">
       <div className="flex items-center justify-between mb-8">
-        <h1 className="font-headings font-bold text-[32px] text-text tracking-tight">Invoices</h1>
+        <div>
+          <h1 className="font-headings font-bold text-[32px] text-text tracking-tight">Invoices</h1>
+          <p className="font-body text-[15px] text-muted mt-1">Manage and sync extracted document data.</p>
+        </div>
         <Link href="/upload">
           <Button variant="primary">
             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="h-4 w-4 mr-2">

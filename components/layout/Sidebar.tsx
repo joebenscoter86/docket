@@ -95,25 +95,28 @@ export default function Sidebar({ isOpen, onClose, userName, userEmail }: Sideba
       </div>
 
       {/* Nav links */}
-      <nav className="flex-1 space-y-1 px-3 py-4">
-        {navItems.map((item) => {
-          const isActive = pathname.startsWith(item.href)
-          return (
-            <Link
-              key={item.href}
-              href={item.href}
-              onClick={onClose}
-              className={`flex items-center gap-3 rounded-brand-md px-3 py-2.5 text-sm font-body transition-all duration-150 ease-in-out ${
-                isActive
-                  ? 'bg-nav-active text-primary font-bold'
-                  : 'text-muted hover:bg-background hover:text-text'
-              }`}
-            >
-              {item.icon}
-              {item.label}
-            </Link>
-          )
-        })}
+      <nav className="flex-1 px-3 py-4">
+        <p className="text-[11px] font-bold uppercase tracking-wider text-muted px-3 mb-3">Menu</p>
+        <div className="space-y-1">
+          {navItems.map((item) => {
+            const isActive = pathname.startsWith(item.href)
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                onClick={onClose}
+                className={`flex items-center gap-3 rounded-brand-md px-3 py-2.5 text-sm font-body transition-all duration-150 ease-in-out ${
+                  isActive
+                    ? 'bg-nav-active text-primary font-bold'
+                    : 'text-muted hover:bg-background hover:text-text'
+                }`}
+              >
+                {item.icon}
+                {item.label}
+              </Link>
+            )
+          })}
+        </div>
       </nav>
 
       {/* User badge + sign out */}

@@ -89,11 +89,18 @@ export default function InvoiceList({
   return (
     <div>
       {/* Filter Tabs */}
-      <div className="flex gap-1 border-b border-border mb-6">
+      <div className="flex gap-2 mb-6">
         {FILTER_TABS.map((tab) => {
           const isActive = currentStatus === tab.key;
           const count = counts[tab.key];
-          const isPendingReview = tab.key === "pending_review" && count > 0;
+
+          // Dot color per status
+          const dotColors: Record<string, string> = {
+            pending_review: 'bg-warning',
+            approved: 'bg-primary',
+            synced: 'bg-accent',
+            error: 'bg-error',
+          };
 
           return (
             <Link
@@ -102,22 +109,21 @@ export default function InvoiceList({
                 status: tab.key === "all" ? undefined : tab.key,
                 cursor: undefined,
               })}
-              className={`px-4 py-2 text-sm border-b-2 -mb-px flex items-center gap-2 ${
+              className={`inline-flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium transition-all duration-150 ease-in-out ${
                 isActive
-                  ? "text-primary border-primary font-bold"
-                  : "text-muted hover:text-text border-transparent"
+                  ? "bg-primary text-white shadow-soft"
+                  : "bg-surface text-text border border-border hover:border-primary/30"
               }`}
             >
+              {tab.key !== 'all' && (
+                <span className={`h-2 w-2 rounded-full ${
+                  isActive ? 'bg-white/70' : (dotColors[tab.key] || 'bg-muted')
+                }`} />
+              )}
               {tab.label}
-              <span
-                className={`text-xs px-1.5 py-0.5 rounded-full ${
-                  isPendingReview
-                    ? "bg-primary text-white"
-                    : isActive
-                    ? "bg-[#DBEAFE] text-primary"
-                    : "bg-[#F1F5F9] text-muted"
-                }`}
-              >
+              <span className={`text-xs font-bold ${
+                isActive ? "text-white/80" : "text-muted"
+              }`}>
                 {count}
               </span>
             </Link>
@@ -182,38 +188,31 @@ export default function InvoiceList({
               </thead>
               <tbody>
                 {invoices.map((invoice) => (
-                  <tr key={invoice.id} className="border-b border-[#F1F5F9] transition-all duration-150 ease-in-out hover:bg-background group">
-                    <td colSpan={7} className="p-0">
-                      <Link
-                        href={`/invoices/${invoice.id}/review`}
-                        className="grid grid-cols-[1fr_1fr_auto_auto_auto_auto_auto] w-full"
-                      >
-                        <span className="py-3.5 px-3 text-[14px] text-text truncate max-w-[200px]">
-                          {invoice.file_name}
-                        </span>
-                        <span className="py-3.5 px-3 text-[14px] font-medium text-text">
-                          {invoice.extracted_data?.vendor_name ?? (
-                            <span className="text-muted">Pending</span>
-                          )}
-                        </span>
-                        <span className="py-3.5 px-3 font-mono text-[13px] text-[#475569]">
-                          {invoice.extracted_data?.invoice_number ?? "\u2014"}
-                        </span>
-                        <span className="py-3.5 px-3 font-mono text-[13px] text-[#475569]">
-                          {formatDate(invoice.extracted_data?.invoice_date ?? null)}
-                        </span>
-                        <span className="py-3.5 px-3 text-[14px] text-right font-mono">
-                          {invoice.extracted_data?.total_amount != null
-                            ? formatCurrency(invoice.extracted_data.total_amount, null)
-                            : "\u2014"}
-                        </span>
-                        <span className="py-3.5 px-3">
-                          <InvoiceStatusBadge status={invoice.status} />
-                        </span>
-                        <span className="py-3.5 px-3 text-[14px] text-muted group-hover:opacity-100 opacity-70 transition-opacity">
-                          {formatRelativeTime(invoice.uploaded_at)}
-                        </span>
-                      </Link>
+                  <tr key={invoice.id} className="border-b border-[#F1F5F9] transition-all duration-150 ease-in-out hover:bg-background group cursor-pointer" onClick={() => router.push(`/invoices/${invoice.id}/review`)}>
+                    <td className="py-3.5 px-3 text-[14px] text-text truncate max-w-[200px]">
+                      {invoice.file_name}
+                    </td>
+                    <td className="py-3.5 px-3 text-[14px] font-medium text-text">
+                      {invoice.extracted_data?.vendor_name ?? (
+                        <span className="text-muted">Pending</span>
+                      )}
+                    </td>
+                    <td className="py-3.5 px-3 font-mono text-[13px] text-[#475569]">
+                      {invoice.extracted_data?.invoice_number ?? "\u2014"}
+                    </td>
+                    <td className="py-3.5 px-3 font-mono text-[13px] text-[#475569]">
+                      {formatDate(invoice.extracted_data?.invoice_date ?? null)}
+                    </td>
+                    <td className="py-3.5 px-3 text-[14px] text-right font-mono">
+                      {invoice.extracted_data?.total_amount != null
+                        ? formatCurrency(invoice.extracted_data.total_amount, null)
+                        : "\u2014"}
+                    </td>
+                    <td className="py-3.5 px-3">
+                      <InvoiceStatusBadge status={invoice.status} />
+                    </td>
+                    <td className="py-3.5 px-3 text-[14px] text-muted">
+                      {formatRelativeTime(invoice.uploaded_at)}
                     </td>
                   </tr>
                 ))}
