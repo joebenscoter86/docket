@@ -1,9 +1,32 @@
+:root {
+  --color-primary: #3B82F6;
+  --color-background: #F8FAFC;
+  --color-surface: #FFFFFF;
+  --color-text: #0F172A;
+  --color-muted: #94A3B8;
+  --color-accent: #10B981;
+  --color-warning: #F59E0B;
+  --color-error: #DC2626;
+  --color-border: #E2E8F0;
+  --color-nav-active-bg: #EFF6FF;
+
+  --font-headings: 'Cabinet Grotesk', sans-serif;
+  --font-body: 'Satoshi', sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
+
+  --radius-brand-sm: 8px;
+  --radius-brand-md: 12px;
+  --radius-brand-lg: 24px;
+
+  --shadow-soft: 0 12px 40px -8px rgba(15, 23, 42, 0.06);
+  --shadow-float: 0 20px 60px -12px rgba(15, 23, 42, 0.12);
+}
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 body {
-  color: #1e293b;
-  background: #f9fafb;
-  font-family: "Inter", system-ui, -apple-system, sans-serif;
+  color: var(--color-text);
+  background: var(--color-background);
 }
