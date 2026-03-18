@@ -30,9 +30,7 @@ Initialize the Stripe SDK with `STRIPE_SECRET_KEY`. Single server-side instance.
 
 Three exported functions:
 
-- `getOrCreateStripeCustomer(userId: string, email: string): Promise<string>` — Checks `users.stripe_customer_id`. If null, creates a Stripe customer with `email` and `metadata: { userId }`, stores the ID back via admin Supabase client, returns the customer ID. If already set, returns existing ID.
-
-- `getSubscriptionStatus(userId: string): Promise<string | null>` — Reads `users.subscription_status` from DB. Returns the status string or null.
+- `getOrCreateStripeCustomer(userId: string, email: string): Promise<string>` — Checks `users.stripe_customer_id`. If null, creates a Stripe customer with `email` and `metadata: { userId }`, stores the ID back via admin Supabase client, returns the customer ID. If already set, returns existing ID. **Race condition guard:** If two concurrent requests both see null, both create Stripe customers. Mitigate by attempting the DB update first — if another request already stored a `stripe_customer_id`, re-read and return the existing one (same upsert pattern used in DOC-49 for QBO connections).
 
 - `createBillingPortalUrl(stripeCustomerId: string, returnUrl: string): Promise<string>` — Creates a Stripe Customer Portal session and returns the URL.
 
@@ -47,8 +45,9 @@ All DB writes use the admin Supabase client (`createAdminClient()`) since webhoo
 **Flow:**
 1. Authenticate user
 2. Fetch org membership (existing pattern)
-3. Call `getOrCreateStripeCustomer(user.id, user.email)` to ensure Stripe customer exists
-4. Create Stripe Checkout Session:
+3. **Guard:** If `is_design_partner = true`, return `VALIDATION_ERROR`: "Design partners don't need a subscription." If `subscription_status = 'active'`, return `CONFLICT`: "Subscription already active."
+4. Call `getOrCreateStripeCustomer(user.id, user.email)` to ensure Stripe customer exists
+5. Create Stripe Checkout Session:
    - `mode: 'subscription'`
    - `line_items`: single item with `price: STRIPE_GROWTH_PRICE_ID` (env var), `quantity: 1`
    - `customer`: Stripe customer ID
@@ -56,9 +55,11 @@ All DB writes use the admin Supabase client (`createAdminClient()`) since webhoo
    - `cancel_url`: `{origin}/app/settings`
    - `client_reference_id`: user UUID
    - `subscription_data.metadata`: `{ userId, orgId }`
-5. Return `{ data: { sessionUrl: session.url } }`
+6. Return `{ data: { sessionUrl: session.url } }`
 
 **Client behavior:** On button click, POST to the route, then `window.location.href = sessionUrl`.
+
+**Logging:** Structured logging at entry and exit per Architecture Rule 8: `logger.info('stripe_checkout', { userId, orgId, status, durationMs })`.
 
 **New env var:** `STRIPE_GROWTH_PRICE_ID` — the Stripe Price ID for the $99/mo Growth plan. Added to `.env.example`.
 
@@ -68,16 +69,16 @@ All DB writes use the admin Supabase client (`createAdminClient()`) since webhoo
 
 **Auth:** None (called by Stripe). Verify webhook signature via `stripe.webhooks.constructEvent(rawBody, signature, STRIPE_WEBHOOK_SECRET)`. Return 400 on verification failure.
 
-**Raw body handling:** Use `request.text()` to get the raw body (Next.js App Router doesn't auto-parse when you don't call `.json()`). Pass raw string to `constructEvent`.
+**Raw body handling:** Use `Buffer.from(await request.arrayBuffer())` to get the raw body as a Buffer. This is safer than `request.text()` — avoids potential encoding issues that could cause signature verification to fail silently.
 
 **Events:**
 
 | Event | User Lookup | Action |
 |-------|-------------|--------|
 | `checkout.session.completed` | `client_reference_id` (user UUID) | Set `subscription_status = 'active'`. Store `stripe_customer_id` if not already set. |
+| `customer.subscription.created` | `stripe_customer_id` from `users` table | Same mapping as `.updated`. Covers subscriptions created via Stripe dashboard/API. |
 | `customer.subscription.updated` | `stripe_customer_id` from `users` table | Map Stripe status: `active`\|`trialing` → `'active'`, `past_due` → `'past_due'`, `canceled`\|`unpaid` → `'cancelled'`. |
 | `customer.subscription.deleted` | `stripe_customer_id` from `users` table | Set `subscription_status = 'cancelled'`. |
-| `invoice.payment_failed` | `stripe_customer_id` from event's `customer` field → `users` table | Set `subscription_status = 'past_due'`. |
 
 **Idempotency:** All operations are idempotent upserts (setting status to a deterministic value). No dedup table needed at MVP scale.
 
@@ -94,11 +95,13 @@ All DB writes use the admin Supabase client (`createAdminClient()`) since webhoo
 **Auth:** Required.
 
 **Flow:**
-1. Authenticate user
-2. Fetch `stripe_customer_id` from `users` table
+1. Authenticate user via auth-scoped Supabase client
+2. Fetch `stripe_customer_id` from `users` table (auth-scoped client — user's own row, RLS handles it)
 3. If no customer ID, return `VALIDATION_ERROR`: "No billing account found"
 4. Call `createBillingPortalUrl(stripeCustomerId, returnUrl)`
 5. Return `{ data: { portalUrl } }`
+
+**Logging:** Structured logging at entry and exit: `logger.info('stripe_portal', { userId, status, durationMs })`.
 
 **Client behavior:** Same pattern as checkout — POST, then redirect.
 
@@ -125,7 +128,14 @@ Extract billing section into `components/settings/BillingCard.tsx`, following th
 - "Growth Plan" with green "Active" badge
 - "Manage Subscription" button (outline) → POST `/api/stripe/portal` → redirect
 
+**State D — Cancelled** (`subscription_status = 'cancelled'`):
+- "Your subscription has been cancelled."
+- "Subscribe" button (primary) to re-subscribe via checkout
+- Differentiated from State B's "never subscribed" copy
+
 **Success toast:** When URL has `?subscribed=true`, show brief success message: "Subscription activated! You're on the Growth plan." Clear the param from URL after displaying.
+
+**Webhook timing gap:** When the user returns from Stripe Checkout to `?subscribed=true`, the webhook may not have fired yet — `subscription_status` could still be stale. The success toast displays based on the URL param regardless. If the status hasn't updated, the page still shows the subscribe UI behind the toast. A page refresh after a few seconds resolves it. Acceptable for MVP; a polling mechanism is overkill at this scale.
 
 ### 6. Middleware
 
