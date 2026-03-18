@@ -12,6 +12,7 @@ import {
 } from "@/lib/utils/errors";
 import { logger } from "@/lib/utils/logger";
 import { runExtraction } from "@/lib/extraction/run";
+import { waitUntil } from "@vercel/functions";
 
 export async function POST(request: Request) {
   const startTime = Date.now();
@@ -186,37 +187,34 @@ export async function POST(request: Request) {
       status: "success",
     });
 
-    // 9. Auto-trigger extraction
-    let extractionStatus: "pending_review" | "error" = "error";
-    let extractedData = null;
-    try {
-      const extractionResult = await runExtraction({
+    // 9. Auto-trigger extraction (fire-and-forget via waitUntil)
+    // Extraction progress is tracked via realtime subscription on the client.
+    // waitUntil keeps the serverless function alive after the response is sent,
+    // so the extraction promise completes instead of being killed by Vercel.
+    waitUntil(
+      runExtraction({
         invoiceId,
         orgId: orgId!,
         userId: userId!,
         filePath: storagePath,
         fileType,
-      });
-      extractionStatus = "pending_review";
-      extractedData = extractionResult.data;
-    } catch {
-      // Extraction failure is non-fatal for the upload response.
-      // Invoice status is already set to 'error' by runExtraction.
-      // User can retry via the extract endpoint.
-      logger.warn("invoice_upload_extraction_failed", {
-        userId,
-        orgId,
-        invoiceId,
-        status: "extraction_failed",
-      });
-    }
+      }).catch(() => {
+        // Extraction failure is non-fatal for the upload response.
+        // Invoice status is already set to 'error' by runExtraction.
+        // User can retry via the extract endpoint.
+        logger.warn("invoice_upload_extraction_failed", {
+          userId,
+          orgId,
+          invoiceId,
+          status: "extraction_failed",
+        });
+      })
+    );
 
     return apiSuccess({
       invoiceId,
       fileName,
       signedUrl: signedUrlData?.signedUrl || null,
-      extractionStatus,
-      extractedData,
     });
   } catch (error) {
     const durationMs = Date.now() - startTime;
