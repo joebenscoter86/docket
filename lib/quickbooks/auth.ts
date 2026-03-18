@@ -138,7 +138,7 @@ export async function refreshAccessToken(
 
 /**
  * Store an encrypted QBO connection for an org.
- * Upserts: if a quickbooks connection already exists for this org, it's replaced.
+ * Upserts on (org_id, provider): if a connection already exists, tokens are replaced.
  */
 export async function storeConnection(
   supabase: ReturnType<typeof import("@/lib/supabase/admin").createAdminClient>,
@@ -149,22 +149,19 @@ export async function storeConnection(
   const encryptedAccess = encrypt(tokens.accessToken);
   const encryptedRefresh = encrypt(tokens.refreshToken);
 
-  // Delete existing QBO connection for this org (one connection per org for MVP)
-  await supabase
-    .from("accounting_connections")
-    .delete()
-    .eq("org_id", orgId)
-    .eq("provider", "quickbooks");
-
-  const { error } = await supabase.from("accounting_connections").insert({
-    org_id: orgId,
-    provider: "quickbooks",
-    access_token: encryptedAccess,
-    refresh_token: encryptedRefresh,
-    token_expires_at: tokens.expiresAt.toISOString(),
-    company_id: tokens.companyId,
-    company_name: companyName ?? null,
-  });
+  const { error } = await supabase.from("accounting_connections").upsert(
+    {
+      org_id: orgId,
+      provider: "quickbooks",
+      access_token: encryptedAccess,
+      refresh_token: encryptedRefresh,
+      token_expires_at: tokens.expiresAt.toISOString(),
+      company_id: tokens.companyId,
+      company_name: companyName ?? null,
+      connected_at: new Date().toISOString(),
+    },
+    { onConflict: "org_id,provider" }
+  );
 
   if (error) {
     logger.error("qbo.store_connection_failed", { orgId, error: error.message });
