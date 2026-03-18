@@ -25,53 +25,53 @@ describe("InvoiceStatusBadge", () => {
   });
 
   it("non-extracting statuses do not have animate-ping class", () => {
-    const nonPulsingStatuses: InvoiceStatus[] = [
+    const nonPingStatuses: InvoiceStatus[] = [
       "uploading",
       "pending_review",
       "approved",
       "synced",
       "error",
     ];
-    for (const status of nonPulsingStatuses) {
+    for (const status of nonPingStatuses) {
       const { container } = render(<InvoiceStatusBadge status={status} />);
       const pingEl = container.querySelector(".animate-ping");
       expect(pingEl, `Expected no animate-ping for status: ${status}`).toBeNull();
     }
   });
 
-  it("synced status has green background class", () => {
+  it("synced status has green background", () => {
     const { container } = render(<InvoiceStatusBadge status="synced" />);
     const pill = container.firstChild as HTMLElement;
-    expect(pill.className).toMatch(/bg-green/);
+    expect(pill.className).toContain("bg-[#D1FAE5]");
   });
 
-  it("error status has red background class", () => {
+  it("error status has red background", () => {
     const { container } = render(<InvoiceStatusBadge status="error" />);
     const pill = container.firstChild as HTMLElement;
-    expect(pill.className).toMatch(/bg-red/);
+    expect(pill.className).toContain("bg-[#FEE2E2]");
   });
 
-  it("pending_review status has amber background class", () => {
+  it("pending_review status has amber background", () => {
     const { container } = render(<InvoiceStatusBadge status="pending_review" />);
     const pill = container.firstChild as HTMLElement;
-    expect(pill.className).toMatch(/bg-amber/);
+    expect(pill.className).toContain("bg-[#FEF3C7]");
   });
 
-  it("uploading status has blue background class", () => {
-    const { container } = render(<InvoiceStatusBadge status="uploading" />);
-    const pill = container.firstChild as HTMLElement;
-    expect(pill.className).toMatch(/bg-blue/);
-  });
-
-  it("extracting status has blue background class", () => {
+  it("extracting status has purple background", () => {
     const { container } = render(<InvoiceStatusBadge status="extracting" />);
     const pill = container.firstChild as HTMLElement;
-    expect(pill.className).toMatch(/bg-blue/);
+    expect(pill.className).toContain("bg-[#EDE9FE]");
   });
 
-  it("approved status has blue background class", () => {
+  it("approved status has blue background", () => {
     const { container } = render(<InvoiceStatusBadge status="approved" />);
     const pill = container.firstChild as HTMLElement;
-    expect(pill.className).toMatch(/bg-blue/);
+    expect(pill.className).toContain("bg-[#DBEAFE]");
+  });
+
+  it("uploading status has amber background", () => {
+    const { container } = render(<InvoiceStatusBadge status="uploading" />);
+    const pill = container.firstChild as HTMLElement;
+    expect(pill.className).toContain("bg-[#FEF3C7]");
   });
 });
