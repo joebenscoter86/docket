@@ -10,9 +10,9 @@ New users face the worst experience: zero history, zero suggestions, pure manual
 
 A two-layer suggestion system that pre-fills GL account dropdowns:
 
-1. **AI-Inferred suggestions (DOC-46):** During extraction, pass the user's QBO chart of accounts to Claude alongside the invoice. Claude returns a suggested GL account for each line item. Works from invoice #1 with zero history.
+1. **AI-Inferred suggestions (DOC-78):** During extraction, pass the user's QBO chart of accounts to Claude alongside the invoice. Claude returns a suggested GL account for each line item. Works from invoice #1 with zero history.
 
-2. **History-based suggestions (DOC-47):** Record which GL accounts the user assigns to line items, keyed by vendor + description. On future invoices from the same vendor, look up historical mappings first. Higher confidence than AI guesses.
+2. **History-based suggestions (DOC-79):** Record which GL accounts the user assigns to line items, keyed by vendor + description. On future invoices from the same vendor, look up historical mappings first. Higher confidence than AI guesses.
 
 **Priority order at suggestion time:**
 1. Historical match (vendor + description) → high confidence
@@ -21,7 +21,7 @@ A two-layer suggestion system that pre-fills GL account dropdowns:
 
 ---
 
-## DOC-46: AI-Inferred GL Account Suggestions
+## DOC-78: AI-Inferred GL Account Suggestions
 
 ### Overview
 
@@ -74,10 +74,10 @@ ALTER TABLE extracted_line_items
 ```
 
 - `suggested_gl_account_id`: The original AI-suggested (or history-based) account ID. Preserved even if the user overrides `gl_account_id`. Null if no suggestion.
-- `gl_suggestion_source`: Where the suggestion came from (`'ai'` for DOC-46, `'history'` for DOC-47). Null if no suggestion.
+- `gl_suggestion_source`: Where the suggestion came from (`'ai'` for DOC-78, `'history'` for DOC-79). Null if no suggestion.
 - `is_user_confirmed`: Whether the user has explicitly interacted with the GL dropdown for this line item. Defaults to `false` for AI/history suggestions, set to `true` when the user selects any value. Persists across page refreshes.
 
-**No new tables for DOC-46.** The suggestion is stored directly on the line item row.
+**No new tables for DOC-78.** The suggestion is stored directly on the line item row.
 
 ### Type Changes
 
@@ -236,7 +236,7 @@ The account list adds ~500-2000 tokens to the prompt (typical small business has
 
 ---
 
-## DOC-47: History-Based GL Account Learning
+## DOC-79: History-Based GL Account Learning
 
 ### Overview
 
@@ -343,7 +343,7 @@ Extend the suggestion badge to distinguish sources:
 - **AI suggestion:** Small "AI" badge with subtle blue/purple tint. Lower trust — Claude's best guess.
 - **User-confirmed:** No badge. Normal dropdown appearance.
 
-The `suggestionSource` prop on `GlAccountSelect` (added in DOC-46) drives this distinction.
+The `suggestionSource` prop on `GlAccountSelect` (added in DOC-78) drives this distinction.
 
 ### Mapping Lifecycle
 
@@ -354,7 +354,7 @@ The `suggestionSource` prop on `GlAccountSelect` (added in DOC-46) drives this d
 
 ### Dependencies
 
-- Requires DOC-46 to be complete (UI patterns, schema columns, suggestion flow)
+- Requires DOC-78 to be complete (UI patterns, schema columns, suggestion flow)
 - Requires vendor name to be extracted (already in place)
 - Requires GL account selection to hit the PATCH endpoint (already in place)
 
@@ -362,7 +362,7 @@ The `suggestionSource` prop on `GlAccountSelect` (added in DOC-46) drives this d
 
 ## Testing Strategy
 
-### DOC-46 Tests
+### DOC-78 Tests
 
 | Test | Type | Description |
 |------|------|-------------|
@@ -375,7 +375,7 @@ The `suggestionSource` prop on `GlAccountSelect` (added in DOC-46) drives this d
 | Sync with suggestions | API | Pre-filled suggestions count as valid for sync |
 | Stale suggested account | Component | Suggested account not in current dropdown — user must re-select |
 
-### DOC-47 Tests
+### DOC-79 Tests
 
 | Test | Type | Description |
 |------|------|-------------|
@@ -393,8 +393,8 @@ The `suggestionSource` prop on `GlAccountSelect` (added in DOC-46) drives this d
 
 Both issues are additive — no breaking changes to existing data or flows.
 
-- DOC-46 adds columns to `extracted_line_items` (nullable + default false, backward-compatible)
-- DOC-47 adds a new table (`gl_account_mappings`)
+- DOC-78 adds columns to `extracted_line_items` (nullable + default false, backward-compatible)
+- DOC-79 adds a new table (`gl_account_mappings`)
 - Existing invoices continue to work as-is; suggestions only appear on new extractions
 - The `ExtractionProvider` interface change is backward-compatible (optional `context` parameter)
 - Both `ExtractedLineItemRow` types (in `lib/extraction/types.ts` and `lib/types/invoice.ts`) must be updated
