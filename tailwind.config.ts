@@ -18,27 +18,50 @@ const config: Config = {
       },
       colors: {
         primary: {
-          DEFAULT: "#1e293b", // slate-800
+          DEFAULT: "#3B82F6",
+          hover: "#2563EB",
         },
-        accent: {
-          DEFAULT: "#2563eb", // blue-600
-          hover: "#1d4ed8",   // blue-700
-        },
-        success: {
-          DEFAULT: "#16a34a", // green-600
-        },
-        warning: {
-          DEFAULT: "#f59e0b", // amber-500
-        },
-        error: {
-          DEFAULT: "#dc2626", // red-600
+        background: {
+          DEFAULT: "#F8FAFC",
         },
         surface: {
-          DEFAULT: "#ffffff",
+          DEFAULT: "#FFFFFF",
+        },
+        text: {
+          DEFAULT: "#0F172A",
+        },
+        muted: {
+          DEFAULT: "#94A3B8",
+        },
+        accent: {
+          DEFAULT: "#10B981",
+        },
+        warning: {
+          DEFAULT: "#F59E0B",
+        },
+        error: {
+          DEFAULT: "#DC2626",
         },
         border: {
-          DEFAULT: "#e5e7eb", // gray-200
+          DEFAULT: "#E2E8F0",
         },
+        "nav-active": {
+          DEFAULT: "#EFF6FF",
+        },
+      },
+      fontFamily: {
+        headings: ["Cabinet Grotesk", "sans-serif"],
+        body: ["Satoshi", "sans-serif"],
+        mono: ["JetBrains Mono", "monospace"],
+      },
+      borderRadius: {
+        "brand-sm": "8px",
+        "brand-md": "12px",
+        "brand-lg": "24px",
+      },
+      boxShadow: {
+        soft: "0 12px 40px -8px rgba(15, 23, 42, 0.06)",
+        float: "0 20px 60px -12px rgba(15, 23, 42, 0.12)",
       },
     },
   },

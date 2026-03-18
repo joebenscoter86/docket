@@ -96,23 +96,23 @@ export default function ApproveBar({
     idle: {
       label: "Approve Invoice",
       className: canApprove
-        ? "bg-blue-600 text-white hover:bg-blue-700"
-        : "bg-blue-300 text-white cursor-not-allowed",
+        ? "bg-primary text-white hover:bg-primary-hover"
+        : "bg-primary/50 text-white cursor-not-allowed",
       disabled: !canApprove,
     },
     confirming: {
       label: "Confirm Approval",
-      className: "bg-green-600 text-white hover:bg-green-700",
+      className: "bg-accent text-white hover:bg-green-700",
       disabled: false,
     },
     submitting: {
       label: "Approving...",
-      className: "bg-blue-400 text-white cursor-not-allowed",
+      className: "bg-primary/60 text-white cursor-not-allowed",
       disabled: true,
     },
     approved: {
       label: "Approved",
-      className: "bg-green-600 text-white cursor-not-allowed",
+      className: "bg-accent text-white cursor-not-allowed",
       disabled: true,
     },
   };
@@ -125,25 +125,25 @@ export default function ApproveBar({
       <div className="text-sm flex items-center gap-2 min-w-0">
         {barState === "approved" ? (
           <>
-            <span className="h-2 w-2 rounded-full bg-green-500 shrink-0" />
-            <span className="text-green-700">
+            <span className="h-2 w-2 rounded-full bg-accent shrink-0" />
+            <span className="text-accent">
               Invoice approved. Ready to sync to QuickBooks.
             </span>
           </>
         ) : errorMessage ? (
           <>
-            <span className="h-2 w-2 rounded-full bg-red-500 shrink-0" />
-            <span className="text-red-700 truncate">{errorMessage}</span>
+            <span className="h-2 w-2 rounded-full bg-error shrink-0" />
+            <span className="text-error truncate">{errorMessage}</span>
           </>
         ) : canApprove ? (
           <>
-            <span className="h-2 w-2 rounded-full bg-green-500 shrink-0" />
-            <span className="text-green-700">Ready to approve</span>
+            <span className="h-2 w-2 rounded-full bg-accent shrink-0" />
+            <span className="text-accent">Ready to approve</span>
           </>
         ) : (
           <>
-            <span className="h-2 w-2 rounded-full bg-amber-500 shrink-0" />
-            <span className="text-amber-700">
+            <span className="h-2 w-2 rounded-full bg-warning shrink-0" />
+            <span className="text-warning">
               Missing: {missingFields.join(", ")}
             </span>
           </>

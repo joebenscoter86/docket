@@ -62,6 +62,7 @@ describe("ClaudeExtractionProvider", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.stubEnv("ANTHROPIC_API_KEY", "test-key-for-mocked-tests");
     provider = new ClaudeExtractionProvider();
   });
 
