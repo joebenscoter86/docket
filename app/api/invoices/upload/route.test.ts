@@ -68,6 +68,11 @@ vi.mock("@/lib/extraction/run", () => ({
   runExtraction: (...args: unknown[]) => mockRunExtraction(...args),
 }));
 
+const mockCheckInvoiceAccess = vi.fn().mockResolvedValue({ allowed: true, reason: "active_subscription" });
+vi.mock("@/lib/billing/access", () => ({
+  checkInvoiceAccess: (...args: unknown[]) => mockCheckInvoiceAccess(...args),
+}));
+
 // Helper: create a mock Request with FormData
 function createUploadRequest(
   file?: { name: string; type: string; content: Buffer }
@@ -127,6 +132,35 @@ describe("POST /api/invoices/upload", () => {
 
     expect(res.status).toBe(403);
     expect(body.error).toContain("No organization found");
+  });
+
+  it("returns 402 when user does not have an active subscription", async () => {
+    mockGetUser.mockResolvedValue({
+      data: { user: { id: "user-1" } },
+      error: null,
+    });
+    mockFrom.mockResolvedValue({
+      data: { org_id: "org-1" },
+      error: null,
+    });
+    mockCheckInvoiceAccess.mockResolvedValueOnce({
+      allowed: false,
+      reason: "no_subscription",
+      subscriptionStatus: "inactive",
+      trialExpired: true,
+    });
+
+    const req = createUploadRequest({
+      name: "invoice.pdf",
+      type: "application/pdf",
+      content: Buffer.from("%PDF-1.4"),
+    });
+
+    const res = await POST(req);
+    const body = await res.json();
+
+    expect(res.status).toBe(402);
+    expect(body.code).toBe("SUBSCRIPTION_REQUIRED");
   });
 
   it("returns 400 when no file is provided", async () => {

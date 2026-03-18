@@ -2,6 +2,7 @@ import { NextRequest } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { isConnected } from "@/lib/quickbooks/auth";
+import { checkInvoiceAccess } from "@/lib/billing/access";
 import { createBill, attachPdfToBill, QBOApiError } from "@/lib/quickbooks/api";
 import { logger } from "@/lib/utils/logger";
 import {
@@ -11,6 +12,7 @@ import {
   validationError,
   apiSuccess,
   internalError,
+  subscriptionRequired,
 } from "@/lib/utils/errors";
 import type { QBOBillPayload, QBOBillLine } from "@/lib/quickbooks/types";
 
@@ -50,6 +52,25 @@ export async function POST(
     }
 
     const orgId = membership.org_id;
+
+    // 2b. Subscription check
+    const access = await checkInvoiceAccess(user.id);
+    if (!access.allowed) {
+      logger.warn("sync_route_access_denied", {
+        action: "sync",
+        invoiceId,
+        userId: user.id,
+        orgId,
+        reason: access.reason,
+        subscriptionStatus: access.subscriptionStatus,
+        trialExpired: access.trialExpired,
+      });
+      return subscriptionRequired("Subscription required to sync invoices.", {
+        subscriptionStatus: access.subscriptionStatus,
+        trialExpired: access.trialExpired,
+      });
+    }
+
     const adminSupabase = createAdminClient();
 
     // 3. Verify the invoice exists and belongs to this org
