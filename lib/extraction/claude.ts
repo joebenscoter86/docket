@@ -6,6 +6,7 @@ import type {
   ExtractionResult,
   ExtractedInvoice,
   ExtractedLineItem,
+  ExtractionContext,
 } from "./types";
 
 const MODEL = "claude-sonnet-4-20250514";
@@ -78,6 +79,27 @@ Rules:
 - Do not infer or calculate values — extract only what is explicitly shown
 - Return raw JSON only — no wrapping, no explanation`;
 
+function buildAccountPromptSection(
+  accounts: Array<{ id: string; name: string }>
+): string {
+  const accountList = JSON.stringify(
+    accounts.map((a) => ({ id: a.id, name: a.name }))
+  );
+  return `
+
+Available expense accounts (use ONLY these IDs):
+${accountList}
+
+For each line item, also return:
+  "suggested_gl_account_id": "string or null — the ID of the most likely expense account from the list above"
+
+Rules for GL account suggestions:
+- Match based on the semantic meaning of the line item description to the account name
+- Only suggest an account if you are reasonably confident in the match
+- Use null if no account is a clear match
+- Use the exact ID string from the provided account list`;
+}
+
 interface AIResponse {
   vendor_name: string | null;
   vendor_address: string | null;
@@ -91,6 +113,7 @@ interface AIResponse {
     quantity: number | null;
     unit_price: number | null;
     amount: number | null;
+    suggested_gl_account_id?: string | null;
   }>;
   subtotal: number | null;
   tax_amount: number | null;
@@ -146,10 +169,14 @@ function mapToExtractedInvoice(ai: AIResponse): ExtractedInvoice {
   const lineItems: ExtractedLineItem[] = (ai.line_items ?? []).map(
     (item, index) => ({
       description: item.description,
-      quantity: item.quantity,
-      unitPrice: item.unit_price,
-      amount: item.amount,
+      quantity: item.quantity != null ? Number(item.quantity) : null,
+      unitPrice: item.unit_price != null ? Number(item.unit_price) : null,
+      amount: item.amount != null ? Number(item.amount) : null,
       sortOrder: index,
+      suggestedGlAccountId:
+        typeof item.suggested_gl_account_id === "string"
+          ? item.suggested_gl_account_id
+          : null,
     })
   );
 
@@ -188,9 +215,15 @@ export class ClaudeExtractionProvider implements ExtractionProvider {
 
   async extractInvoiceData(
     fileBuffer: Buffer,
-    mimeType: string
+    mimeType: string,
+    context?: ExtractionContext
   ): Promise<ExtractionResult> {
     const startTime = Date.now();
+
+    let promptText = EXTRACTION_PROMPT;
+    if (context?.accounts && context.accounts.length > 0) {
+      promptText += buildAccountPromptSection(context.accounts);
+    }
 
     let response: Anthropic.Message;
     try {
@@ -202,7 +235,7 @@ export class ClaudeExtractionProvider implements ExtractionProvider {
             role: "user",
             content: [
               buildContentBlock(fileBuffer, mimeType) as Anthropic.ContentBlockParam,
-              { type: "text", text: EXTRACTION_PROMPT },
+              { type: "text", text: promptText },
             ],
           },
         ],
