@@ -6,6 +6,57 @@ export type InvoiceStatus =
   | "synced"
   | "error";
 
+// ─── Output Type (Bill-to-Check Toggle) ───
+
+export type OutputType = "bill" | "check" | "cash" | "credit_card";
+export type TransactionType = "bill" | "check" | "cash" | "credit_card";
+export type ProviderEntityType = "Bill" | "Purchase";
+
+/** Map output_type → QBO PaymentType for Purchase endpoint */
+export const OUTPUT_TYPE_TO_PAYMENT_TYPE: Record<Exclude<OutputType, "bill">, string> = {
+  check: "Check",
+  cash: "Cash",
+  credit_card: "CreditCard",
+};
+
+/** Map output_type → required QBO account type for payment account selector */
+export const OUTPUT_TYPE_TO_ACCOUNT_TYPE: Record<Exclude<OutputType, "bill">, "Bank" | "CreditCard"> = {
+  check: "Bank",
+  cash: "Bank",
+  credit_card: "CreditCard",
+};
+
+/** Display labels for the output type dropdown */
+export const OUTPUT_TYPE_LABELS: Record<OutputType, string> = {
+  bill: "Create Bill",
+  check: "Write Check",
+  cash: "Record Expense",
+  credit_card: "Credit Card",
+};
+
+/** Helper text shown below output type dropdown */
+export const OUTPUT_TYPE_HELPER_TEXT: Record<Exclude<OutputType, "bill">, string> = {
+  check: "Records as a direct check payment from your bank account.",
+  cash: "Records as a cash expense from your bank account.",
+  credit_card: "Records as a credit card charge.",
+};
+
+/** Sync success messages per output type */
+export const SYNC_SUCCESS_MESSAGES: Record<OutputType, string> = {
+  bill: "Bill created in QuickBooks",
+  check: "Check created in QuickBooks",
+  cash: "Expense recorded in QuickBooks",
+  credit_card: "Credit card expense recorded in QuickBooks",
+};
+
+/** Short labels for transaction type display in invoice list */
+export const TRANSACTION_TYPE_SHORT_LABELS: Record<TransactionType, string> = {
+  bill: "Bill",
+  check: "Check",
+  cash: "Expense",
+  credit_card: "CC",
+};
+
 export interface ExtractedLineItemRow {
   id: string;
   description: string | null;

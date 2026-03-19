@@ -139,6 +139,44 @@ export interface QBOErrorResponse {
   };
 }
 
+// ─── Purchase Creation Types (Check/Cash/CreditCard) ───
+
+export interface QBOPurchaseLine {
+  Amount: number;
+  DetailType: "AccountBasedExpenseLineDetail";
+  AccountBasedExpenseLineDetail: {
+    AccountRef: { value: string };
+    Description?: string;
+  };
+}
+
+export interface QBOPurchasePayload {
+  PaymentType: "Check" | "Cash" | "CreditCard";
+  AccountRef: { value: string };
+  EntityRef: { value: string; type: "Vendor" };
+  TxnDate?: string;
+  DocNumber?: string;
+  Line: QBOPurchaseLine[];
+}
+
+export interface QBOPurchaseResponse {
+  Purchase: {
+    Id: string;
+    PaymentType: string;
+    TotalAmt: number;
+  };
+  time: string;
+}
+
+// ─── Payment Account Types ───
+
+export interface QBOPaymentAccount {
+  id: string;
+  name: string;
+  accountType: string;
+  currentBalance?: number;
+}
+
 // ─── Token / Connection Types ───
 
 export interface QBOTokens {
