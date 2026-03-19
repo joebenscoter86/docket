@@ -100,12 +100,35 @@ export default function GlAccountSelect({
         </select>
       </div>
       {suggestedAccount && showSuggestion && (
-        <span className="text-xs text-blue-600 flex items-center gap-1">
-          <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-blue-50 text-blue-700">
+        <button
+          type="button"
+          onClick={async () => {
+            setSaveStatus("saving");
+            const ok = await onSelect(suggestedAccountId!);
+            setSaveStatus(ok ? "saved" : "error");
+            if (ok) {
+              if (savedTimer.current) clearTimeout(savedTimer.current);
+              savedTimer.current = setTimeout(() => setSaveStatus("idle"), 2000);
+            }
+          }}
+          disabled={disabled || saveStatus === "saving"}
+          className="group flex items-center gap-1.5 px-2 py-1 rounded-md bg-blue-50 border border-blue-200 hover:bg-blue-100 hover:border-blue-300 transition-colors text-xs text-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+          title={`Accept suggestion: ${suggestedAccount.label}`}
+        >
+          <span className="inline-flex items-center px-1 py-0.5 rounded text-[10px] font-semibold bg-blue-100 text-blue-600 group-hover:bg-blue-200">
             AI
           </span>
-          suggests: {suggestedAccount.label}
-        </span>
+          <span className="font-medium truncate">{suggestedAccount.label}</span>
+          <svg
+            className="h-3.5 w-3.5 flex-shrink-0 text-blue-400 group-hover:text-blue-600 transition-colors"
+            fill="none"
+            viewBox="0 0 24 24"
+            strokeWidth={2.5}
+            stroke="currentColor"
+          >
+            <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+          </svg>
+        </button>
       )}
     </div>
   );

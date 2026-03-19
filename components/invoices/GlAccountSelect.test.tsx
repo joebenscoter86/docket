@@ -18,7 +18,7 @@ const defaultProps = {
 };
 
 describe("GlAccountSelect", () => {
-  it("shows AI suggestion label when suggestedAccountId is provided and no account is selected", () => {
+  it("shows clickable suggestion pill when suggestedAccountId is provided and no account is selected", () => {
     render(
       <GlAccountSelect
         {...defaultProps}
@@ -27,22 +27,39 @@ describe("GlAccountSelect", () => {
       />
     );
 
-    expect(screen.getByText(/suggests:/i)).toBeInTheDocument();
-    // Account name appears in both the suggestion label and the dropdown option with AI prefix
-    const matches = screen.getAllByText(/Software & Subscriptions/);
-    expect(matches.length).toBeGreaterThanOrEqual(1);
-    // The AI badge inside the suggestion label
+    // Suggestion pill is a button with the account name
+    const pill = screen.getByTitle(/Accept suggestion/i);
+    expect(pill).toBeInTheDocument();
+    expect(screen.getByText("Software & Subscriptions")).toBeInTheDocument();
+    // AI badge inside the pill
     const badges = screen.getAllByText("AI");
     expect(badges.length).toBeGreaterThanOrEqual(1);
   });
 
-  it("does not show suggestion label when no suggestedAccountId is provided", () => {
-    render(<GlAccountSelect {...defaultProps} />);
+  it("calls onSelect when suggestion pill is clicked", async () => {
+    const onSelect = vi.fn().mockResolvedValue(true);
+    render(
+      <GlAccountSelect
+        {...defaultProps}
+        onSelect={onSelect}
+        suggestedAccountId="acc-2"
+        suggestionSource="ai"
+      />
+    );
 
-    expect(screen.queryByText(/suggests:/i)).toBeNull();
+    const pill = screen.getByTitle(/Accept suggestion/i);
+    await pill.click();
+
+    expect(onSelect).toHaveBeenCalledWith("acc-2");
   });
 
-  it("does not show suggestion label when account is already confirmed (currentAccountId is set)", () => {
+  it("does not show suggestion pill when no suggestedAccountId is provided", () => {
+    render(<GlAccountSelect {...defaultProps} />);
+
+    expect(screen.queryByTitle(/Accept suggestion/i)).toBeNull();
+  });
+
+  it("does not show suggestion pill when account is already confirmed (currentAccountId is set)", () => {
     render(
       <GlAccountSelect
         {...defaultProps}
@@ -52,7 +69,7 @@ describe("GlAccountSelect", () => {
       />
     );
 
-    expect(screen.queryByText(/suggests:/i)).toBeNull();
+    expect(screen.queryByTitle(/Accept suggestion/i)).toBeNull();
   });
 
   it("shows suggested account as first option with AI prefix in dropdown", () => {
@@ -80,7 +97,7 @@ describe("GlAccountSelect", () => {
     expect(select.options[0].value).toBe("");
   });
 
-  it("does not show suggestion label when suggestionSource is null", () => {
+  it("does not show suggestion pill when suggestionSource is null", () => {
     render(
       <GlAccountSelect
         {...defaultProps}
@@ -89,6 +106,6 @@ describe("GlAccountSelect", () => {
       />
     );
 
-    expect(screen.queryByText(/suggests:/i)).toBeNull();
+    expect(screen.queryByTitle(/Accept suggestion/i)).toBeNull();
   });
 });
