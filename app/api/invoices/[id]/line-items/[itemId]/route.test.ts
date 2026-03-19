@@ -26,6 +26,15 @@ const mockServerClient = {
         })),
       };
     }
+    if (table === "extracted_data") {
+      return {
+        select: vi.fn(() => ({
+          eq: vi.fn(() => ({
+            single: vi.fn().mockResolvedValue({ data: { vendor_name: "Acme Corp" }, error: null }),
+          })),
+        })),
+      };
+    }
     return {};
   }),
 };
@@ -41,7 +50,12 @@ vi.mock("@/lib/extraction/data", () => ({
   updateLineItemField: (...args: unknown[]) => mockUpdateLineItemField(...args),
   deleteLineItem: (...args: unknown[]) => mockDeleteLineItem(...args),
   recordCorrection: (...args: unknown[]) => mockRecordCorrection(...args),
-  LINE_ITEM_EDITABLE_FIELDS: new Set(["description", "quantity", "unit_price", "amount"]),
+  LINE_ITEM_EDITABLE_FIELDS: new Set(["description", "quantity", "unit_price", "amount", "gl_account_id"]),
+}));
+
+const mockUpsertGlMapping = vi.fn();
+vi.mock("@/lib/extraction/gl-mappings", () => ({
+  upsertGlMapping: (...args: unknown[]) => mockUpsertGlMapping(...args),
 }));
 
 vi.mock("@/lib/utils/logger", () => ({
@@ -83,6 +97,7 @@ const fakeLineItem = {
   amount: 6000,
   gl_account_id: null,
   sort_order: 0,
+  extracted_data_id: "ed-1",
 };
 
 describe("PATCH /api/invoices/[id]/line-items/[itemId]", () => {
@@ -102,7 +117,7 @@ describe("PATCH /api/invoices/[id]/line-items/[itemId]", () => {
     mockGetUser.mockResolvedValue({ data: { user: { id: "user-1" } }, error: null });
     mockInvoiceSelect.mockResolvedValue({ data: fakeInvoice, error: null });
 
-    const { request, params } = makePatchRequest("inv-1", "li-1", { field: "gl_account_id", value: "hack" });
+    const { request, params } = makePatchRequest("inv-1", "li-1", { field: "raw_ai_response", value: "hack" });
     const res = await PATCH(request, { params });
     const body = await res.json();
     expect(res.status).toBe(400);
@@ -170,6 +185,43 @@ describe("PATCH /api/invoices/[id]/line-items/[itemId]", () => {
     await PATCH(request, { params });
 
     expect(mockRecordCorrection).not.toHaveBeenCalled();
+  });
+
+  it("records GL mapping when gl_account_id is set to a non-null value", async () => {
+    mockGetUser.mockResolvedValue({ data: { user: { id: "user-1" } }, error: null });
+    mockInvoiceSelect.mockResolvedValue({ data: fakeInvoice, error: null });
+    mockLineItemSelect.mockResolvedValue({ data: fakeLineItem, error: null });
+    mockUpdateLineItemField.mockResolvedValue({ ...fakeLineItem, gl_account_id: "acc-84" });
+    mockUpsertGlMapping.mockResolvedValue(undefined);
+
+    const { request, params } = makePatchRequest("inv-1", "li-1", { field: "gl_account_id", value: "acc-84" });
+    await PATCH(request, { params });
+
+    expect(mockUpsertGlMapping).toHaveBeenCalledWith("org-1", "Acme Corp", "Web dev", "acc-84");
+  });
+
+  it("does not record GL mapping when gl_account_id is set to null", async () => {
+    mockGetUser.mockResolvedValue({ data: { user: { id: "user-1" } }, error: null });
+    mockInvoiceSelect.mockResolvedValue({ data: fakeInvoice, error: null });
+    mockLineItemSelect.mockResolvedValue({ data: fakeLineItem, error: null });
+    mockUpdateLineItemField.mockResolvedValue({ ...fakeLineItem, gl_account_id: null });
+
+    const { request, params } = makePatchRequest("inv-1", "li-1", { field: "gl_account_id", value: null });
+    await PATCH(request, { params });
+
+    expect(mockUpsertGlMapping).not.toHaveBeenCalled();
+  });
+
+  it("does not record GL mapping for non-gl_account_id fields", async () => {
+    mockGetUser.mockResolvedValue({ data: { user: { id: "user-1" } }, error: null });
+    mockInvoiceSelect.mockResolvedValue({ data: fakeInvoice, error: null });
+    mockLineItemSelect.mockResolvedValue({ data: fakeLineItem, error: null });
+    mockUpdateLineItemField.mockResolvedValue({ ...fakeLineItem, description: "Updated" });
+
+    const { request, params } = makePatchRequest("inv-1", "li-1", { field: "description", value: "Updated" });
+    await PATCH(request, { params });
+
+    expect(mockUpsertGlMapping).not.toHaveBeenCalled();
   });
 });
 
