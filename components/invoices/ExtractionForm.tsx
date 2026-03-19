@@ -8,11 +8,13 @@ import {
   type FormField,
 } from "./extraction-form-reducer";
 import { formatCurrency, parseCurrencyInput } from "@/lib/utils/currency";
-import type { ExtractedDataRow } from "@/lib/types/invoice";
+import type { ExtractedDataRow, OutputType } from "@/lib/types/invoice";
 import type { InvoiceStatus } from "@/lib/types/invoice";
+import { OUTPUT_TYPE_LABELS } from "@/lib/types/invoice";
 import LineItemEditor from "./LineItemEditor";
 import ActionBar from "./ActionBar";
 import SyncStatusPanel from "./SyncStatusPanel";
+import OutputTypeSelector from "./OutputTypeSelector";
 import { useQboOptions } from "./hooks/useQboOptions";
 import VendorSelect from "./VendorSelect";
 
@@ -21,6 +23,14 @@ interface ExtractionFormProps {
   invoiceId: string;
   invoiceStatus: InvoiceStatus;
   errorMessage?: string | null;
+  outputType: OutputType;
+  paymentAccountId: string | null;
+  paymentAccountName: string | null;
+  orgDefaults: {
+    defaultOutputType: OutputType;
+    defaultPaymentAccountId: string | null;
+    defaultPaymentAccountName: string | null;
+  };
 }
 
 const FIELD_CONFIG: Record<
@@ -52,6 +62,10 @@ export default function ExtractionForm({
   invoiceId,
   invoiceStatus,
   errorMessage: initialErrorMessage,
+  outputType: initialOutputType,
+  paymentAccountId: initialPaymentAccountId,
+  paymentAccountName: initialPaymentAccountName,
+  orgDefaults,
 }: ExtractionFormProps) {
   const [state, dispatch] = useReducer(
     formReducer,
@@ -74,6 +88,11 @@ export default function ExtractionForm({
   const [lineItemsMissingGl, setLineItemsMissingGl] = useState(() =>
     (extractedData.extracted_line_items ?? []).filter((li) => !li.gl_account_id).length
   );
+
+  // Output type state
+  const [currentOutputType, setCurrentOutputType] = useState<OutputType>(initialOutputType);
+  const [currentPaymentAccountId, setCurrentPaymentAccountId] = useState<string | null>(initialPaymentAccountId);
+  const [currentPaymentAccountName, setCurrentPaymentAccountName] = useState<string | null>(initialPaymentAccountName);
 
   const handleVendorSelect = useCallback(
     async (vendorRefValue: string | null): Promise<boolean> => {
@@ -249,6 +268,9 @@ export default function ExtractionForm({
   if (!vendorRef) syncBlockers.push("Select a QuickBooks vendor");
   if (lineItemsMissingGl > 0) {
     syncBlockers.push(`${lineItemsMissingGl} line item(s) need a GL account`);
+  }
+  if (currentOutputType !== "bill" && !currentPaymentAccountId) {
+    syncBlockers.push(`Select a payment account for ${OUTPUT_TYPE_LABELS[currentOutputType]}`);
   }
 
   function renderField(field: FormField) {
@@ -454,6 +476,33 @@ export default function ExtractionForm({
           {renderField("total_amount")}
         </div>
       </div>
+
+      {/* Output type selector — between amounts and action bar */}
+      {(currentStatus === "pending_review" || currentStatus === "approved" || currentStatus === "synced") && (
+        <>
+          <div className="border-t border-border" />
+          <div>
+            <h3 className="text-xs font-semibold uppercase tracking-wide text-muted mb-4">
+              QuickBooks Output
+            </h3>
+            <OutputTypeSelector
+              invoiceId={invoiceId}
+              initialOutputType={currentOutputType}
+              initialPaymentAccountId={currentPaymentAccountId}
+              initialPaymentAccountName={currentPaymentAccountName}
+              orgDefaultPaymentAccountId={orgDefaults.defaultPaymentAccountId}
+              orgDefaultPaymentAccountName={orgDefaults.defaultPaymentAccountName}
+              disabled={currentStatus === "synced"}
+              qboConnected={qboOptions.connected}
+              onOutputTypeChange={setCurrentOutputType}
+              onPaymentAccountChange={(id, name) => {
+                setCurrentPaymentAccountId(id);
+                setCurrentPaymentAccountName(name);
+              }}
+            />
+          </div>
+        </>
+      )}
 
       {/* Action bar — shown for pending_review, approved, and synced invoices */}
       {(currentStatus === "pending_review" || currentStatus === "approved" || currentStatus === "synced") && (

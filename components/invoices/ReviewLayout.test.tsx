@@ -30,6 +30,14 @@ const defaultProps = {
     fileName: "invoice-2024-001.pdf",
     fileType: "application/pdf",
     status: "pending_review" as const,
+    outputType: "bill" as const,
+    paymentAccountId: null,
+    paymentAccountName: null,
+  },
+  orgDefaults: {
+    defaultOutputType: "bill" as const,
+    defaultPaymentAccountId: null,
+    defaultPaymentAccountName: null,
   },
   signedUrl: "https://example.com/signed-url",
   extractedData: {

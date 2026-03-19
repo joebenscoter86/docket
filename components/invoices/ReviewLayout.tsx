@@ -16,7 +16,7 @@ const PdfViewer = dynamic(() => import("./PdfViewer"), {
   ),
 });
 import ExtractionForm from "./ExtractionForm";
-import type { InvoiceStatus, ExtractedDataRow } from "@/lib/types/invoice";
+import type { InvoiceStatus, ExtractedDataRow, OutputType } from "@/lib/types/invoice";
 
 interface ReviewLayoutProps {
   invoice: {
@@ -25,9 +25,17 @@ interface ReviewLayoutProps {
     fileType: string;
     status: InvoiceStatus;
     errorMessage?: string | null;
+    outputType: OutputType;
+    paymentAccountId: string | null;
+    paymentAccountName: string | null;
   };
   signedUrl: string;
   extractedData: ExtractedDataRow | null;
+  orgDefaults: {
+    defaultOutputType: OutputType;
+    defaultPaymentAccountId: string | null;
+    defaultPaymentAccountName: string | null;
+  };
 }
 
 type MobileTab = "document" | "details";
@@ -42,6 +50,7 @@ export default function ReviewLayout({
   invoice,
   signedUrl,
   extractedData,
+  orgDefaults,
 }: ReviewLayoutProps) {
   const [activeTab, setActiveTab] = useState<MobileTab>("document");
 
@@ -141,7 +150,16 @@ export default function ReviewLayout({
         >
           <div className="flex-1 p-4 md:p-6">
             {extractedData ? (
-              <ExtractionForm extractedData={extractedData} invoiceId={invoice.id} invoiceStatus={invoice.status} errorMessage={invoice.errorMessage} />
+              <ExtractionForm
+                extractedData={extractedData}
+                invoiceId={invoice.id}
+                invoiceStatus={invoice.status}
+                errorMessage={invoice.errorMessage}
+                outputType={invoice.outputType}
+                paymentAccountId={invoice.paymentAccountId}
+                paymentAccountName={invoice.paymentAccountName}
+                orgDefaults={orgDefaults}
+              />
             ) : (
               <div className="flex items-center justify-center h-full text-sm text-muted">
                 <div className="text-center">

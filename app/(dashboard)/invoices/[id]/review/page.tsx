@@ -6,7 +6,7 @@ import { logger } from "@/lib/utils/logger";
 import ReviewLayout from "@/components/invoices/ReviewLayout";
 import ReviewProcessingState from "@/components/invoices/ReviewProcessingState";
 import Link from "next/link";
-import type { InvoiceStatus, ExtractedDataRow } from "@/lib/types/invoice";
+import type { InvoiceStatus, ExtractedDataRow, OutputType } from "@/lib/types/invoice";
 
 const PROCESSING_STATUSES: InvoiceStatus[] = ["uploading", "extracting", "error"];
 
@@ -20,7 +20,7 @@ export default async function ReviewPage({
   // Fetch invoice row
   const { data: invoice, error: invoiceError } = await supabase
     .from("invoices")
-    .select("id, status, file_path, file_name, file_type, error_message")
+    .select("id, status, file_path, file_name, file_type, error_message, output_type, payment_account_id, payment_account_name")
     .eq("id", params.id)
     .single();
 
@@ -43,14 +43,28 @@ export default async function ReviewPage({
     );
   }
 
-  // Fetch extracted data and signed URL in parallel
+  // Fetch extracted data, signed URL, and org defaults in parallel
   // Admin client required for Storage — bucket RLS restricts anon access
   const admin = createAdminClient();
-  const [extractedData, signedUrlResult] = await Promise.all([
+  const [extractedData, signedUrlResult, orgResult] = await Promise.all([
     getExtractedData(invoice.id),
     admin.storage
       .from("invoices")
       .createSignedUrl(invoice.file_path, 3600),
+    supabase
+      .from("org_memberships")
+      .select("org_id")
+      .limit(1)
+      .single()
+      .then(async ({ data: membership }) => {
+        if (!membership) return null;
+        const { data: org } = await admin
+          .from("organizations")
+          .select("default_output_type, default_payment_account_id, default_payment_account_name")
+          .eq("id", membership.org_id)
+          .single();
+        return org;
+      }),
   ]);
 
   // Guard: signed URL failure
@@ -82,11 +96,19 @@ export default async function ReviewPage({
         fileType: invoice.file_type,
         status: invoice.status as InvoiceStatus,
         errorMessage: invoice.error_message,
+        outputType: (invoice.output_type ?? "bill") as OutputType,
+        paymentAccountId: invoice.payment_account_id ?? null,
+        paymentAccountName: invoice.payment_account_name ?? null,
       }}
       signedUrl={signedUrlResult.data.signedUrl}
       // getExtractedData returns Supabase-inferred types where confidence_score
       // is string | null. The DB CHECK constraint guarantees valid values.
       extractedData={extractedData as unknown as ExtractedDataRow}
+      orgDefaults={{
+        defaultOutputType: (orgResult?.default_output_type ?? "bill") as OutputType,
+        defaultPaymentAccountId: orgResult?.default_payment_account_id ?? null,
+        defaultPaymentAccountName: orgResult?.default_payment_account_name ?? null,
+      }}
     />
   );
 }
