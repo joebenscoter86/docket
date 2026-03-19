@@ -1,7 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { isConnected } from "@/lib/quickbooks/auth";
-import { createBill, attachPdfToBill, QBOApiError } from "@/lib/quickbooks/api";
+import { createBill, attachPdfToEntity, QBOApiError } from "@/lib/quickbooks/api";
 import { logger } from "@/lib/utils/logger";
 import {
   authError,
@@ -245,7 +245,7 @@ export async function POST(
       }
 
       const fileBuffer = Buffer.from(await fileData.arrayBuffer());
-      await attachPdfToBill(adminSupabase, orgId, billId, fileBuffer, invoice.file_name);
+      await attachPdfToEntity(adminSupabase, orgId, billId, "Bill", fileBuffer, invoice.file_name);
     } catch (error) {
       attachmentStatus = "failed";
       logger.warn("sync_retry_attachment_failed", {

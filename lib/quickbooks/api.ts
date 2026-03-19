@@ -9,6 +9,9 @@ import type {
   QBOAttachmentMetadata,
   QBOErrorResponse,
   QBOErrorDetail,
+  QBOPurchasePayload,
+  QBOPurchaseResponse,
+  QBOPaymentAccount,
   VendorOption,
   AccountOption,
 } from "./types";
@@ -122,7 +125,24 @@ async function qboFetch<T>(
     throw parseQBOError(response.status, errorBody);
   }
 
-  return (await response.json()) as T;
+  // Catch malformed JSON responses from QBO (pre-existing gap fix)
+  let responseBody: T;
+  try {
+    responseBody = (await response.json()) as T;
+  } catch {
+    const rawText = await response.text().catch(() => "(unreadable)");
+    logger.error("qbo.malformed_json_response", {
+      path,
+      status: String(response.status),
+      rawResponse: rawText.slice(0, 500),
+    });
+    throw new QBOApiError(
+      response.status,
+      [{ Message: "Unexpected response from QuickBooks", Detail: "Malformed JSON in response body", code: "malformed_response" }],
+      "unknown"
+    );
+  }
+  return responseBody;
 }
 
 // ─── Vendor Operations ───
@@ -344,16 +364,92 @@ export async function createBill(
   return response;
 }
 
+// ─── Payment Account Operations ───
+
+/**
+ * Fetch active payment accounts from QBO (Bank or CreditCard type).
+ * Used for the payment account selector when output_type is non-Bill.
+ */
+export async function fetchPaymentAccounts(
+  supabase: ReturnType<typeof import("@/lib/supabase/admin").createAdminClient>,
+  orgId: string,
+  accountType: "Bank" | "CreditCard"
+): Promise<QBOPaymentAccount[]> {
+  const startTime = Date.now();
+
+  const query = `SELECT * FROM Account WHERE AccountType = '${accountType === "CreditCard" ? "Credit Card" : "Bank"}' AND Active = true MAXRESULTS 1000`;
+
+  const response = await qboFetch<QBOQueryResponse<QBOAccount>>(
+    supabase,
+    orgId,
+    `/query?query=${encodeURIComponent(query)}`
+  );
+
+  const accounts = response.QueryResponse.Account ?? [];
+
+  logger.info("qbo.query_payment_accounts", {
+    orgId,
+    accountType,
+    count: String(accounts.length),
+    durationMs: Date.now() - startTime,
+  });
+
+  return accounts.map((a) => ({
+    id: a.Id,
+    name: a.Name,
+    accountType: a.AccountType,
+    currentBalance: a.CurrentBalance,
+  }));
+}
+
+// ─── Purchase Operations (Check/Cash/CreditCard) ───
+
+/**
+ * Create a Purchase in QBO (Check, Cash Expense, or Credit Card).
+ * All three non-Bill types use the same endpoint with different PaymentType values.
+ */
+export async function createPurchase(
+  supabase: ReturnType<typeof import("@/lib/supabase/admin").createAdminClient>,
+  orgId: string,
+  purchase: QBOPurchasePayload
+): Promise<QBOPurchaseResponse> {
+  const startTime = Date.now();
+
+  const response = await qboFetch<QBOPurchaseResponse>(
+    supabase,
+    orgId,
+    "/purchase",
+    {
+      method: "POST",
+      body: purchase,
+    }
+  );
+
+  logger.info("qbo.purchase_created", {
+    orgId,
+    purchaseId: response.Purchase.Id,
+    paymentType: response.Purchase.PaymentType,
+    totalAmt: String(response.Purchase.TotalAmt),
+    durationMs: Date.now() - startTime,
+  });
+
+  return response;
+}
+
 // ─── Attachment Operations ───
 
 /**
- * Attach a PDF to a bill via QBO's Attachable upload endpoint.
+ * Attach a PDF to a Bill or Purchase via QBO's Attachable upload endpoint.
  * Uses multipart form-data with file_metadata_0 + file_content_0.
+ *
+ * Replaces the former `attachPdfToBill` — now accepts entityType parameter
+ * to support both Bill and Purchase attachments.
  */
-export async function attachPdfToBill(
+export async function attachPdfToEntity(
   supabase: ReturnType<typeof import("@/lib/supabase/admin").createAdminClient>,
   orgId: string,
-  billId: string,
+  entityId: string,
+  entityType: "Bill" | "Purchase",
   fileBuffer: Buffer,
   fileName: string
 ): Promise<QBOAttachableResponse> {
@@ -367,8 +463,8 @@ export async function attachPdfToBill(
     AttachableRef: [
       {
         EntityRef: {
-          type: "Bill",
-          value: billId,
+          type: entityType,
+          value: entityId,
         },
       },
     ],
@@ -417,7 +513,8 @@ export async function attachPdfToBill(
     const errorText = await response.text();
     logger.error("qbo.attach_pdf_failed", {
       orgId,
-      billId,
+      entityId,
+      entityType,
       status: String(response.status),
       error: errorText,
     });
@@ -432,7 +529,8 @@ export async function attachPdfToBill(
 
   logger.info("qbo.pdf_attached", {
     orgId,
-    billId,
+    entityId,
+    entityType,
     attachmentId: result.AttachableResponse?.[0]?.Attachable?.Id,
     durationMs: Date.now() - startTime,
   });

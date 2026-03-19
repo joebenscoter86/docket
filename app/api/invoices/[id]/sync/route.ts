@@ -3,7 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { isConnected } from "@/lib/quickbooks/auth";
 import { checkInvoiceAccess } from "@/lib/billing/access";
-import { createBill, attachPdfToBill, QBOApiError } from "@/lib/quickbooks/api";
+import { createBill, attachPdfToEntity, QBOApiError } from "@/lib/quickbooks/api";
 import { logger } from "@/lib/utils/logger";
 import {
   authError,
@@ -263,10 +263,11 @@ export async function POST(
       }
 
       const fileBuffer = Buffer.from(await fileData.arrayBuffer());
-      await attachPdfToBill(
+      await attachPdfToEntity(
         adminSupabase,
         orgId,
         billId,
+        "Bill",
         fileBuffer,
         invoice.file_name
       );
