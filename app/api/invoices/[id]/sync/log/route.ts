@@ -45,7 +45,7 @@ export async function GET(
     const adminSupabase = createAdminClient();
     const { data: logs, error: logError } = await adminSupabase
       .from("sync_log")
-      .select("id, provider, provider_bill_id, status, synced_at, provider_response")
+      .select("id, provider, provider_bill_id, status, synced_at, provider_response, transaction_type, provider_entity_type")
       .eq("invoice_id", invoiceId)
       .order("synced_at", { ascending: false });
 

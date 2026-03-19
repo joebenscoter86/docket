@@ -12,6 +12,7 @@ interface InvoicesPageProps {
     direction?: string;
     cursor?: string;
     limit?: string;
+    output_type?: string;
   }>;
 }
 
@@ -30,6 +31,7 @@ export default async function InvoicesPage({ searchParams }: InvoicesPageProps) 
     direction: resolvedParams.direction,
     cursor: resolvedParams.cursor,
     limit: resolvedParams.limit ? Number(resolvedParams.limit) : undefined,
+    output_type: resolvedParams.output_type,
   });
 
   const [listResult, counts] = await Promise.all([
@@ -67,6 +69,7 @@ export default async function InvoicesPage({ searchParams }: InvoicesPageProps) 
         currentSort={params.sort}
         currentDirection={params.direction}
         hasCursor={!!resolvedParams.cursor}
+        currentOutputType={params.output_type}
       />
     </div>
   );

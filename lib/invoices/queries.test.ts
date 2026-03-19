@@ -76,6 +76,7 @@ describe("validateListParams", () => {
       direction: "desc",
       cursor: undefined,
       limit: 25,
+      output_type: "all",
     });
   });
 
@@ -92,6 +93,7 @@ describe("validateListParams", () => {
       direction: "asc",
       cursor: undefined,
       limit: 10,
+      output_type: "all",
     });
   });
 
@@ -108,6 +110,7 @@ describe("validateListParams", () => {
       direction: "desc",
       cursor: undefined,
       limit: 100,
+      output_type: "all",
     });
   });
 
@@ -236,6 +239,7 @@ describe("fetchInvoiceList", () => {
       sort: "uploaded_at",
       direction: "desc",
       limit: 25,
+      output_type: "all",
     });
     expect(mocks.from).toHaveBeenCalledWith("invoices");
     expect(mocks.query.select).toHaveBeenCalledWith(
@@ -250,6 +254,7 @@ describe("fetchInvoiceList", () => {
       sort: "uploaded_at",
       direction: "desc",
       limit: 25,
+      output_type: "all",
     });
     expect(mocks.query.eq).toHaveBeenCalledWith("status", "approved");
   });
@@ -261,6 +266,7 @@ describe("fetchInvoiceList", () => {
       sort: "uploaded_at",
       direction: "desc",
       limit: 25,
+      output_type: "all",
     });
     expect(mocks.query.eq).not.toHaveBeenCalled();
   });
@@ -272,6 +278,7 @@ describe("fetchInvoiceList", () => {
       sort: "uploaded_at",
       direction: "desc",
       limit: 25,
+      output_type: "all",
     });
     expect(mocks.query.limit).toHaveBeenCalledWith(26);
   });

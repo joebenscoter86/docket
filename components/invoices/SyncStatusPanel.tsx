@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import { TransactionType, SYNC_SUCCESS_MESSAGES, TRANSACTION_TYPE_SHORT_LABELS } from "@/lib/types/invoice";
 
 interface SyncLogEntry {
   id: string;
@@ -9,6 +10,8 @@ interface SyncLogEntry {
   status: "success" | "failed" | "retrying";
   synced_at: string;
   provider_response: Record<string, unknown> | null;
+  transaction_type: TransactionType | null;
+  provider_entity_type: string | null;
 }
 
 interface SyncStatusPanelProps {
@@ -33,6 +36,27 @@ function getErrorMessage(entry: SyncLogEntry): string {
   if (typeof response.detail === "string") return response.detail;
   if (typeof response.code === "string") return `Error code: ${response.code}`;
   return "Sync failed. Please try again.";
+}
+
+function getSuccessMessage(entry: SyncLogEntry): string {
+  if (entry.transaction_type) {
+    return SYNC_SUCCESS_MESSAGES[entry.transaction_type];
+  }
+  return "Synced to QuickBooks";
+}
+
+function getFailureMessage(entry: SyncLogEntry): string {
+  const typeLabel = entry.transaction_type
+    ? TRANSACTION_TYPE_SHORT_LABELS[entry.transaction_type]
+    : "Sync";
+  return `${typeLabel} creation failed`;
+}
+
+function getEntityLabel(entry: SyncLogEntry): string {
+  if (entry.transaction_type) {
+    return TRANSACTION_TYPE_SHORT_LABELS[entry.transaction_type];
+  }
+  return "Bill";
 }
 
 export default function SyncStatusPanel({
@@ -118,8 +142,8 @@ export default function SyncStatusPanel({
                 }`}
               >
                 {latestLog.status === "success"
-                  ? "Synced to QuickBooks"
-                  : "Sync Failed"}
+                  ? getSuccessMessage(latestLog)
+                  : getFailureMessage(latestLog)}
               </span>
               <span className="text-xs text-muted shrink-0">
                 {formatSyncTime(latestLog.synced_at)}
@@ -128,7 +152,7 @@ export default function SyncStatusPanel({
 
             {latestLog.status === "success" && latestLog.provider_bill_id && (
               <p className="text-sm text-accent mt-1">
-                Bill ID: <span className="font-mono">{latestLog.provider_bill_id}</span>
+                {getEntityLabel(latestLog)} ID: <span className="font-mono">{latestLog.provider_bill_id}</span>
               </p>
             )}
 
@@ -187,7 +211,7 @@ export default function SyncStatusPanel({
                       </span>
                       {log.provider_bill_id && (
                         <span className="text-muted font-mono text-xs">
-                          Bill {log.provider_bill_id}
+                          {getEntityLabel(log)} {log.provider_bill_id}
                         </span>
                       )}
                     </span>

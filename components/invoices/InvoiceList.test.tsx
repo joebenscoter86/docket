@@ -46,6 +46,7 @@ const sampleInvoices: InvoiceListItem[] = [
     file_name: "invoice-001.pdf",
     status: "pending_review",
     uploaded_at: "2026-03-16T12:00:00Z",
+    output_type: null,
     extracted_data: {
       vendor_name: "Acme Corp",
       invoice_number: "INV-001",
@@ -58,6 +59,7 @@ const sampleInvoices: InvoiceListItem[] = [
     file_name: "receipt.pdf",
     status: "synced",
     uploaded_at: "2026-03-15T10:00:00Z",
+    output_type: null,
     extracted_data: null,
   },
 ];
@@ -73,6 +75,7 @@ describe("InvoiceList", () => {
         currentSort="uploaded_at"
         currentDirection="desc"
         hasCursor={false}
+        currentOutputType="all"
       />
     );
     expect(screen.getByText(/no invoices yet/i)).toBeInTheDocument();
@@ -89,6 +92,7 @@ describe("InvoiceList", () => {
         currentSort="uploaded_at"
         currentDirection="desc"
         hasCursor={false}
+        currentOutputType="all"
       />
     );
     expect(screen.getByText(/no invoices match this filter/i)).toBeInTheDocument();
@@ -104,9 +108,10 @@ describe("InvoiceList", () => {
         currentSort="uploaded_at"
         currentDirection="desc"
         hasCursor={false}
+        currentOutputType="all"
       />
     );
-    expect(screen.getByText(/all/i)).toBeInTheDocument();
+    expect(screen.getAllByText(/^all$/i).length).toBeGreaterThan(0);
     expect(screen.getByText("20")).toBeInTheDocument();
     expect(screen.getByText("3")).toBeInTheDocument();
   });
@@ -121,6 +126,7 @@ describe("InvoiceList", () => {
         currentSort="uploaded_at"
         currentDirection="desc"
         hasCursor={false}
+        currentOutputType="all"
       />
     );
     expect(screen.getAllByText("invoice-001.pdf").length).toBeGreaterThan(0);
@@ -138,6 +144,7 @@ describe("InvoiceList", () => {
         currentSort="uploaded_at"
         currentDirection="desc"
         hasCursor={false}
+        currentOutputType="all"
       />
     );
     expect(screen.getAllByText("Pending").length).toBeGreaterThan(0);
@@ -153,6 +160,7 @@ describe("InvoiceList", () => {
         currentSort="uploaded_at"
         currentDirection="desc"
         hasCursor={false}
+        currentOutputType="all"
       />
     );
     expect(screen.getByText("Next")).toBeInTheDocument();
@@ -168,6 +176,7 @@ describe("InvoiceList", () => {
         currentSort="uploaded_at"
         currentDirection="desc"
         hasCursor={false}
+        currentOutputType="all"
       />
     );
     expect(screen.queryByText("Next")).not.toBeInTheDocument();
@@ -183,6 +192,7 @@ describe("InvoiceList", () => {
         currentSort="uploaded_at"
         currentDirection="desc"
         hasCursor={true}
+        currentOutputType="all"
       />
     );
     expect(screen.getByText("Previous")).toBeInTheDocument();
