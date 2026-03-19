@@ -108,4 +108,46 @@ describe("GlAccountSelect", () => {
 
     expect(screen.queryByTitle(/Accept suggestion/i)).toBeNull();
   });
+
+  it("shows 'Learned' badge when suggestionSource is 'history' and account is pre-filled", () => {
+    render(
+      <GlAccountSelect
+        {...defaultProps}
+        currentAccountId="acc-2"
+        suggestedAccountId="acc-2"
+        suggestionSource="history"
+      />
+    );
+
+    expect(screen.getByText("Learned")).toBeInTheDocument();
+    expect(screen.queryByTitle(/Accept suggestion/i)).toBeNull();
+  });
+
+  it("does not show 'Learned' badge after user changes selection (cleared source)", () => {
+    render(
+      <GlAccountSelect
+        {...defaultProps}
+        currentAccountId="acc-1"
+        suggestedAccountId="acc-2"
+        suggestionSource={null}
+      />
+    );
+
+    expect(screen.queryByText("Learned")).toBeNull();
+  });
+
+  it("shows 'Learned' prefix in dropdown for history-sourced suggestion", () => {
+    render(
+      <GlAccountSelect
+        {...defaultProps}
+        currentAccountId="acc-2"
+        suggestedAccountId="acc-2"
+        suggestionSource="history"
+      />
+    );
+
+    const select = screen.getByRole("combobox") as HTMLSelectElement;
+    const options = Array.from(select.options);
+    expect(options[1].text).toBe("Learned · Software & Subscriptions");
+  });
 });
