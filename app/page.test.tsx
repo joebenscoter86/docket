@@ -24,7 +24,7 @@ describe('Landing page', () => {
     mockGetUser.mockClear()
   })
 
-  it('redirects authenticated users to /app/invoices', async () => {
+  it('redirects authenticated users to /invoices', async () => {
     mockGetUser.mockResolvedValue({
       data: { user: { id: 'test-user-id' } },
     })
@@ -32,7 +32,7 @@ describe('Landing page', () => {
     const { default: Home } = await import('./page')
     await Home()
 
-    expect(mockRedirect).toHaveBeenCalledWith('/app/invoices')
+    expect(mockRedirect).toHaveBeenCalledWith('/invoices')
   })
 
   it('does not redirect unauthenticated users', async () => {
