@@ -223,9 +223,9 @@ export async function POST(
         const purchaseLines: QBOPurchaseLine[] = lineItems.map((li: { amount: number; gl_account_id: string; description: string | null }) => ({
           Amount: Number(li.amount),
           DetailType: "AccountBasedExpenseLineDetail" as const,
+          Description: li.description ?? undefined,
           AccountBasedExpenseLineDetail: {
             AccountRef: { value: li.gl_account_id },
-            ...(li.description ? { Description: li.description } : {}),
           },
         }));
 

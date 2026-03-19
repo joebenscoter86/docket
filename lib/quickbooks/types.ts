@@ -144,9 +144,9 @@ export interface QBOErrorResponse {
 export interface QBOPurchaseLine {
   Amount: number;
   DetailType: "AccountBasedExpenseLineDetail";
+  Description?: string;
   AccountBasedExpenseLineDetail: {
     AccountRef: { value: string };
-    Description?: string;
   };
 }
 
