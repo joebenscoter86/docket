@@ -8,9 +8,9 @@ New users face the worst experience: zero history, zero suggestions, pure manual
 
 ## Solution
 
-A two-layer suggestion system that pre-fills GL account dropdowns:
+A two-layer suggestion system that recommends GL accounts for each line item:
 
-1. **AI-Inferred suggestions (DOC-78):** During extraction, pass the user's QBO chart of accounts to Claude alongside the invoice. Claude returns a suggested GL account for each line item. Works from invoice #1 with zero history.
+1. **AI-Inferred suggestions (DOC-78):** During extraction, pass the user's QBO chart of accounts to Claude alongside the invoice. Claude returns a suggested GL account for each line item. Works from invoice #1 with zero history. **Suggestions require explicit user confirmation** — they appear as recommendations in the dropdown, not pre-filled values.
 
 2. **History-based suggestions (DOC-79):** Record which GL accounts the user assigns to line items, keyed by vendor + description. On future invoices from the same vendor, look up historical mappings first. Higher confidence than AI guesses.
 
@@ -36,11 +36,14 @@ User uploads invoice
   → Pass account list + invoice to Claude in a single extraction call
   → Claude returns extracted data + suggested GL account per line item
   → Validate suggested IDs against real account list (discard hallucinated IDs)
-  → Store suggestions in extracted_line_items (suggested_gl_account_id + gl_account_id pre-fill)
-  → Review UI shows suggestions as pre-filled but visually distinct
-  → User confirms (one click) or overrides (select different account)
-  → Confirmation state persisted via is_user_confirmed column
+  → Store suggestions in suggested_gl_account_id (gl_account_id stays NULL)
+  → Review UI shows suggestion as highlighted first option in dropdown with "AI" tag
+  → User opens dropdown → sees AI suggestion at top → selects it or picks another
+  → On selection: gl_account_id populated, is_user_confirmed = true
+  → Only confirmed line items (gl_account_id IS NOT NULL) count toward sync readiness
 ```
+
+**Key design decision: suggestions require explicit confirmation.** AI suggestions are stored in `suggested_gl_account_id` only — they are never automatically copied into `gl_account_id`. The user must interact with the dropdown to accept or override the suggestion. This ensures accounting data going into QBO always reflects a deliberate user choice.
 
 ### Extraction Prompt Changes
 
@@ -73,9 +76,9 @@ ALTER TABLE extracted_line_items
   ADD COLUMN is_user_confirmed BOOLEAN DEFAULT false;
 ```
 
-- `suggested_gl_account_id`: The original AI-suggested (or history-based) account ID. Preserved even if the user overrides `gl_account_id`. Null if no suggestion.
+- `suggested_gl_account_id`: The AI-suggested (or history-based) account ID. Stored as a recommendation only — never copied into `gl_account_id` automatically. Preserved for analytics even after user confirms. Null if no suggestion.
 - `gl_suggestion_source`: Where the suggestion came from (`'ai'` for DOC-78, `'history'` for DOC-79). Null if no suggestion.
-- `is_user_confirmed`: Whether the user has explicitly interacted with the GL dropdown for this line item. Defaults to `false` for AI/history suggestions, set to `true` when the user selects any value. Persists across page refreshes.
+- `is_user_confirmed`: Whether the user has explicitly selected a GL account for this line item. Defaults to `false`. Set to `true` when the user selects any value from the dropdown. In the confirmation-required model, this is functionally equivalent to `gl_account_id IS NOT NULL`, but kept as an explicit column for DOC-79 compatibility (history-based suggestions may pre-fill `gl_account_id` since they reflect prior user choices, not AI inference).
 
 **No new tables for DOC-78.** The suggestion is stored directly on the line item row.
 
@@ -182,38 +185,46 @@ When storing line items in `extracted_line_items`, include the new fields:
 ```typescript
 {
   // ...existing fields...
-  gl_account_id: item.suggestedGlAccountId,           // Pre-fill the actual field
-  suggested_gl_account_id: item.suggestedGlAccountId,  // Keep original suggestion for tracking
+  gl_account_id: null,                                  // NOT pre-filled — requires user confirmation
+  suggested_gl_account_id: item.suggestedGlAccountId,   // AI recommendation stored separately
   gl_suggestion_source: item.suggestedGlAccountId ? 'ai' : null,
-  is_user_confirmed: false,                            // Not yet confirmed by user
+  is_user_confirmed: false,                             // Not yet confirmed by user
 }
 ```
 
-**Important:** We pre-fill `gl_account_id` (the actual field used for sync) with the suggestion. This means the suggestion is "accepted by default" — the user only needs to act if they want to change it. This minimizes clicks for the common case where the suggestion is correct.
+**Important:** `gl_account_id` stays `null` at extraction time. The suggestion is stored only in `suggested_gl_account_id`. When the user selects an account from the dropdown (whether the AI suggestion or a different one), the PATCH endpoint sets both `gl_account_id` and `is_user_confirmed = true`. This ensures every GL account in QBO reflects a deliberate user choice.
 
 ### UI Changes
 
 **`GlAccountSelect.tsx` — visual treatment of suggestions:**
 
-The dropdown already works with `currentAccountId`. The change is purely visual — when a value is pre-filled from a suggestion, show an indicator:
+The dropdown shows suggestions as recommended options, not pre-filled values:
 
-- **AI suggestion present, not yet confirmed by user:** Show a small "AI" badge/icon next to the dropdown and a subtle background tint (e.g., light blue/purple). The dropdown value is pre-selected but the visual treatment signals "this is a suggestion, review it."
-- **User confirms (selects any value, even the same one) or changes:** Badge disappears, normal appearance. `is_user_confirmed` set to `true` via API call.
-- **No suggestion:** Dropdown shows "Select account..." placeholder (same as today).
+- **AI suggestion present, not yet confirmed (`gl_account_id` is null, `suggested_gl_account_id` exists):**
+  - Dropdown shows "Select account..." placeholder (same as today — no value is pre-selected)
+  - Below the dropdown: subtle "AI suggests: [Account Name]" label with small "AI" badge in blue/purple
+  - When user opens the dropdown, the suggested account appears as the **first option** in the list, visually highlighted with an "AI" tag to distinguish it from the alphabetical list
+  - User selects the suggestion (or any other account) → normal one-click interaction
+- **User selects any account:**
+  - Suggestion label/badge disappears
+  - `gl_account_id` populated with the selected value
+  - `is_user_confirmed` set to `true` via the existing PATCH endpoint
+  - Normal dropdown appearance from this point
+- **No suggestion:** Dropdown shows "Select account..." placeholder (same as today). No badge.
 
 Props added to `GlAccountSelect`:
 
 ```typescript
 interface GlAccountSelectProps {
   // ...existing props...
-  isSuggested?: boolean;        // true if current value is an unconfirmed suggestion
+  suggestedAccountId?: string | null;    // the AI-recommended account ID
   suggestionSource?: 'ai' | 'history' | null;  // for badge text/icon
 }
 ```
 
-The parent (`LineItemEditor`) derives `isSuggested` from the line item's `is_user_confirmed` and `suggested_gl_account_id` fields. When the user interacts with the dropdown, `LineItemEditor` calls the API to set `is_user_confirmed = true`.
+The parent (`LineItemEditor`) passes the line item's `suggested_gl_account_id` and `gl_suggestion_source` as props. When the user selects any account, the existing `handleGlAccountSelect` flow handles the PATCH call — the endpoint is extended to also set `is_user_confirmed = true` when `gl_account_id` is updated.
 
-**Sync blocking behavior:** Suggested (pre-filled) GL accounts **do count** as valid for sync purposes. The user is not forced to manually confirm every suggestion before syncing — they only need to review and change the ones that look wrong. This keeps the flow fast: upload → extract → glance at suggestions → sync.
+**Sync gating behavior: suggestions do NOT count as valid for sync.** Only line items with a confirmed `gl_account_id` (i.e., where the user has explicitly selected an account) count toward sync readiness. The "missing GL accounts" count reflects line items where `gl_account_id IS NULL`, which includes items with unconfirmed AI suggestions. This ensures all accounting data in QBO reflects deliberate user choices.
 
 ### Validation
 
@@ -232,7 +243,7 @@ The account list adds ~500-2000 tokens to the prompt (typical small business has
 | Claude returns invalid account ID | Discard that suggestion. Line item gets no suggestion. |
 | Claude returns no suggestions | All line items show "Select account..." (same as today). |
 | Account list is empty | Skip GL suggestions. |
-| Suggested account no longer in QBO at review time | Dropdown shows the value but it won't match any option — user must re-select. Same behavior as if a previously-selected account was deactivated. |
+| Suggested account no longer in QBO at review time | "AI suggests" label still shows the account name, but it won't appear in the dropdown options. User must select a different valid account. No broken state since `gl_account_id` was never pre-filled. |
 
 ---
 
@@ -369,11 +380,13 @@ The `suggestionSource` prop on `GlAccountSelect` (added in DOC-78) drives this d
 | Extraction with accounts | Unit | Claude prompt includes account list, response includes suggested IDs |
 | Extraction without QBO | Unit | Graceful degradation — no suggestions, extraction succeeds |
 | Invalid account ID filtering | Unit | Hallucinated IDs are discarded before storage |
-| Suggestion pre-fill | Component | GlAccountSelect shows pre-filled value with "AI" badge |
-| Suggestion override | Component | Changing selection clears badge, saves new value, persists confirmation |
-| Suggestion persists across refresh | Component | Revisiting review page shows correct badge state from `is_user_confirmed` |
-| Sync with suggestions | API | Pre-filled suggestions count as valid for sync |
-| Stale suggested account | Component | Suggested account not in current dropdown — user must re-select |
+| Suggestion stored separately | Unit | `gl_account_id` stays null, `suggested_gl_account_id` populated after extraction |
+| Suggestion display | Component | GlAccountSelect shows "AI suggests: X" label and highlighted first option in dropdown |
+| Suggestion acceptance | Component | Selecting the suggested account sets `gl_account_id` and `is_user_confirmed = true` |
+| Suggestion override | Component | Selecting a different account sets that as `gl_account_id`, badge disappears |
+| Confirmation persists across refresh | Component | Revisiting review page shows correct state from DB |
+| Unconfirmed suggestions block sync | API | Line items with `gl_account_id = null` (even with suggestions) count as "missing GL" |
+| Stale suggested account | Component | Suggested account not in current dropdown options — suggestion label still shows but user must pick a valid account |
 
 ### DOC-79 Tests
 
