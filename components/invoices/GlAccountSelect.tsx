@@ -10,6 +10,8 @@ interface GlAccountSelectProps {
   currentAccountId: string | null;
   onSelect: (accountId: string | null) => Promise<boolean>;
   disabled?: boolean;
+  suggestedAccountId?: string | null;
+  suggestionSource?: "ai" | "history" | null;
 }
 
 const STATUS_BORDER: Record<string, string> = {
@@ -26,6 +28,8 @@ export default function GlAccountSelect({
   currentAccountId,
   onSelect,
   disabled = false,
+  suggestedAccountId,
+  suggestionSource,
 }: GlAccountSelectProps) {
   const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
   const savedTimer = useRef<ReturnType<typeof setTimeout>>();
@@ -66,22 +70,43 @@ export default function GlAccountSelect({
     );
   }
 
+  const showSuggestion = suggestedAccountId && !currentAccountId && suggestionSource;
+  const suggestedAccount = showSuggestion
+    ? accounts.find((a) => a.value === suggestedAccountId)
+    : null;
+
+  const orderedAccounts = suggestedAccount
+    ? [suggestedAccount, ...accounts.filter((a) => a.value !== suggestedAccountId)]
+    : accounts;
+
   return (
-    <div className={STATUS_BORDER[saveStatus]}>
-      <select
-        className="w-full border border-border rounded-md px-2 py-1.5 text-sm focus:outline-none focus-visible:ring-[3px] focus-visible:ring-[#BFDBFE] focus:border-primary bg-white"
-        value={currentAccountId ?? ""}
-        onChange={handleChange}
-        disabled={disabled || accounts.length === 0}
-        title={accounts.length === 0 ? "No expense accounts found in QuickBooks" : undefined}
-      >
-        <option value="">Select account...</option>
-        {accounts.map((a) => (
-          <option key={a.value} value={a.value}>
-            {a.label}
-          </option>
-        ))}
-      </select>
+    <div className="flex flex-col gap-1">
+      <div className={STATUS_BORDER[saveStatus]}>
+        <select
+          className="w-full border border-border rounded-md px-2 py-1.5 text-sm focus:outline-none focus-visible:ring-[3px] focus-visible:ring-[#BFDBFE] focus:border-primary bg-white"
+          value={currentAccountId ?? ""}
+          onChange={handleChange}
+          disabled={disabled || accounts.length === 0}
+          title={accounts.length === 0 ? "No expense accounts found in QuickBooks" : undefined}
+        >
+          <option value="">Select account...</option>
+          {orderedAccounts.map((a) => (
+            <option key={a.value} value={a.value}>
+              {a.value === suggestedAccountId && showSuggestion
+                ? `AI · ${a.label}`
+                : a.label}
+            </option>
+          ))}
+        </select>
+      </div>
+      {suggestedAccount && showSuggestion && (
+        <span className="text-xs text-blue-600 flex items-center gap-1">
+          <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-blue-50 text-blue-700">
+            AI
+          </span>
+          suggests: {suggestedAccount.label}
+        </span>
+      )}
     </div>
   );
 }

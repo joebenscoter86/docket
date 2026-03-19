@@ -221,4 +221,67 @@ describe("ClaudeExtractionProvider", () => {
       provider.extractInvoiceData(pdfBuffer, "application/pdf")
     ).rejects.toThrow("Extraction service is busy");
   });
+
+  describe("GL account suggestions", () => {
+    const sampleAccounts = [
+      { id: "123", name: "Office Supplies" },
+      { id: "456", name: "Professional Services" },
+    ];
+
+    it("includes account list in prompt when context has accounts", async () => {
+      mockSuccessResponse();
+
+      await provider.extractInvoiceData(pdfBuffer, "application/pdf", {
+        accounts: sampleAccounts,
+      });
+
+      const callArgs = mockCreate.mock.calls[0][0];
+      const textBlock = callArgs.messages[0].content[1];
+      expect(textBlock.text).toContain("Available expense accounts");
+      expect(textBlock.text).toContain("123");
+      expect(textBlock.text).toContain("456");
+    });
+
+    it("does not include account section when context is undefined", async () => {
+      mockSuccessResponse();
+
+      await provider.extractInvoiceData(pdfBuffer, "application/pdf");
+
+      const callArgs = mockCreate.mock.calls[0][0];
+      const textBlock = callArgs.messages[0].content[1];
+      expect(textBlock.text).not.toContain("Available expense accounts");
+    });
+
+    it("parses suggested_gl_account_id from AI response into suggestedGlAccountId", async () => {
+      const responseWithGlSuggestions = {
+        ...SAMPLE_AI_RESPONSE,
+        line_items: [
+          {
+            description: "Office supplies",
+            quantity: 1,
+            unit_price: 50.0,
+            amount: 50.0,
+            suggested_gl_account_id: "123",
+          },
+          {
+            description: "Consulting",
+            quantity: 2,
+            unit_price: 100.0,
+            amount: 200.0,
+            suggested_gl_account_id: null,
+          },
+        ],
+      };
+      mockSuccessResponse(JSON.stringify(responseWithGlSuggestions));
+
+      const result = await provider.extractInvoiceData(
+        pdfBuffer,
+        "application/pdf",
+        { accounts: sampleAccounts }
+      );
+
+      expect(result.data.lineItems[0].suggestedGlAccountId).toBe("123");
+      expect(result.data.lineItems[1].suggestedGlAccountId).toBeNull();
+    });
+  });
 });

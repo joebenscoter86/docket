@@ -30,7 +30,7 @@ export async function getExtractedData(invoiceId: string) {
       `
       *,
       extracted_line_items (
-        id, description, quantity, unit_price, amount, gl_account_id, sort_order
+        id, description, quantity, unit_price, amount, gl_account_id, suggested_gl_account_id, gl_suggestion_source, is_user_confirmed, sort_order
       )
     `
     )
@@ -153,9 +153,12 @@ export async function createLineItem(extractedDataId: string) {
       unit_price: null,
       amount: null,
       gl_account_id: null,
+      suggested_gl_account_id: null,
+      gl_suggestion_source: null,
+      is_user_confirmed: false,
       sort_order: nextSortOrder,
     })
-    .select("id, description, quantity, unit_price, amount, gl_account_id, sort_order")
+    .select("id, description, quantity, unit_price, amount, gl_account_id, suggested_gl_account_id, gl_suggestion_source, is_user_confirmed, sort_order")
     .single();
 
   if (error || !data) {
@@ -181,11 +184,21 @@ export async function updateLineItemField(
 
   const supabase = createClient();
 
+  let updatePayload: Record<string, unknown>;
+  if (field === "gl_account_id") {
+    updatePayload =
+      value !== null
+        ? { gl_account_id: value, is_user_confirmed: true }
+        : { gl_account_id: null, is_user_confirmed: false };
+  } else {
+    updatePayload = { [field]: value };
+  }
+
   const { data, error } = await supabase
     .from("extracted_line_items")
-    .update({ [field]: value })
+    .update(updatePayload)
     .eq("id", itemId)
-    .select("id, description, quantity, unit_price, amount, gl_account_id, sort_order")
+    .select("id, description, quantity, unit_price, amount, gl_account_id, suggested_gl_account_id, gl_suggestion_source, is_user_confirmed, sort_order")
     .single();
 
   if (error || !data) {

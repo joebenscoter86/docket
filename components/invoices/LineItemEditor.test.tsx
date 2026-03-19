@@ -16,6 +16,9 @@ const MOCK_ITEMS: ExtractedLineItemRow[] = [
     amount: 6000,
     gl_account_id: null,
     sort_order: 0,
+    suggested_gl_account_id: null,
+    gl_suggestion_source: null,
+    is_user_confirmed: false,
   },
   {
     id: "li-2",
@@ -25,6 +28,9 @@ const MOCK_ITEMS: ExtractedLineItemRow[] = [
     amount: 120,
     gl_account_id: null,
     sort_order: 1,
+    suggested_gl_account_id: null,
+    gl_suggestion_source: null,
+    is_user_confirmed: false,
   },
 ];
 

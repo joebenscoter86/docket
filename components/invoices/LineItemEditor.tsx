@@ -102,7 +102,7 @@ export default function LineItemEditor({
       const item = state.items.find((i) => i.id === itemId);
       if (!item) return;
 
-      const value = valueOverride !== undefined ? valueOverride : item.values[field as keyof typeof item.values];
+      const value = valueOverride !== undefined ? valueOverride : (item.values[field as keyof typeof item.values] as string | number | null);
 
       // Validate
       const fieldError = validateLineItemField(field, value);
@@ -416,6 +416,8 @@ export default function LineItemEditor({
               currentAccountId={item.values.gl_account_id as string | null}
               onSelect={(accountId) => handleGlAccountSelect(item.id, accountId)}
               disabled={disabled}
+              suggestedAccountId={item.values.suggested_gl_account_id}
+              suggestionSource={item.values.gl_suggestion_source as "ai" | "history" | null}
             />
 
             {/* Remove button */}

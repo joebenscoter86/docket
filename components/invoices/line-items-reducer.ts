@@ -8,6 +8,9 @@ export interface LineItemValues {
   unit_price: number | null;
   amount: number | null;
   gl_account_id: string | null;
+  suggested_gl_account_id: string | null;
+  gl_suggestion_source: string | null;
+  is_user_confirmed: boolean;
 }
 
 export interface LineItemState {
@@ -37,6 +40,9 @@ function extractValues(item: ExtractedLineItemRow): LineItemValues {
     unit_price: item.unit_price,
     amount: item.amount,
     gl_account_id: item.gl_account_id,
+    suggested_gl_account_id: item.suggested_gl_account_id,
+    gl_suggestion_source: item.gl_suggestion_source,
+    is_user_confirmed: item.is_user_confirmed,
   };
 }
 
@@ -130,6 +136,9 @@ export function lineItemsReducer(
         unit_price: null,
         amount: null,
         gl_account_id: null,
+        suggested_gl_account_id: null,
+        gl_suggestion_source: null,
+        is_user_confirmed: false,
       };
       const newItem: LineItemState = {
         id: action.item.id,
