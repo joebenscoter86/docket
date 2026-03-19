@@ -2,7 +2,8 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { getExtractionProvider } from "./provider";
 import { mapToExtractedDataRow, mapToLineItemRows } from "./mapper";
 import { logger } from "@/lib/utils/logger";
-import type { ExtractionResult } from "./types";
+import { queryAccounts } from "@/lib/quickbooks/api";
+import type { ExtractionResult, ExtractionContext } from "./types";
 
 export async function runExtraction(params: {
   invoiceId: string;
@@ -31,11 +32,55 @@ export async function runExtraction(params: {
     }
     const fileBuffer = Buffer.from(await fileResponse.arrayBuffer());
 
-    // 3. Call extraction provider
-    const provider = getExtractionProvider();
-    const result = await provider.extractInvoiceData(fileBuffer, fileType);
+    // 3. Fetch QBO accounts for GL suggestions (non-fatal)
+    // queryAccounts() internally handles connection lookup and token decryption.
+    // If no QBO connection exists, it throws — the catch block handles it gracefully.
+    let accountContext: ExtractionContext | undefined;
+    let validAccountIds: Set<string> | undefined;
+    try {
+      const accounts = await queryAccounts(admin, orgId);
+      if (accounts.length > 0) {
+        const mappedAccounts = accounts.map((a) => ({
+          id: a.Id,
+          name: a.SubAccount ? a.FullyQualifiedName : a.Name,
+        }));
+        accountContext = { accounts: mappedAccounts };
+        validAccountIds = new Set(mappedAccounts.map((a) => a.id));
+      }
+    } catch (err) {
+      // Non-fatal: no QBO connection, expired token, API error — all handled here.
+      // Extraction proceeds without GL suggestions.
+      logger.warn("gl_suggestion_accounts_fetch_failed", {
+        action: "run_extraction",
+        invoiceId,
+        orgId,
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
 
-    // 3.5. Clean up stale extraction data from prior attempts
+    // 4. Call extraction provider
+    const provider = getExtractionProvider();
+    const result = await provider.extractInvoiceData(fileBuffer, fileType, accountContext);
+
+    // 4.5. Validate AI-suggested GL account IDs against real account list
+    if (validAccountIds && result.data.lineItems.length > 0) {
+      for (const item of result.data.lineItems) {
+        if (
+          item.suggestedGlAccountId &&
+          !validAccountIds.has(item.suggestedGlAccountId)
+        ) {
+          logger.warn("gl_suggestion_invalid_id_discarded", {
+            action: "run_extraction",
+            invoiceId,
+            orgId,
+            suggestedId: item.suggestedGlAccountId,
+          });
+          item.suggestedGlAccountId = null;
+        }
+      }
+    }
+
+    // 5. Clean up stale extraction data from prior attempts
     const { data: existingData } = await admin
       .from("extracted_data")
       .select("id")
@@ -64,7 +109,7 @@ export async function runExtraction(params: {
       });
     }
 
-    // 4. Store extracted_data
+    // 6. Store extracted_data
     const extractedDataRow = mapToExtractedDataRow(result, invoiceId);
     const { data: extractedRow, error: insertError } = await admin
       .from("extracted_data")
@@ -79,7 +124,7 @@ export async function runExtraction(params: {
       );
     }
 
-    // 5. Store line items
+    // 7. Store line items
     if (result.data.lineItems.length > 0) {
       const lineItemRows = mapToLineItemRows(
         result.data.lineItems,
@@ -97,7 +142,7 @@ export async function runExtraction(params: {
       }
     }
 
-    // 6. Update invoice status to pending_review
+    // 8. Update invoice status to pending_review
     const { error: statusError } = await admin
       .from("invoices")
       .update({ status: "pending_review", error_message: null })
@@ -112,7 +157,7 @@ export async function runExtraction(params: {
       });
     }
 
-    // 7. Log success
+    // 9. Log success
     logger.info("extraction_complete", {
       invoiceId,
       orgId,

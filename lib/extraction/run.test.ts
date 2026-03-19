@@ -20,6 +20,13 @@ vi.mock("@/lib/utils/logger", () => ({
   },
 }));
 
+// Mock queryAccounts — default to rejection (no QBO connection) so existing tests
+// continue to work without adjustment. Individual tests override as needed.
+const mockQueryAccounts = vi.fn();
+vi.mock("@/lib/quickbooks/api", () => ({
+  queryAccounts: (...args: unknown[]) => mockQueryAccounts(...args),
+}));
+
 // ---------------------------------------------------------------------------
 // Supabase admin mock — must handle multiple tables with different chains
 // ---------------------------------------------------------------------------
@@ -177,6 +184,9 @@ function setupHappyPath() {
   });
 
   mockExtractInvoiceData.mockResolvedValue(MOCK_RESULT);
+
+  // Default: no QBO connection → proceed without GL suggestions
+  mockQueryAccounts.mockRejectedValue(new Error("No QBO connection"));
 }
 
 // ---------------------------------------------------------------------------
@@ -225,7 +235,8 @@ describe("runExtraction", () => {
 
     expect(mockExtractInvoiceData).toHaveBeenCalledWith(
       expect.any(Buffer),
-      BASE_PARAMS.fileType
+      BASE_PARAMS.fileType,
+      undefined // no QBO connection → no account context
     );
   });
 
@@ -438,6 +449,184 @@ describe("runExtraction", () => {
 
     // Restore original mocks
     vi.resetModules();
+  });
+
+  // ---------------------------------------------------------------------------
+  // GL account suggestions
+  // ---------------------------------------------------------------------------
+
+  describe("GL account suggestions in extraction", () => {
+    // Each test in this describe block does a fresh module reset + re-registration
+    // to avoid contamination from vi.doMock calls in earlier tests (e.g., the
+    // "throws when extracted_data DB insert fails" test).
+    beforeEach(() => {
+      vi.resetModules();
+      // Re-register the base happy-path admin mock
+      vi.doMock("@/lib/supabase/admin", () => ({
+        createAdminClient: () => ({
+          storage: {
+            from: () => ({
+              createSignedUrl: mockCreateSignedUrl,
+            }),
+          },
+          from: (table: string) => {
+            if (table === "extracted_data") {
+              return {
+                insert: (data: unknown) => {
+                  mockExtractedDataInsert(data);
+                  return {
+                    select: () => ({
+                      single: () => Promise.resolve({ data: { id: "ed-uuid-1" }, error: null }),
+                    }),
+                  };
+                },
+                select: (cols: string) => {
+                  if (cols === "id") {
+                    return {
+                      eq: () => Promise.resolve({ data: [], error: null }),
+                    };
+                  }
+                  return { eq: () => ({ single: () => Promise.resolve({ data: null, error: null }) }) };
+                },
+                delete: () => {
+                  mockExtractedDataDelete();
+                  return { eq: () => Promise.resolve({ error: null }) };
+                },
+              };
+            }
+            if (table === "extracted_line_items") {
+              return {
+                insert: (data: unknown) => {
+                  mockLineItemsInsert(data);
+                  return Promise.resolve({ error: null });
+                },
+                delete: () => {
+                  mockLineItemsDelete();
+                  return { in: () => Promise.resolve({ error: null }) };
+                },
+              };
+            }
+            if (table === "invoices") {
+              return {
+                update: (data: unknown) => {
+                  mockInvoicesUpdate(data);
+                  return { eq: () => Promise.resolve({ error: null }) };
+                },
+                select: (cols: unknown) => {
+                  mockInvoicesSelect(cols);
+                  return {
+                    eq: () => ({
+                      single: () => Promise.resolve({ data: { retry_count: 0 }, error: null }),
+                    }),
+                  };
+                },
+              };
+            }
+            throw new Error(`Unexpected table: ${table}`);
+          },
+        }),
+      }));
+      vi.doMock("./provider", () => ({
+        getExtractionProvider: () => ({ extractInvoiceData: mockExtractInvoiceData }),
+      }));
+      vi.doMock("@/lib/quickbooks/api", () => ({
+        queryAccounts: (...args: unknown[]) => mockQueryAccounts(...args),
+      }));
+    });
+
+    afterEach(() => {
+      vi.resetModules();
+    });
+
+    it("fetches QBO accounts and passes them as context to provider", async () => {
+      setupHappyPath();
+
+      const mockAccounts = [
+        { Id: "84", Name: "Office Supplies", FullyQualifiedName: "Office Supplies", SubAccount: false },
+        { Id: "92", Name: "Travel", FullyQualifiedName: "Travel:Airfare", SubAccount: true },
+      ];
+      mockQueryAccounts.mockResolvedValue(mockAccounts);
+
+      const { runExtraction } = await import("./run");
+      await runExtraction(BASE_PARAMS);
+
+      expect(mockExtractInvoiceData).toHaveBeenCalledWith(
+        expect.any(Buffer),
+        BASE_PARAMS.fileType,
+        {
+          accounts: [
+            { id: "84", name: "Office Supplies" },    // SubAccount false → use Name
+            { id: "92", name: "Travel:Airfare" },     // SubAccount true → use FullyQualifiedName
+          ],
+        }
+      );
+    });
+
+    it("proceeds without suggestions when QBO account fetch fails", async () => {
+      setupHappyPath();
+      // mockQueryAccounts is already set to reject in setupHappyPath
+
+      const { runExtraction } = await import("./run");
+      const result = await runExtraction(BASE_PARAMS);
+
+      expect(result).toEqual(MOCK_RESULT);
+      expect(mockExtractInvoiceData).toHaveBeenCalledWith(
+        expect.any(Buffer),
+        BASE_PARAMS.fileType,
+        undefined
+      );
+    });
+
+    it("validates suggested account IDs and discards hallucinated IDs", async () => {
+      setupHappyPath();
+
+      // Only account "84" is real
+      mockQueryAccounts.mockResolvedValue([
+        { Id: "84", Name: "Office Supplies", FullyQualifiedName: "Office Supplies", SubAccount: false },
+      ]);
+
+      // Provider returns two line items: one with valid ID, one hallucinated
+      const resultWithSuggestions: ExtractionResult = {
+        ...MOCK_RESULT,
+        data: {
+          ...MOCK_RESULT.data,
+          lineItems: [
+            {
+              description: "Office paper",
+              quantity: 1,
+              unitPrice: 50,
+              amount: 50,
+              sortOrder: 0,
+              suggestedGlAccountId: "84", // valid
+            },
+            {
+              description: "Mystery item",
+              quantity: 1,
+              unitPrice: 100,
+              amount: 100,
+              sortOrder: 1,
+              suggestedGlAccountId: "999", // hallucinated — not in account list
+            },
+          ],
+        },
+      };
+      mockExtractInvoiceData.mockResolvedValue(resultWithSuggestions);
+
+      const { runExtraction } = await import("./run");
+      await runExtraction(BASE_PARAMS);
+
+      // The line items passed to insert should have "999" nullified
+      const insertedRows = mockLineItemsInsert.mock.calls[0][0] as Array<{
+        suggested_gl_account_id: string | null;
+        description: string | null;
+      }>;
+
+      const officeRow = insertedRows.find((r) => r.description === "Office paper");
+      const mysteryRow = insertedRows.find((r) => r.description === "Mystery item");
+
+      expect(officeRow?.suggested_gl_account_id).toBe("84");
+      expect(mysteryRow?.suggested_gl_account_id).toBeNull();
+    });
   });
 
   it("deletes stale extracted_data and line items when prior extraction exists", async () => {
