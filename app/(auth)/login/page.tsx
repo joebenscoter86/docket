@@ -50,8 +50,8 @@ export default function LoginPage() {
           <Image
             src="/dockett_logo.png"
             alt="Docket logo"
-            width={120}
-            height={120}
+            width={240}
+            height={240}
             priority
           />
         </div>
