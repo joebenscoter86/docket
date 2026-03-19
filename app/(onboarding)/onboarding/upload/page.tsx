@@ -11,7 +11,7 @@ export default function OnboardingUploadPage() {
   const [uploadComplete, setUploadComplete] = useState(false)
   const [finishing, setFinishing] = useState(false)
 
-  const handleUploadComplete = useCallback((_invoiceId: string) => {
+  const handleUploadComplete = useCallback(() => {
     setUploadComplete(true)
   }, [])
 
