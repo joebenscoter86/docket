@@ -77,6 +77,7 @@ describe("POST /api/stripe/webhook", () => {
         object: {
           customer: "cus_123",
           status: "active",
+          items: { data: [{ current_period_start: 1742169600, current_period_end: 1744848000 }] },
         },
       },
     });
@@ -96,6 +97,7 @@ describe("POST /api/stripe/webhook", () => {
         object: {
           customer: "cus_123",
           status: "past_due",
+          items: { data: [{ current_period_start: 1742169600, current_period_end: 1744848000 }] },
         },
       },
     });
