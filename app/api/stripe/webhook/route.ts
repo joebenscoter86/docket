@@ -44,13 +44,23 @@ async function findUserByStripeCustomerId(
 async function updateSubscriptionStatus(
   userId: string,
   status: string,
-  stripeCustomerId?: string
+  options?: {
+    stripeCustomerId?: string;
+    billingPeriodStart?: number;
+    billingPeriodEnd?: number;
+  }
 ): Promise<void> {
   const admin = createAdminClient();
-  const updates: Record<string, string> = { subscription_status: status };
+  const updates: Record<string, string | null> = { subscription_status: status };
 
-  if (stripeCustomerId) {
-    updates.stripe_customer_id = stripeCustomerId;
+  if (options?.stripeCustomerId) {
+    updates.stripe_customer_id = options.stripeCustomerId;
+  }
+  if (options?.billingPeriodStart !== undefined) {
+    updates.billing_period_start = new Date(options.billingPeriodStart * 1000).toISOString();
+  }
+  if (options?.billingPeriodEnd !== undefined) {
+    updates.billing_period_end = new Date(options.billingPeriodEnd * 1000).toISOString();
   }
 
   await admin.from("users").update(updates).eq("id", userId);
@@ -97,11 +107,9 @@ export async function POST(request: Request) {
         const userId = session.client_reference_id;
 
         if (userId) {
-          await updateSubscriptionStatus(
-            userId,
-            "active",
-            session.customer as string
-          );
+          await updateSubscriptionStatus(userId, "active", {
+            stripeCustomerId: session.customer as string,
+          });
           logger.info("stripe_webhook.checkout_completed", {
             userId,
             stripeCustomerId: session.customer as string,
@@ -119,7 +127,11 @@ export async function POST(request: Request) {
 
         if (userId) {
           const newStatus = mapSubscriptionStatus(subscription.status);
-          await updateSubscriptionStatus(userId, newStatus);
+          const firstItem = subscription.items.data[0];
+          await updateSubscriptionStatus(userId, newStatus, {
+            billingPeriodStart: firstItem?.current_period_start,
+            billingPeriodEnd: firstItem?.current_period_end,
+          });
           logger.info("stripe_webhook.subscription_updated", {
             userId,
             stripeCustomerId: customerId,

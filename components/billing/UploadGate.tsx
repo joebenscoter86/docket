@@ -6,6 +6,15 @@ interface UploadGateProps {
 }
 
 function getGateContent(subscriptionStatus: string, trialExpired: boolean) {
+  if (subscriptionStatus === "usage_limit") {
+    return {
+      heading: "Monthly limit reached",
+      body: "You've reached your invoice limit for this month. Your limit will reset at the start of your next billing period.",
+      ctaText: "View Billing",
+      ctaHref: "/app/settings",
+    };
+  }
+
   if (trialExpired) {
     return {
       heading: "Your free trial has ended",

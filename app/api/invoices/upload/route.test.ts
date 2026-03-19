@@ -73,6 +73,14 @@ vi.mock("@/lib/billing/access", () => ({
   checkInvoiceAccess: (...args: unknown[]) => mockCheckInvoiceAccess(...args),
 }));
 
+const mockCheckUsageLimit = vi.fn().mockResolvedValue({
+  allowed: true,
+  usage: { used: 5, limit: null, percentUsed: null, periodStart: new Date(), periodEnd: new Date(), isDesignPartner: false },
+});
+vi.mock("@/lib/billing/usage", () => ({
+  checkUsageLimit: (...args: unknown[]) => mockCheckUsageLimit(...args),
+}));
+
 // Helper: create a mock Request with FormData
 function createUploadRequest(
   file?: { name: string; type: string; content: Buffer }

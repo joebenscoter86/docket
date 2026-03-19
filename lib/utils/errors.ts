@@ -8,6 +8,7 @@ export type ErrorCode =
   | "RATE_LIMITED"
   | "UNPROCESSABLE"
   | "SUBSCRIPTION_REQUIRED"
+  | "USAGE_LIMIT_REACHED"
   | "INTERNAL_ERROR"
   | "NOT_IMPLEMENTED";
 
@@ -55,6 +56,10 @@ export function unprocessableEntity(message: string) {
 
 export function subscriptionRequired(message: string, details?: Record<string, unknown>) {
   return apiError({ error: message, code: "SUBSCRIPTION_REQUIRED", status: 402, details });
+}
+
+export function usageLimitError(message: string, details?: Record<string, unknown>) {
+  return apiError({ error: message, code: "USAGE_LIMIT_REACHED", status: 429, details });
 }
 
 export function internalError(message = "Internal server error") {

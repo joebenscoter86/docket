@@ -11,10 +11,15 @@ interface BillingCardProps {
     subscription_status: string | null;
     is_design_partner: boolean;
   };
-  invoicesThisMonth: number;
+  usage: {
+    used: number;
+    limit: number | null;
+    percentUsed: number | null;
+    periodEnd: string; // ISO string
+  };
 }
 
-export function BillingCard({ user, invoicesThisMonth }: BillingCardProps) {
+export function BillingCard({ user, usage }: BillingCardProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -74,9 +79,31 @@ export function BillingCard({ user, invoicesThisMonth }: BillingCardProps) {
           You have free access to all MVP features as a design partner. Capped
           at 100 invoices/month.
         </p>
-        <p className="font-body text-sm text-muted mt-1">
-          {invoicesThisMonth} / 100 invoices this month
-        </p>
+        {/* Usage display with progress bar */}
+        <div className="mt-3">
+          <div className="flex items-center justify-between text-sm text-muted mb-1.5">
+            <span>{usage.used} / {usage.limit} invoices this month</span>
+            <span>{Math.min(Math.round(usage.percentUsed ?? 0), 100)}%</span>
+          </div>
+          <div className="h-2 rounded-full bg-gray-100 overflow-hidden">
+            <div
+              className={`h-full rounded-full transition-all ${
+                (usage.percentUsed ?? 0) >= 100
+                  ? "bg-red-500"
+                  : (usage.percentUsed ?? 0) >= 80
+                    ? "bg-amber-500"
+                    : "bg-green-500"
+              }`}
+              style={{ width: `${Math.min(usage.percentUsed ?? 0, 100)}%` }}
+            />
+          </div>
+          {(usage.percentUsed ?? 0) >= 80 && (usage.percentUsed ?? 0) < 100 && (
+            <p className="mt-1.5 text-xs text-amber-600 font-medium">Approaching limit</p>
+          )}
+          {(usage.percentUsed ?? 0) >= 100 && (
+            <p className="mt-1.5 text-xs text-red-600 font-medium">Limit reached</p>
+          )}
+        </div>
       </div>
     );
   }
@@ -98,7 +125,7 @@ export function BillingCard({ user, invoicesThisMonth }: BillingCardProps) {
           invoices, or cancel anytime.
         </p>
         <p className="font-body text-sm text-muted mb-5">
-          {invoicesThisMonth} invoices this month
+          {usage.used} invoices this billing period
         </p>
         {error && (
           <p className="text-sm text-error mb-3">{error}</p>
@@ -133,7 +160,7 @@ export function BillingCard({ user, invoicesThisMonth }: BillingCardProps) {
           using Docket.
         </p>
         <p className="font-body text-sm text-muted mb-5">
-          {invoicesThisMonth} invoices this month
+          {usage.used} invoices this month
         </p>
         {error && (
           <p className="text-sm text-error mb-3">{error}</p>
@@ -170,7 +197,7 @@ export function BillingCard({ user, invoicesThisMonth }: BillingCardProps) {
           </li>
         </ul>
         <p className="font-body text-sm text-muted mt-2">
-          {invoicesThisMonth} invoices this month
+          {usage.used} invoices this month
         </p>
       </div>
 

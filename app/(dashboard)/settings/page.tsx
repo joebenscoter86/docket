@@ -5,6 +5,7 @@ import { QBOConnectionCard } from "@/components/settings/QBOConnectionCard";
 import { SettingsAlert } from "@/components/settings/SettingsAlert";
 import { BillingCard } from "@/components/settings/BillingCard";
 import { AccountCard } from "@/components/settings/AccountCard";
+import { getUsageThisPeriod } from "@/lib/billing/usage";
 
 export default async function SettingsPage({
   searchParams,
@@ -62,17 +63,20 @@ export default async function SettingsPage({
     }
   }
 
-  // Count invoices this month
-  let invoicesThisMonth = 0;
+  // Get usage info
+  let usage = { used: 0, limit: null as number | null, percentUsed: null as number | null, periodEnd: new Date().toISOString() };
   if (orgId) {
-    const now = new Date();
-    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
-    const { count } = await supabase
-      .from("invoices")
-      .select("*", { count: "exact", head: true })
-      .eq("org_id", orgId)
-      .gte("uploaded_at", startOfMonth);
-    invoicesThisMonth = count ?? 0;
+    try {
+      const usageInfo = await getUsageThisPeriod(orgId, user!.id);
+      usage = {
+        used: usageInfo.used,
+        limit: usageInfo.limit,
+        percentUsed: usageInfo.percentUsed,
+        periodEnd: usageInfo.periodEnd.toISOString(),
+      };
+    } catch {
+      // Fail-open: show 0 usage if query fails
+    }
   }
 
   return (
@@ -118,7 +122,7 @@ export default async function SettingsPage({
         <p className="text-[13px] font-bold uppercase tracking-wider text-muted mb-3">
           Billing
         </p>
-        <BillingCard user={billingUser} invoicesThisMonth={invoicesThisMonth} />
+        <BillingCard user={billingUser} usage={usage} />
       </div>
     </div>
   );
