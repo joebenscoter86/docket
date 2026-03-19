@@ -11,9 +11,10 @@ interface BillingCardProps {
     subscription_status: string | null;
     is_design_partner: boolean;
   };
+  invoicesThisMonth: number;
 }
 
-export function BillingCard({ user }: BillingCardProps) {
+export function BillingCard({ user, invoicesThisMonth }: BillingCardProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -73,6 +74,9 @@ export function BillingCard({ user }: BillingCardProps) {
           You have free access to all MVP features as a design partner. Capped
           at 100 invoices/month.
         </p>
+        <p className="font-body text-sm text-muted mt-1">
+          {invoicesThisMonth} / 100 invoices this month
+        </p>
       </div>
     );
   }
@@ -89,9 +93,12 @@ export function BillingCard({ user }: BillingCardProps) {
             Active
           </span>
         </div>
-        <p className="font-body text-sm text-muted mb-5">
+        <p className="font-body text-sm text-muted mb-1">
           Your subscription is active. Manage your payment method, view
           invoices, or cancel anytime.
+        </p>
+        <p className="font-body text-sm text-muted mb-5">
+          {invoicesThisMonth} invoices this month
         </p>
         {error && (
           <p className="text-sm text-error mb-3">{error}</p>
@@ -121,9 +128,12 @@ export function BillingCard({ user }: BillingCardProps) {
             Cancelled
           </span>
         </div>
-        <p className="font-body text-sm text-muted mb-5">
+        <p className="font-body text-sm text-muted mb-1">
           Your subscription has been cancelled. Subscribe again to continue
           using Docket.
+        </p>
+        <p className="font-body text-sm text-muted mb-5">
+          {invoicesThisMonth} invoices this month
         </p>
         {error && (
           <p className="text-sm text-error mb-3">{error}</p>
@@ -159,6 +169,9 @@ export function BillingCard({ user }: BillingCardProps) {
             <span className="text-accent">&#10003;</span> QuickBooks Online sync
           </li>
         </ul>
+        <p className="font-body text-sm text-muted mt-2">
+          {invoicesThisMonth} invoices this month
+        </p>
       </div>
 
       {user.subscription_status === "past_due" && (

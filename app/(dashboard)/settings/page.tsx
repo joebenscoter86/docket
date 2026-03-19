@@ -4,6 +4,7 @@ import { loadConnection } from "@/lib/quickbooks/auth";
 import { QBOConnectionCard } from "@/components/settings/QBOConnectionCard";
 import { SettingsAlert } from "@/components/settings/SettingsAlert";
 import { BillingCard } from "@/components/settings/BillingCard";
+import { AccountCard } from "@/components/settings/AccountCard";
 
 export default async function SettingsPage({
   searchParams,
@@ -61,6 +62,19 @@ export default async function SettingsPage({
     }
   }
 
+  // Count invoices this month
+  let invoicesThisMonth = 0;
+  if (orgId) {
+    const now = new Date();
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+    const { count } = await supabase
+      .from("invoices")
+      .select("*", { count: "exact", head: true })
+      .eq("org_id", orgId)
+      .gte("uploaded_at", startOfMonth);
+    invoicesThisMonth = count ?? 0;
+  }
+
   return (
     <div className="max-w-[600px] mx-auto space-y-9">
       <div>
@@ -96,26 +110,7 @@ export default async function SettingsPage({
         <p className="text-[13px] font-bold uppercase tracking-wider text-muted mb-3">
           Account
         </p>
-        <div className="bg-surface rounded-brand-lg shadow-soft px-6 py-6">
-          <div className="space-y-4">
-            <div>
-              <label className="text-sm font-medium text-muted block mb-1.5">
-                Email
-              </label>
-              <div className="bg-background rounded-brand-md px-3.5 py-2.5 text-[14px] text-text">
-                {user?.email}
-              </div>
-            </div>
-            <div>
-              <label className="text-sm font-medium text-muted block mb-1.5">
-                Organization
-              </label>
-              <div className="bg-background rounded-brand-md px-3.5 py-2.5 text-[14px] text-text">
-                {orgName || "—"}
-              </div>
-            </div>
-          </div>
-        </div>
+        <AccountCard email={user?.email ?? ""} orgName={orgName} orgId={orgId} />
       </div>
 
       {/* Billing Section */}
@@ -123,7 +118,7 @@ export default async function SettingsPage({
         <p className="text-[13px] font-bold uppercase tracking-wider text-muted mb-3">
           Billing
         </p>
-        <BillingCard user={billingUser} />
+        <BillingCard user={billingUser} invoicesThisMonth={invoicesThisMonth} />
       </div>
     </div>
   );
