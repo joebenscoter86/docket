@@ -235,6 +235,8 @@ export default function LineItemEditor({
   const handleGlAccountSelect = useCallback(
     async (itemId: string, accountId: string | null): Promise<boolean> => {
       dispatch({ type: "SET_ITEM_VALUE", itemId, field: "gl_account_id", value: accountId });
+      // Clear suggestion source so "Learned" / "AI" badge disappears on user override
+      dispatch({ type: "SET_ITEM_VALUE", itemId, field: "gl_suggestion_source", value: null });
       const ok = await saveField(itemId, "gl_account_id", accountId);
       if (ok) {
         dispatch({ type: "MARK_ITEM_SAVED", itemId, field: "gl_account_id", value: accountId });
