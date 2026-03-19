@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { InvoiceListItem, InvoiceListCounts } from "@/lib/invoices/types";
+import { TRANSACTION_TYPE_SHORT_LABELS, OutputType } from "@/lib/types/invoice";
 import InvoiceStatusBadge from "./InvoiceStatusBadge";
 import Button from "@/components/ui/Button";
 import { formatCurrency } from "@/lib/utils/currency";
@@ -16,6 +17,7 @@ interface InvoiceListProps {
   currentSort: string;
   currentDirection: string;
   hasCursor: boolean;
+  currentOutputType: string;
 }
 
 const FILTER_TABS: { key: keyof InvoiceListCounts; label: string }[] = [
@@ -31,6 +33,14 @@ const SORT_OPTIONS = [
   { value: "invoice_date", label: "Invoice Date" },
   { value: "vendor_name", label: "Vendor" },
   { value: "total_amount", label: "Amount" },
+];
+
+const TYPE_FILTER_CHIPS: { key: string; label: string }[] = [
+  { key: "all", label: "All" },
+  { key: "bill", label: "Bill" },
+  { key: "check", label: "Check" },
+  { key: "cash", label: "Expense" },
+  { key: "credit_card", label: "Credit Card" },
 ];
 
 function buildUrl(
@@ -70,6 +80,7 @@ export default function InvoiceList({
   currentSort,
   currentDirection,
   hasCursor,
+  currentOutputType,
 }: InvoiceListProps) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -129,6 +140,29 @@ export default function InvoiceList({
               }`}>
                 {count}
               </span>
+            </Link>
+          );
+        })}
+      </div>
+
+      {/* Type Filter Chips */}
+      <div className="flex gap-2 mb-6">
+        {TYPE_FILTER_CHIPS.map((chip) => {
+          const isActive = currentOutputType === chip.key;
+          return (
+            <Link
+              key={chip.key}
+              href={buildUrl(pathname, searchParams, {
+                output_type: chip.key === "all" ? undefined : chip.key,
+                cursor: undefined,
+              })}
+              className={`inline-flex items-center px-3 py-1.5 rounded-full text-xs font-medium transition-all duration-150 ease-in-out ${
+                isActive
+                  ? "bg-primary text-white shadow-soft"
+                  : "bg-surface text-text border border-border hover:border-primary/30"
+              }`}
+            >
+              {chip.label}
             </Link>
           );
         })}
@@ -212,7 +246,14 @@ export default function InvoiceList({
                         : "\u2014"}
                     </td>
                     <td className="py-3.5 px-3">
-                      <InvoiceStatusBadge status={invoice.status} />
+                      <span className="inline-flex items-center gap-2">
+                        <InvoiceStatusBadge status={invoice.status} />
+                        {invoice.status === "synced" && invoice.output_type && (
+                          <span className="text-xs text-muted">
+                            {TRANSACTION_TYPE_SHORT_LABELS[invoice.output_type as OutputType]}
+                          </span>
+                        )}
+                      </span>
                     </td>
                     <td className="py-3.5 px-3 text-[14px] text-muted">
                       {formatRelativeTime(invoice.uploaded_at)}
@@ -235,7 +276,14 @@ export default function InvoiceList({
                   <span className="text-sm font-medium text-text truncate max-w-[200px]">
                     {invoice.file_name}
                   </span>
-                  <InvoiceStatusBadge status={invoice.status} />
+                  <span className="inline-flex items-center gap-2">
+                    <InvoiceStatusBadge status={invoice.status} />
+                    {invoice.status === "synced" && invoice.output_type && (
+                      <span className="text-xs text-muted">
+                        {TRANSACTION_TYPE_SHORT_LABELS[invoice.output_type as OutputType]}
+                      </span>
+                    )}
+                  </span>
                 </div>
                 <div className="text-sm text-muted mb-1">
                   {invoice.extracted_data?.vendor_name ?? (
