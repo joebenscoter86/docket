@@ -46,17 +46,14 @@ export default function LoginPage() {
     <div className="w-full max-w-md px-4">
       <div className="rounded-3xl bg-white p-8 shadow-float sm:p-10">
         {/* Logo */}
-        <div className="mb-6 flex items-center justify-center gap-3">
+        <div className="mb-8 flex justify-center">
           <Image
             src="/dockett_logo.png"
-            alt="Dockett logo"
-            width={56}
-            height={56}
+            alt="Docket logo"
+            width={120}
+            height={120}
             priority
           />
-          <span className="font-headings text-3xl font-bold tracking-tight text-text">
-            Dockett
-          </span>
         </div>
 
         {/* Heading */}
