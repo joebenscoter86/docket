@@ -7,6 +7,8 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 const mockSelectSingle = vi.fn();
 const mockUpdate = vi.fn();
 const mockInsert = vi.fn();
+const mockLineItemUpdate = vi.fn();
+const mockLineItemSelectSingle = vi.fn();
 
 vi.mock("@/lib/supabase/server", () => ({
   createClient: () => ({
@@ -33,6 +35,20 @@ vi.mock("@/lib/supabase/server", () => ({
       if (table === "corrections") {
         return { insert: mockInsert };
       }
+      if (table === "extracted_line_items") {
+        return {
+          update: (data: unknown) => {
+            mockLineItemUpdate(data);
+            return {
+              eq: () => ({
+                select: () => ({
+                  single: mockLineItemSelectSingle,
+                }),
+              }),
+            };
+          },
+        };
+      }
       throw new Error(`Unexpected table: ${table}`);
     },
   }),
@@ -42,7 +58,7 @@ vi.mock("@/lib/utils/logger", () => ({
   logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn() },
 }));
 
-import { getExtractedData, updateExtractedField, recordCorrection } from "./data";
+import { getExtractedData, updateExtractedField, recordCorrection, updateLineItemField } from "./data";
 
 // ---------------------------------------------------------------
 // Fixtures
@@ -236,5 +252,83 @@ describe("recordCorrection", () => {
       "Old",
       "New"
     );
+  });
+});
+
+describe("updateLineItemField", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  const MOCK_LINE_ITEM = {
+    id: "item-1",
+    description: "Widget A",
+    quantity: 10,
+    unit_price: 90,
+    amount: 900,
+    gl_account_id: "84",
+    suggested_gl_account_id: null,
+    gl_suggestion_source: null,
+    is_user_confirmed: true,
+    sort_order: 0,
+  };
+
+  it("sets is_user_confirmed=true when gl_account_id is set to non-null", async () => {
+    mockLineItemSelectSingle.mockResolvedValue({
+      data: { ...MOCK_LINE_ITEM, gl_account_id: "84", is_user_confirmed: true },
+      error: null,
+    });
+
+    const result = await updateLineItemField("item-1", "gl_account_id", "84");
+
+    expect(mockLineItemUpdate).toHaveBeenCalledWith({
+      gl_account_id: "84",
+      is_user_confirmed: true,
+    });
+    expect(result).not.toBeNull();
+    expect(result!.is_user_confirmed).toBe(true);
+  });
+
+  it("sets is_user_confirmed=false when gl_account_id is cleared", async () => {
+    mockLineItemSelectSingle.mockResolvedValue({
+      data: { ...MOCK_LINE_ITEM, gl_account_id: null, is_user_confirmed: false },
+      error: null,
+    });
+
+    const result = await updateLineItemField("item-1", "gl_account_id", null);
+
+    expect(mockLineItemUpdate).toHaveBeenCalledWith({
+      gl_account_id: null,
+      is_user_confirmed: false,
+    });
+    expect(result).not.toBeNull();
+    expect(result!.is_user_confirmed).toBe(false);
+  });
+
+  it("updates other fields without touching is_user_confirmed", async () => {
+    mockLineItemSelectSingle.mockResolvedValue({
+      data: { ...MOCK_LINE_ITEM, description: "Updated Widget" },
+      error: null,
+    });
+
+    await updateLineItemField("item-1", "description", "Updated Widget");
+
+    expect(mockLineItemUpdate).toHaveBeenCalledWith({ description: "Updated Widget" });
+  });
+
+  it("rejects updates to non-editable fields", async () => {
+    await expect(
+      updateLineItemField("item-1", "is_user_confirmed", true)
+    ).rejects.toThrow("Field 'is_user_confirmed' is not editable on line items");
+  });
+
+  it("returns null and logs error on Supabase failure", async () => {
+    mockLineItemSelectSingle.mockResolvedValue({
+      data: null,
+      error: { message: "RLS violation" },
+    });
+
+    const result = await updateLineItemField("item-1", "description", "test");
+    expect(result).toBeNull();
   });
 });
