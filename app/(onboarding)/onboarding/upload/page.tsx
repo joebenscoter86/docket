@@ -47,8 +47,18 @@ export default function OnboardingUploadPage() {
         </p>
       </div>
 
-      {/* Upload zone */}
-      <UploadZone onUploadComplete={handleUploadComplete} />
+      {/* Upload zone / success state */}
+      {uploadComplete ? (
+        <div className="flex flex-col items-center justify-center rounded-brand-lg border-2 border-dashed border-accent bg-accent/5 p-12">
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="h-12 w-12 text-accent">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
+          </svg>
+          <p className="mt-4 font-headings text-xl font-bold text-text">Invoice uploaded successfully!</p>
+          <p className="mt-2 font-body text-sm text-muted">Click &quot;Finish Setup&quot; below to start reviewing your invoice.</p>
+        </div>
+      ) : (
+        <UploadZone onUploadComplete={handleUploadComplete} />
+      )}
 
       {/* Feature pills */}
       <div className="flex flex-wrap items-center justify-center gap-8 text-sm">
