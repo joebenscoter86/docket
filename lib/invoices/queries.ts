@@ -6,6 +6,7 @@ import {
   VALID_STATUSES,
   VALID_SORTS,
   VALID_DIRECTIONS,
+  VALID_OUTPUT_TYPES,
   DEFAULT_LIMIT,
   MAX_LIMIT,
 } from "./types";
@@ -79,6 +80,15 @@ export function validateListParams(params: InvoiceListParams) {
       ? (params.direction as (typeof VALID_DIRECTIONS)[number])
       : "desc";
 
+  // Validate output_type
+  const output_type =
+    params.output_type &&
+    VALID_OUTPUT_TYPES.includes(
+      params.output_type as (typeof VALID_OUTPUT_TYPES)[number]
+    )
+      ? (params.output_type as (typeof VALID_OUTPUT_TYPES)[number])
+      : "all";
+
   // Validate and clamp limit
   let limit = typeof params.limit === "number" ? params.limit : DEFAULT_LIMIT;
   limit = Math.max(1, Math.min(limit, MAX_LIMIT));
@@ -89,6 +99,7 @@ export function validateListParams(params: InvoiceListParams) {
     direction,
     cursor: params.cursor,
     limit,
+    output_type,
   };
 }
 
@@ -143,13 +154,14 @@ interface ValidatedParams {
   direction: string;
   cursor?: string;
   limit: number;
+  output_type: string;
 }
 
 export async function fetchInvoiceList(
   supabase: SupabaseClient,
   params: ValidatedParams
 ): Promise<{ invoices: InvoiceListItem[]; nextCursor: string | null }> {
-  const { status, sort, direction, cursor, limit } = params;
+  const { status, sort, direction, cursor, limit, output_type } = params;
   const sortConfig = SORT_COLUMN_MAP[sort] ?? SORT_COLUMN_MAP.uploaded_at;
 
   let query = supabase.from("invoices").select(`
@@ -157,6 +169,7 @@ export async function fetchInvoiceList(
       file_name,
       status,
       uploaded_at,
+      output_type,
       extracted_data (
         vendor_name,
         invoice_number,
@@ -168,6 +181,11 @@ export async function fetchInvoiceList(
   // Status filter
   if (status !== "all") {
     query = query.eq("status", status);
+  }
+
+  // Output type filter
+  if (output_type !== "all") {
+    query = query.eq("output_type", output_type);
   }
 
   // Cursor pagination — always keyed on (uploaded_at, id) regardless of display sort.
@@ -227,6 +245,7 @@ export async function fetchInvoiceList(
         file_name: row.file_name as string,
         status: row.status as InvoiceListItem["status"],
         uploaded_at: row.uploaded_at as string,
+        output_type: (row.output_type as InvoiceListItem["output_type"]) ?? null,
         extracted_data: extracted
           ? {
               vendor_name: (extracted as Record<string, unknown>).vendor_name as string | null,
