@@ -5,6 +5,8 @@ export interface ExtractedLineItem {
   amount: number | null;
   sortOrder: number;
   suggestedGlAccountId: string | null;
+  glAccountId?: string | null;           // Set by history lookup, null for AI-only
+  glSuggestionSource?: "ai" | "history"; // Override source when set by history
 }
 
 export interface ExtractedInvoice {

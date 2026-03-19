@@ -300,4 +300,43 @@ describe("GL suggestion fields", () => {
     expect(rows[0].gl_account_id).toBeNull();
     expect(rows[0].is_user_confirmed).toBe(false);
   });
+
+  it("maps history-sourced items with gl_account_id and source 'history'", () => {
+    const items = [
+      {
+        description: "Office Supplies",
+        quantity: 1,
+        unitPrice: 50,
+        amount: 50,
+        sortOrder: 0,
+        suggestedGlAccountId: "84",
+        glAccountId: "84",
+        glSuggestionSource: "history" as const,
+      },
+    ];
+
+    const rows = mapToLineItemRows(items, "ed-1");
+    expect(rows[0].gl_account_id).toBe("84");
+    expect(rows[0].suggested_gl_account_id).toBe("84");
+    expect(rows[0].gl_suggestion_source).toBe("history");
+    expect(rows[0].is_user_confirmed).toBe(false);
+  });
+
+  it("keeps gl_account_id null for AI-sourced items", () => {
+    const items = [
+      {
+        description: "Consulting",
+        quantity: 1,
+        unitPrice: 200,
+        amount: 200,
+        sortOrder: 0,
+        suggestedGlAccountId: "84",
+      },
+    ];
+
+    const rows = mapToLineItemRows(items, "ed-1");
+    expect(rows[0].gl_account_id).toBeNull();
+    expect(rows[0].suggested_gl_account_id).toBe("84");
+    expect(rows[0].gl_suggestion_source).toBe("ai");
+  });
 });
