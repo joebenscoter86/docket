@@ -17,12 +17,12 @@ Single-page marketing landing at `/` for unauthenticated users. Communicates wha
 Minimal, sticky top bar:
 
 ```
-[Docket logo]                           [Log In]  [Get Started →]
+[Docket logo]                           [Log In]  [Get Started Free]
 ```
 
-- **Logo:** "Docket" text in Cabinet Grotesk 700, links to `/`
+- **Logo:** Docket logo image (`/public/dockett_logo.png`), links to `/`
 - **Log In:** text link → `/login`
-- **Get Started:** primary button (blue, 12px radius) → `/signup`
+- **Get Started Free:** primary button (blue, 12px radius) → `/signup`
 - No dropdowns, no nav items linking to pages that don't exist
 - White background, subtle bottom border, sticks on scroll
 
@@ -31,11 +31,12 @@ Minimal, sticky top bar:
 Two-column layout (text left, screenshot right). Full-viewport height on desktop.
 
 - **Headline:** "From invoice to QuickBooks in under a minute."
-  - Cabinet Grotesk 700, ~40-48px, dark text
+  - Cabinet Grotesk 700, ~40-48px, dark text (larger than app headings — landing-page-specific sizing, use Tailwind `text-5xl`/`text-4xl`, not new design tokens)
 - **Subheadline:** "Upload your invoices. AI pulls out the details. You review, approve, and sync — done."
   - Satoshi 400, ~18px, muted text color
-- **CTA:** "Start Free Trial" → `/signup`
+- **CTA:** "Get Started Free" → `/signup`
   - Primary button, large (48px height), no secondary CTA
+  - Same label as nav button for consistency
 - **Right side:** Real screenshot of the Docket review UI (side-by-side PDF viewer + extraction form)
   - Static image served from `/public/images/`
   - Subtle soft shadow and rounded corners on the screenshot
@@ -59,7 +60,7 @@ Centered heading + 3 cards in a row.
 | 3 | Sync/arrow icon | Sync | "One click creates a bill or cuts a check in QuickBooks." |
 
 - Cards: white surface, soft shadow, 12px radius, generous padding
-- Icons: simple line icons or emoji-style, blue primary color
+- Icons: inline SVGs in Heroicons outline style (matching the sidebar icon patterns), primary blue color
 - Step numbers optional (subtle, above title)
 
 ### Section 3: Features
@@ -84,11 +85,11 @@ Two-column layout — feature list on the left, real screenshot on the right (or
 
 ### Section 4: Bottom CTA
 
-Full-width section with centered text and button. Slightly different background (light gradient or the `--color-background` off-white) to visually separate from the features section.
+Full-width section with centered text and button. Background uses `bg-background` (`#F8FAFC`) to visually separate from the white features section above.
 
 - **Headline:** "Spend your evening, your way — not on invoices."
   - Cabinet Grotesk 700, ~36px
-- **CTA:** "Start Free Trial" → `/signup`
+- **CTA:** "Get Started Free" → `/signup`
   - Primary button, large
 
 ### Section 5: Footer
@@ -107,13 +108,15 @@ Privacy Policy · Terms of Service
 
 ## Responsive Behavior
 
+> **Note:** UIdesign.md specifies "mobile is unsupported — redirect to desktop warning" for the app. The landing page is an exception because it's a marketing surface, not an app screen. Potential customers will find Docket on their phones — the landing page must look great on mobile even if the app itself is desktop-only.
+
 | Breakpoint | Behavior |
 |------------|----------|
 | Desktop (≥1024px) | Two-column hero, 3-column cards, two-column features |
 | Tablet (768-1023px) | Two-column hero (narrower screenshot), 3-column cards, single-column features |
 | Mobile (<768px) | Single column throughout. Screenshot stacks below hero text. Cards stack vertically. Features stack. |
 
-- Nav collapses: logo + hamburger menu on mobile (containing Log In + Get Started)
+- **Mobile nav:** Logo + hamburger icon. Tapping opens a slide-down panel (white background, same shadow-soft) containing "Log In" text link and "Get Started Free" button. Closes on tap outside or a second tap on hamburger. Panel is keyboard-navigable.
 - All sections get reduced padding on mobile
 - Hero headline scales down to ~28-32px on mobile
 
@@ -140,6 +143,14 @@ export const metadata: Metadata = {
     url: 'https://dockett.app',
     siteName: 'Docket',
     type: 'website',
+    images: [
+      {
+        url: 'https://dockett.app/images/og-image.png',
+        width: 1200,
+        height: 630,
+        alt: 'Docket — Invoice to QuickBooks in Under a Minute',
+      },
+    ],
   },
 }
 ```
@@ -150,6 +161,8 @@ export const metadata: Metadata = {
 - Save as `/public/images/review-ui-screenshot.png` (and a 2x version for retina)
 - Use `next/image` with proper `width`, `height`, and `alt` text
 - Screenshot should show a clean, populated state — not empty or error
+- **Fallback:** If no clean sample data is available at implementation time, use a placeholder image and replace with real screenshot before launch
+- **OG image:** Create a 1200x630px image at `/public/images/og-image.png` — can be a branded card with the headline and a cropped screenshot
 
 ### File Structure
 
@@ -169,6 +182,7 @@ public/
   images/
     review-ui-screenshot.png         # Real product screenshot
     review-ui-screenshot@2x.png      # Retina version
+    og-image.png                     # 1200x630 Open Graph image
 ```
 
 ### Design Tokens Used
@@ -178,6 +192,14 @@ All from UIdesign.md / Precision Flow — no new tokens:
 - Typography: Cabinet Grotesk (headings), Satoshi (body)
 - Radius: `radius-md` (12px) for cards and buttons
 - Shadows: `shadow-soft` for cards, `shadow-float` for screenshot
+
+### Accessibility
+
+- Use semantic landmarks: `<nav>` for nav bar, `<main>` for page content, `<section>` for each content section, `<footer>` for footer
+- Screenshot `alt` text: "Docket review interface showing a PDF invoice side-by-side with extracted data fields"
+- Hamburger menu is keyboard-navigable (Escape to close, Tab through items)
+- All interactive elements have visible focus states (existing `focus ring` token)
+- No animations — static page, no scroll-triggered transitions
 
 ### Dependencies
 
