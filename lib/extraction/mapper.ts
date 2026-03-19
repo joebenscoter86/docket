@@ -144,6 +144,9 @@ export function mapToLineItemRows(
       unit_price: unitPrice,
       amount,
       gl_account_id: null,
+      suggested_gl_account_id: item.suggestedGlAccountId ?? null,
+      gl_suggestion_source: item.suggestedGlAccountId ? "ai" : null,
+      is_user_confirmed: false,
       sort_order: item.sortOrder ?? index,
     };
   });

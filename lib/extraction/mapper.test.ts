@@ -27,8 +27,8 @@ const VALID_RESULT: ExtractionResult = {
     paymentTerms: "Net 30",
     confidenceScore: "high",
     lineItems: [
-      { description: "Widget A", quantity: 10, unitPrice: 90, amount: 900, sortOrder: 0 },
-      { description: "Widget B", quantity: 5, unitPrice: 20, amount: 100, sortOrder: 1 },
+      { description: "Widget A", quantity: 10, unitPrice: 90, amount: 900, sortOrder: 0, suggestedGlAccountId: null },
+      { description: "Widget B", quantity: 5, unitPrice: 20, amount: 100, sortOrder: 1, suggestedGlAccountId: null },
     ],
   },
   rawResponse: { parsed: {} },
@@ -227,6 +227,9 @@ describe("mapToLineItemRows", () => {
       unit_price: 90,
       amount: 900,
       gl_account_id: null,
+      suggested_gl_account_id: null,
+      gl_suggestion_source: null,
+      is_user_confirmed: false,
       sort_order: 0,
     });
     expect(rows[1].sort_order).toBe(1);
@@ -240,6 +243,7 @@ describe("mapToLineItemRows", () => {
         unitPrice: "$500.00" as unknown as number,
         amount: "$500.00" as unknown as number,
         sortOrder: 0,
+        suggestedGlAccountId: null,
       },
     ];
 
@@ -254,7 +258,7 @@ describe("mapToLineItemRows", () => {
 
   it("handles null fields in line items", () => {
     const items = [
-      { description: null, quantity: null, unitPrice: null, amount: null, sortOrder: 0 },
+      { description: null, quantity: null, unitPrice: null, amount: null, sortOrder: 0, suggestedGlAccountId: null },
     ];
 
     const rows = mapToLineItemRows(items, "ed-1");
@@ -264,10 +268,36 @@ describe("mapToLineItemRows", () => {
 
   it("defaults quantity to 1 when null but unit_price and amount are present", () => {
     const items = [
-      { description: "Flat fee", quantity: null, unitPrice: 100, amount: 100, sortOrder: 0 },
+      { description: "Flat fee", quantity: null, unitPrice: 100, amount: 100, sortOrder: 0, suggestedGlAccountId: null },
     ];
 
     const rows = mapToLineItemRows(items, "ed-1");
     expect(rows[0].quantity).toBe(1);
+  });
+});
+
+describe("GL suggestion fields", () => {
+  it("maps suggestedGlAccountId to suggestion columns", () => {
+    const items = [
+      { description: "Consulting", quantity: 1, unitPrice: 200, amount: 200, sortOrder: 0, suggestedGlAccountId: "84" },
+    ];
+
+    const rows = mapToLineItemRows(items, "ed-1");
+    expect(rows[0].suggested_gl_account_id).toBe("84");
+    expect(rows[0].gl_suggestion_source).toBe("ai");
+    expect(rows[0].gl_account_id).toBeNull();
+    expect(rows[0].is_user_confirmed).toBe(false);
+  });
+
+  it("sets suggestion columns to null when no suggestion", () => {
+    const items = [
+      { description: "Consulting", quantity: 1, unitPrice: 200, amount: 200, sortOrder: 0, suggestedGlAccountId: null },
+    ];
+
+    const rows = mapToLineItemRows(items, "ed-1");
+    expect(rows[0].suggested_gl_account_id).toBeNull();
+    expect(rows[0].gl_suggestion_source).toBeNull();
+    expect(rows[0].gl_account_id).toBeNull();
+    expect(rows[0].is_user_confirmed).toBe(false);
   });
 });
