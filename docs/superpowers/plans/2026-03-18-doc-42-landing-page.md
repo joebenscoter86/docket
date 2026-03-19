@@ -23,7 +23,7 @@
 | `components/landing/FeaturesSection.tsx` | Create | 4 feature items with descriptions + screenshot |
 | `components/landing/BottomCTA.tsx` | Create | Closing headline + CTA button |
 | `components/landing/LandingNav.test.tsx` | Create | Nav rendering, link targets, hamburger toggle |
-| `app/page.test.tsx` | Create | Auth redirect logic |
+| `app/page.test.tsx` | Replace | Auth redirect logic (replaces existing stub test) |
 | `public/images/review-ui-screenshot.png` | Create | Placeholder screenshot (swap for real one before launch) |
 | `public/images/og-image.png` | Create | 1200x630 OG image placeholder |
 
@@ -121,6 +121,19 @@ describe('LandingNav', () => {
     fireEvent.click(hamburger)
     expect(screen.queryByTestId('mobile-menu')).not.toBeInTheDocument()
   })
+
+  it('closes mobile menu on Escape key', () => {
+    render(<LandingNav />)
+    const hamburger = screen.getByRole('button', { name: /menu/i })
+
+    // Open menu
+    fireEvent.click(hamburger)
+    expect(screen.getByTestId('mobile-menu')).toBeInTheDocument()
+
+    // Escape closes it
+    fireEvent.keyDown(document, { key: 'Escape' })
+    expect(screen.queryByTestId('mobile-menu')).not.toBeInTheDocument()
+  })
 })
 ```
 
@@ -135,12 +148,23 @@ Expected: FAIL — module not found
 // components/landing/LandingNav.tsx
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
 
 export default function LandingNav() {
   const [menuOpen, setMenuOpen] = useState(false)
+
+  // Close menu on Escape key
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && menuOpen) {
+        setMenuOpen(false)
+      }
+    }
+    document.addEventListener('keydown', handleKeyDown)
+    return () => document.removeEventListener('keydown', handleKeyDown)
+  }, [menuOpen])
 
   return (
     <nav className="sticky top-0 z-50 border-b border-border bg-surface">
@@ -250,7 +274,7 @@ import Image from 'next/image'
 
 export default function HeroSection() {
   return (
-    <section className="mx-auto flex max-w-6xl flex-col items-center gap-12 px-6 py-20 lg:flex-row lg:gap-16 lg:py-32">
+    <section className="mx-auto flex max-w-6xl flex-col items-center gap-12 px-6 py-20 lg:min-h-[calc(100vh-73px)] lg:flex-row lg:gap-16 lg:py-32">
       {/* Text */}
       <div className="flex-1 text-center lg:text-left">
         <h1 className="font-headings text-4xl font-bold leading-tight text-text md:text-5xl">
@@ -590,12 +614,17 @@ vi.mock('@/lib/supabase/server', () => ({
 }))
 
 describe('Landing page', () => {
+  beforeEach(() => {
+    vi.resetModules()
+    mockRedirect.mockClear()
+    mockGetUser.mockClear()
+  })
+
   it('redirects authenticated users to /app/invoices', async () => {
     mockGetUser.mockResolvedValue({
       data: { user: { id: 'test-user-id' } },
     })
 
-    // Dynamic import to pick up mocks
     const { default: Home } = await import('./page')
     await Home()
 
@@ -603,7 +632,6 @@ describe('Landing page', () => {
   })
 
   it('does not redirect unauthenticated users', async () => {
-    mockRedirect.mockClear()
     mockGetUser.mockResolvedValue({
       data: { user: null },
     })
@@ -753,7 +781,7 @@ git commit -m "fix: landing page visual polish (DOC-42)"
 - [ ] **Step 1: Push branch and create PR**
 
 ```bash
-git push -u origin feature/BIL-8-landing-page
+git push -u origin feature/DOC-42-landing-page
 gh pr create --title "DOC-42: Landing page" --body "$(cat <<'EOF'
 ## Summary
 - Full landing page at `/` replacing the stub
