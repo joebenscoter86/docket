@@ -27,6 +27,15 @@ vi.mock("@/lib/quickbooks/api", () => ({
   queryAccounts: (...args: unknown[]) => mockQueryAccounts(...args),
 }));
 
+const mockLookupGlMappings = vi.fn();
+vi.mock("./gl-mappings", () => ({
+  lookupGlMappings: (...args: unknown[]) => mockLookupGlMappings(...args),
+}));
+
+vi.mock("@/lib/utils/normalize", () => ({
+  normalizeForMatching: (s: string) => s.toLowerCase().trim().replace(/\s+/g, " "),
+}));
+
 // ---------------------------------------------------------------------------
 // Supabase admin mock — must handle multiple tables with different chains
 // ---------------------------------------------------------------------------
@@ -188,6 +197,9 @@ function setupHappyPath() {
 
   // Default: no QBO connection → proceed without GL suggestions
   mockQueryAccounts.mockRejectedValue(new Error("No QBO connection"));
+
+  // Default: no history mappings found
+  mockLookupGlMappings.mockResolvedValue(new Map());
 }
 
 // ---------------------------------------------------------------------------
@@ -533,6 +545,12 @@ describe("runExtraction", () => {
       vi.doMock("@/lib/quickbooks/api", () => ({
         queryAccounts: (...args: unknown[]) => mockQueryAccounts(...args),
       }));
+      vi.doMock("./gl-mappings", () => ({
+        lookupGlMappings: (...args: unknown[]) => mockLookupGlMappings(...args),
+      }));
+      vi.doMock("@/lib/utils/normalize", () => ({
+        normalizeForMatching: (s: string) => s.toLowerCase().trim().replace(/\s+/g, " "),
+      }));
     });
 
     afterEach(() => {
@@ -627,6 +645,93 @@ describe("runExtraction", () => {
 
       expect(officeRow?.suggested_gl_account_id).toBe("84");
       expect(mysteryRow?.suggested_gl_account_id).toBeNull();
+    });
+
+    it("overrides AI suggestion with history mapping when exact match found", async () => {
+      setupHappyPath();
+
+      const mockAccounts = [
+        { Id: "84", Name: "Office Supplies", FullyQualifiedName: "Office Supplies", SubAccount: false },
+        { Id: "92", Name: "Travel", FullyQualifiedName: "Travel", SubAccount: false },
+      ];
+      mockQueryAccounts.mockResolvedValue(mockAccounts);
+
+      // AI suggests "92" (Travel) for this line item
+      const resultWithAiSuggestion: ExtractionResult = {
+        ...MOCK_RESULT,
+        data: {
+          ...MOCK_RESULT.data,
+          vendorName: "Acme Corp",
+          lineItems: [
+            {
+              description: "Office Supplies",
+              quantity: 1,
+              unitPrice: 50,
+              amount: 50,
+              sortOrder: 0,
+              suggestedGlAccountId: "92",
+            },
+          ],
+        },
+      };
+      mockExtractInvoiceData.mockResolvedValue(resultWithAiSuggestion);
+
+      // History says "Acme Corp" + "office supplies" → account "84"
+      mockLookupGlMappings.mockResolvedValue(
+        new Map([["office supplies", "84"]])
+      );
+
+      const { runExtraction } = await import("./run");
+      await runExtraction(BASE_PARAMS);
+
+      // Line item should be stored with history override
+      const insertedRows = mockLineItemsInsert.mock.calls[0][0];
+      expect(insertedRows[0].gl_account_id).toBe("84");
+      expect(insertedRows[0].suggested_gl_account_id).toBe("84");
+      expect(insertedRows[0].gl_suggestion_source).toBe("history");
+    });
+
+    it("discards stale history mapping and keeps AI suggestion", async () => {
+      setupHappyPath();
+
+      // Only account "92" is valid now
+      const mockAccounts = [
+        { Id: "92", Name: "Travel", FullyQualifiedName: "Travel", SubAccount: false },
+      ];
+      mockQueryAccounts.mockResolvedValue(mockAccounts);
+
+      const resultWithAiSuggestion: ExtractionResult = {
+        ...MOCK_RESULT,
+        data: {
+          ...MOCK_RESULT.data,
+          vendorName: "Acme Corp",
+          lineItems: [
+            {
+              description: "Office Supplies",
+              quantity: 1,
+              unitPrice: 50,
+              amount: 50,
+              sortOrder: 0,
+              suggestedGlAccountId: "92",
+            },
+          ],
+        },
+      };
+      mockExtractInvoiceData.mockResolvedValue(resultWithAiSuggestion);
+
+      // History mapping points to "84" which is no longer valid
+      mockLookupGlMappings.mockResolvedValue(
+        new Map([["office supplies", "84"]])
+      );
+
+      const { runExtraction } = await import("./run");
+      await runExtraction(BASE_PARAMS);
+
+      // Should keep AI suggestion since history account is stale
+      const insertedRows = mockLineItemsInsert.mock.calls[0][0];
+      expect(insertedRows[0].gl_account_id).toBeNull();
+      expect(insertedRows[0].suggested_gl_account_id).toBe("92");
+      expect(insertedRows[0].gl_suggestion_source).toBe("ai");
     });
   });
 

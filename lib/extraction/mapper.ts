@@ -143,9 +143,9 @@ export function mapToLineItemRows(
       quantity,
       unit_price: unitPrice,
       amount,
-      gl_account_id: null,
+      gl_account_id: item.glAccountId ?? null,
       suggested_gl_account_id: item.suggestedGlAccountId ?? null,
-      gl_suggestion_source: item.suggestedGlAccountId ? "ai" : null,
+      gl_suggestion_source: item.glSuggestionSource ?? (item.suggestedGlAccountId ? "ai" : null),
       is_user_confirmed: false,
       sort_order: item.sortOrder ?? index,
     };

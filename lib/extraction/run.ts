@@ -3,6 +3,8 @@ import { getExtractionProvider } from "./provider";
 import { mapToExtractedDataRow, mapToLineItemRows } from "./mapper";
 import { logger } from "@/lib/utils/logger";
 import { queryAccounts } from "@/lib/quickbooks/api";
+import { lookupGlMappings } from "./gl-mappings";
+import { normalizeForMatching } from "@/lib/utils/normalize";
 import type { ExtractionResult, ExtractionContext } from "./types";
 
 export async function runExtraction(params: {
@@ -77,6 +79,33 @@ export async function runExtraction(params: {
           });
           item.suggestedGlAccountId = null;
         }
+      }
+    }
+
+    // 4.6. Override AI suggestions with history-based mappings
+    if (result.data.vendorName && result.data.lineItems.length > 0) {
+      try {
+        const mappings = await lookupGlMappings(orgId, result.data.vendorName);
+        if (mappings.size > 0) {
+          for (const item of result.data.lineItems) {
+            if (!item.description) continue;
+            const normalizedDesc = normalizeForMatching(item.description);
+            const historicalAccountId = mappings.get(normalizedDesc);
+            if (historicalAccountId && validAccountIds?.has(historicalAccountId)) {
+              item.suggestedGlAccountId = historicalAccountId;
+              item.glAccountId = historicalAccountId;
+              item.glSuggestionSource = "history";
+            }
+            // If historical account is stale (not in validAccountIds), keep AI suggestion
+          }
+        }
+      } catch (err) {
+        logger.warn("gl_history_lookup_failed", {
+          action: "run_extraction",
+          invoiceId,
+          orgId,
+          error: err instanceof Error ? err.message : String(err),
+        });
       }
     }
 

@@ -5,6 +5,7 @@ import {
   recordCorrection,
   LINE_ITEM_EDITABLE_FIELDS,
 } from "@/lib/extraction/data";
+import { upsertGlMapping } from "@/lib/extraction/gl-mappings";
 import {
   authError,
   notFound,
@@ -61,7 +62,7 @@ export async function PATCH(
   // 4. Fetch current line item value for correction tracking
   const { data: currentItem } = await client
     .from("extracted_line_items")
-    .select("id, description, quantity, unit_price, amount")
+    .select("id, description, quantity, unit_price, amount, extracted_data_id")
     .eq("id", itemId)
     .single();
 
@@ -104,6 +105,25 @@ export async function PATCH(
       stringify(preUpdateValue),
       stringify(castValue)
     );
+  }
+
+  // 7. Record GL mapping when user confirms a GL account
+  if (field === "gl_account_id" && castValue !== null && currentItem?.extracted_data_id) {
+    const { data: extractedData } = await client
+      .from("extracted_data")
+      .select("vendor_name")
+      .eq("id", currentItem.extracted_data_id)
+      .single();
+
+    const vendorName = extractedData?.vendor_name;
+    const description = currentItem.description;
+
+    if (vendorName && description) {
+      // Fire-and-forget: don't block the response
+      upsertGlMapping(invoice.org_id, vendorName, description, String(castValue)).catch(() => {
+        // Already logged inside upsertGlMapping
+      });
+    }
   }
 
   logger.info("update_line_item_success", {
