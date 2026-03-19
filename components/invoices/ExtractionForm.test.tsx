@@ -10,6 +10,20 @@ vi.mock("./LineItemEditor", () => ({
 vi.mock("./ActionBar", () => ({
   default: () => <div data-testid="action-bar" />,
 }));
+vi.mock("./OutputTypeSelector", () => ({
+  default: () => <div data-testid="output-type-selector" />,
+}));
+
+const defaultOutputProps = {
+  outputType: "bill" as const,
+  paymentAccountId: null,
+  paymentAccountName: null,
+  orgDefaults: {
+    defaultOutputType: "bill" as const,
+    defaultPaymentAccountId: null,
+    defaultPaymentAccountName: null,
+  },
+};
 
 function makeExtractedData(
   overrides: Partial<ExtractedDataRow> = {}
@@ -54,6 +68,7 @@ describe("ExtractionForm confidence indicators", () => {
           extractedData={makeExtractedData({ confidence_score: level })}
           invoiceId="inv-1"
           invoiceStatus="pending_review"
+          {...defaultOutputProps}
         />
       );
       const borderClass =
@@ -75,6 +90,7 @@ describe("ExtractionForm confidence indicators", () => {
           extractedData={makeExtractedData({ confidence_score: level })}
           invoiceId="inv-1"
           invoiceStatus="pending_review"
+          {...defaultOutputProps}
         />
       );
       const label =
@@ -94,6 +110,7 @@ describe("ExtractionForm confidence indicators", () => {
         extractedData={makeExtractedData({ confidence_score: "low" })}
         invoiceId="inv-1"
         invoiceStatus="pending_review"
+        {...defaultOutputProps}
       />
     );
     expect(
@@ -107,6 +124,7 @@ describe("ExtractionForm confidence indicators", () => {
         extractedData={makeExtractedData({ confidence_score: "high" })}
         invoiceId="inv-1"
         invoiceStatus="pending_review"
+        {...defaultOutputProps}
       />
     );
     expect(
@@ -120,6 +138,7 @@ describe("ExtractionForm confidence indicators", () => {
         extractedData={makeExtractedData({ confidence_score: "medium" })}
         invoiceId="inv-1"
         invoiceStatus="pending_review"
+        {...defaultOutputProps}
       />
     );
     expect(
@@ -133,6 +152,7 @@ describe("ExtractionForm confidence indicators", () => {
         extractedData={makeExtractedData({ confidence_score: null })}
         invoiceId="inv-1"
         invoiceStatus="pending_review"
+        {...defaultOutputProps}
       />
     );
     expect(screen.queryByLabelText("High confidence")).toBeNull();
@@ -146,6 +166,7 @@ describe("ExtractionForm confidence indicators", () => {
         extractedData={makeExtractedData({ confidence_score: "medium" })}
         invoiceId="inv-1"
         invoiceStatus="pending_review"
+        {...defaultOutputProps}
       />
     );
 
