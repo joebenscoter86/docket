@@ -27,7 +27,7 @@ export default function LandingNav() {
             alt="Docket"
             width={120}
             height={32}
-            className="h-8 w-auto"
+            style={{ width: 'auto', height: '32px' }}
             priority
           />
         </Link>
