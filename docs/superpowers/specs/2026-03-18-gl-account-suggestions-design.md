@@ -78,7 +78,7 @@ ALTER TABLE extracted_line_items
 
 - `suggested_gl_account_id`: The AI-suggested (or history-based) account ID. Stored as a recommendation only — never copied into `gl_account_id` automatically. Preserved for analytics even after user confirms. Null if no suggestion.
 - `gl_suggestion_source`: Where the suggestion came from (`'ai'` for DOC-78, `'history'` for DOC-79). Null if no suggestion.
-- `is_user_confirmed`: Whether the user has explicitly selected a GL account for this line item. Defaults to `false`. Set to `true` when the user selects any value from the dropdown. In the confirmation-required model, this is functionally equivalent to `gl_account_id IS NOT NULL`, but kept as an explicit column for DOC-79 compatibility (history-based suggestions may pre-fill `gl_account_id` since they reflect prior user choices, not AI inference).
+- `is_user_confirmed`: Whether the GL account has been confirmed (either by user interaction or by history pre-fill). Defaults to `false`. Set to `true` in two cases: (1) user selects any value from the dropdown (DOC-78), or (2) history-based suggestion pre-fills at extraction time (DOC-79) — because the mapping itself was a prior deliberate user choice. For DOC-78 (AI-only), this is functionally equivalent to `gl_account_id IS NOT NULL`. The column becomes load-bearing in DOC-79 where `gl_account_id` can be non-null from a pre-fill AND `is_user_confirmed = true`.
 
 **No new tables for DOC-78.** The suggestion is stored directly on the line item row.
 
@@ -87,6 +87,7 @@ ALTER TABLE extracted_line_items
 **`lib/extraction/types.ts` — domain types (used by extraction provider):**
 
 ```typescript
+// AI response shape (camelCase)
 export interface ExtractedLineItem {
   description: string | null;
   quantity: number | null;
@@ -94,6 +95,20 @@ export interface ExtractedLineItem {
   amount: number | null;
   sortOrder: number;
   suggestedGlAccountId: string | null;  // NEW
+}
+
+// DB insert shape (snake_case) — used by mapper
+export interface ExtractedLineItemRow {
+  extracted_data_id: string;
+  description: string | null;
+  quantity: number | null;
+  unit_price: number | null;
+  amount: number | null;
+  gl_account_id: string | null;
+  sort_order: number;
+  suggested_gl_account_id: string | null;  // NEW
+  gl_suggestion_source: string | null;     // NEW
+  is_user_confirmed: boolean;              // NEW
 }
 ```
 
@@ -114,7 +129,7 @@ export interface ExtractedLineItemRow {
 }
 ```
 
-Both type definitions must be updated — `lib/extraction/types.ts` for the extraction pipeline and `lib/types/invoice.ts` for the UI layer.
+All three type definitions must be updated — `ExtractedLineItem` (AI response), `ExtractedLineItemRow` in `lib/extraction/types.ts` (DB insert), and `ExtractedLineItemRow` in `lib/types/invoice.ts` (UI).
 
 **`ExtractionProvider` interface — add optional context parameter:**
 
@@ -161,9 +176,28 @@ const result = await provider.extractInvoiceData(fileBuffer, fileType, accountCo
 
 **Failure handling:** If QBO accounts can't be fetched (disconnected, token expired, API error), extraction proceeds normally without GL suggestions. This is non-fatal — the user just gets the current experience of manual selection.
 
+### Mapper Changes (`lib/extraction/mapper.ts`)
+
+`mapToLineItemRows` must map the new field from the AI response shape to the DB insert shape:
+
+```typescript
+function mapToLineItemRows(
+  lineItems: ExtractedLineItem[],
+  extractedDataId: string
+): ExtractedLineItemRow[] {
+  return lineItems.map((item, index) => ({
+    // ...existing fields...
+    gl_account_id: null,                                  // NOT pre-filled
+    suggested_gl_account_id: item.suggestedGlAccountId,   // AI recommendation
+    gl_suggestion_source: item.suggestedGlAccountId ? 'ai' : null,
+    is_user_confirmed: false,
+  }));
+}
+```
+
 ### Data Query Changes (`lib/extraction/data.ts`)
 
-The `getExtractedData()` function must include the new columns in its select:
+**`getExtractedData()`** must include the new columns in its select:
 
 ```typescript
 .select(`
@@ -176,7 +210,26 @@ The `getExtractedData()` function must include the new columns in its select:
 `)
 ```
 
-The `createLineItem()` function must include the new columns in its insert (defaulting to null/false) and select return.
+**`createLineItem()`** must include the new columns in its insert (defaulting to `null`/`false`) and its `.select()` return so the UI gets the complete shape back:
+
+```typescript
+// Insert
+{ ...existingFields, suggested_gl_account_id: null, gl_suggestion_source: null, is_user_confirmed: false }
+
+// Select return
+"id, description, quantity, unit_price, amount, gl_account_id, sort_order, suggested_gl_account_id, gl_suggestion_source, is_user_confirmed"
+```
+
+**`updateLineItemField()`** must atomically set `is_user_confirmed` when `gl_account_id` changes:
+
+```typescript
+// When field === "gl_account_id":
+//   If value is non-null → update { gl_account_id: value, is_user_confirmed: true }
+//   If value is null (clearing) → update { gl_account_id: null, is_user_confirmed: false }
+// This avoids a second PATCH call and keeps confirmation state consistent.
+```
+
+The `.select()` return in `updateLineItemField` must also include the three new columns so the UI can update its local state after the PATCH response.
 
 ### Line Item Storage
 
@@ -317,8 +370,8 @@ In `runExtraction()`, after extraction completes but before storing line items:
 2. Query `gl_account_mappings` for this org + vendor
 3. For each line item, check if the normalized description matches a mapping
 4. **Validate the mapped account ID against the current active account list** — discard if the account no longer exists in QBO
-5. If valid match found: use the historical account (source: `'history'`), overriding any AI suggestion. Update both `suggestedGlAccountId` and the pre-filled `gl_account_id`.
-6. If no match: keep the AI suggestion (source: `'ai'`) or null
+5. If valid match found: use the historical account (source: `'history'`), overriding any AI suggestion. Set `suggestedGlAccountId` to the historical account, AND pre-fill `gl_account_id` with the same value, AND set `is_user_confirmed = true`. History-based suggestions are pre-filled because the mapping itself was a prior deliberate user choice — unlike AI inference, it doesn't require re-confirmation.
+6. If no match: keep the AI suggestion (source: `'ai'`) or null. `gl_account_id` stays null, `is_user_confirmed` stays false — user must confirm manually.
 
 ```typescript
 // After extraction, before storing line items:
