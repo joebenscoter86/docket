@@ -2,6 +2,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { validateFileMagicBytes, validateFileSize } from "@/lib/upload/validate";
 import { checkInvoiceAccess } from "@/lib/billing/access";
+import { checkUsageLimit } from "@/lib/billing/usage";
 import {
   authError,
   forbiddenError,
@@ -9,6 +10,7 @@ import {
   internalError,
   apiSuccess,
   subscriptionRequired,
+  usageLimitError,
 } from "@/lib/utils/errors";
 import { logger } from "@/lib/utils/logger";
 import { runExtraction } from "@/lib/extraction/run";
@@ -59,6 +61,23 @@ export async function POST(request: Request) {
       return subscriptionRequired("Subscription required to upload invoices.", {
         subscriptionStatus: access.subscriptionStatus,
         trialExpired: access.trialExpired,
+      });
+    }
+
+    // 2c. Monthly usage limit check
+    const usageCheck = await checkUsageLimit(orgId!, user.id);
+    if (!usageCheck.allowed) {
+      logger.warn("invoice_upload_usage_limit", {
+        action: "upload",
+        userId: user.id,
+        orgId,
+        used: usageCheck.usage.used,
+        limit: usageCheck.usage.limit,
+      });
+      return usageLimitError("Monthly invoice limit reached (100/month).", {
+        used: usageCheck.usage.used,
+        limit: usageCheck.usage.limit,
+        resetsAt: usageCheck.usage.periodEnd.toISOString(),
       });
     }
 
