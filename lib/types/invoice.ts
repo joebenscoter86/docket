@@ -14,6 +14,9 @@ export interface ExtractedLineItemRow {
   amount: number | null;
   gl_account_id: string | null;
   sort_order: number;
+  suggested_gl_account_id: string | null;
+  gl_suggestion_source: string | null;
+  is_user_confirmed: boolean;
 }
 
 export interface ExtractedDataRow {

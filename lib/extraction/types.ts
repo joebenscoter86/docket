@@ -4,6 +4,7 @@ export interface ExtractedLineItem {
   unitPrice: number | null;
   amount: number | null;
   sortOrder: number;
+  suggestedGlAccountId: string | null;
 }
 
 export interface ExtractedInvoice {
@@ -28,10 +29,15 @@ export interface ExtractionResult {
   durationMs: number;
 }
 
+export interface ExtractionContext {
+  accounts?: Array<{ id: string; name: string }>;
+}
+
 export interface ExtractionProvider {
   extractInvoiceData(
     fileBuffer: Buffer,
-    mimeType: string
+    mimeType: string,
+    context?: ExtractionContext
   ): Promise<ExtractionResult>;
 }
 
@@ -63,4 +69,7 @@ export interface ExtractedLineItemRow {
   amount: number | null;
   gl_account_id: string | null;
   sort_order: number;
+  suggested_gl_account_id: string | null;
+  gl_suggestion_source: string | null;
+  is_user_confirmed: boolean;
 }
