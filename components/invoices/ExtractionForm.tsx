@@ -392,6 +392,23 @@ export default function ExtractionForm({
 
   return (
     <div className="space-y-6">
+      {/* Output type selector — top of form so users see all options immediately */}
+      <OutputTypeSelector
+        invoiceId={invoiceId}
+        initialOutputType={currentOutputType}
+        initialPaymentAccountId={currentPaymentAccountId}
+        initialPaymentAccountName={currentPaymentAccountName}
+        orgDefaultPaymentAccountId={orgDefaults.defaultPaymentAccountId}
+        orgDefaultPaymentAccountName={orgDefaults.defaultPaymentAccountName}
+        disabled={currentStatus === "synced"}
+        qboConnected={qboOptions.connected}
+        onOutputTypeChange={setCurrentOutputType}
+        onPaymentAccountChange={(id, name) => {
+          setCurrentPaymentAccountId(id);
+          setCurrentPaymentAccountName(name);
+        }}
+      />
+
       {/* Low-confidence banner */}
       {confidenceScore === "low" && (
         <div className="flex items-start gap-2 bg-warning/5 border border-warning/20 rounded-md p-3">
@@ -476,33 +493,6 @@ export default function ExtractionForm({
           {renderField("total_amount")}
         </div>
       </div>
-
-      {/* Output type selector — between amounts and action bar */}
-      {(currentStatus === "pending_review" || currentStatus === "approved" || currentStatus === "synced") && (
-        <>
-          <div className="border-t border-border" />
-          <div>
-            <h3 className="text-xs font-semibold uppercase tracking-wide text-muted mb-4">
-              QuickBooks Output
-            </h3>
-            <OutputTypeSelector
-              invoiceId={invoiceId}
-              initialOutputType={currentOutputType}
-              initialPaymentAccountId={currentPaymentAccountId}
-              initialPaymentAccountName={currentPaymentAccountName}
-              orgDefaultPaymentAccountId={orgDefaults.defaultPaymentAccountId}
-              orgDefaultPaymentAccountName={orgDefaults.defaultPaymentAccountName}
-              disabled={currentStatus === "synced"}
-              qboConnected={qboOptions.connected}
-              onOutputTypeChange={setCurrentOutputType}
-              onPaymentAccountChange={(id, name) => {
-                setCurrentPaymentAccountId(id);
-                setCurrentPaymentAccountName(name);
-              }}
-            />
-          </div>
-        </>
-      )}
 
       {/* Action bar — shown for pending_review, approved, and synced invoices */}
       {(currentStatus === "pending_review" || currentStatus === "approved" || currentStatus === "synced") && (

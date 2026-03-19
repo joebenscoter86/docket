@@ -18,7 +18,12 @@ interface OutputTypeSelectorProps {
   onPaymentAccountChange: (accountId: string | null, accountName: string | null) => void;
 }
 
-const OUTPUT_TYPE_OPTIONS: OutputType[] = ["bill", "check", "cash", "credit_card"];
+const OUTPUT_TYPE_OPTIONS: { type: OutputType; icon: string }[] = [
+  { type: "bill", icon: "📄" },
+  { type: "check", icon: "✍️" },
+  { type: "cash", icon: "💵" },
+  { type: "credit_card", icon: "💳" },
+];
 
 export default function OutputTypeSelector({
   invoiceId,
@@ -39,43 +44,9 @@ export default function OutputTypeSelector({
 
   const isBill = outputType === "bill";
 
-  const handleOutputTypeChange = useCallback(
-    async (newType: OutputType) => {
-      if (newType === outputType || disabled) return;
-
-      setSaving(true);
-      try {
-        const res = await fetch(`/api/invoices/${invoiceId}`, {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ output_type: newType }),
-        });
-
-        if (!res.ok) return;
-
-        setOutputType(newType);
-        // Clear payment account when type changes (prevents stale account mismatch)
-        setPaymentAccountId(null);
-        setPaymentAccountName(null);
-        onOutputTypeChange(newType);
-        onPaymentAccountChange(null, null);
-
-        // If non-bill and org has a default for this type, pre-select it
-        if (newType !== "bill" && orgDefaultPaymentAccountId) {
-          handlePaymentAccountSelect(orgDefaultPaymentAccountId, orgDefaultPaymentAccountName ?? "");
-        }
-      } finally {
-        setSaving(false);
-      }
-    },
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- handlePaymentAccountSelect is stable (only depends on invoiceId, onPaymentAccountChange)
-    [outputType, disabled, invoiceId, onOutputTypeChange, onPaymentAccountChange, orgDefaultPaymentAccountId, orgDefaultPaymentAccountName]
-  );
-
   const handlePaymentAccountSelect = useCallback(
     async (accountId: string, accountName: string) => {
       try {
-        // Save to invoice
         const res = await fetch(`/api/invoices/${invoiceId}`, {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
@@ -107,26 +78,64 @@ export default function OutputTypeSelector({
     [invoiceId, onPaymentAccountChange]
   );
 
+  const handleOutputTypeChange = useCallback(
+    async (newType: OutputType) => {
+      if (newType === outputType || disabled) return;
+
+      setSaving(true);
+      try {
+        const res = await fetch(`/api/invoices/${invoiceId}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ output_type: newType }),
+        });
+
+        if (!res.ok) return;
+
+        setOutputType(newType);
+        setPaymentAccountId(null);
+        setPaymentAccountName(null);
+        onOutputTypeChange(newType);
+        onPaymentAccountChange(null, null);
+
+        // If non-bill and org has a default for this type, pre-select it
+        if (newType !== "bill" && orgDefaultPaymentAccountId) {
+          handlePaymentAccountSelect(orgDefaultPaymentAccountId, orgDefaultPaymentAccountName ?? "");
+        }
+      } finally {
+        setSaving(false);
+      }
+    },
+    [outputType, disabled, invoiceId, onOutputTypeChange, onPaymentAccountChange, orgDefaultPaymentAccountId, orgDefaultPaymentAccountName, handlePaymentAccountSelect]
+  );
+
   return (
     <div className="space-y-3">
-      <div>
-        <label className="block text-sm font-medium text-text mb-1">
-          Output Type
-        </label>
-        <select
-          value={outputType}
-          onChange={(e) => handleOutputTypeChange(e.target.value as OutputType)}
-          disabled={disabled || saving}
-          className={`w-full md:w-64 border rounded-md px-3 py-2 text-sm focus:outline-none focus-visible:ring-[3px] focus-visible:ring-[#BFDBFE] focus:border-primary ${
-            disabled ? "bg-gray-100 cursor-not-allowed border-border" : "border-border"
-          }`}
-        >
-          {OUTPUT_TYPE_OPTIONS.map((type) => (
-            <option key={type} value={type}>
+      {/* Pill buttons */}
+      <div className="flex flex-wrap gap-2">
+        {OUTPUT_TYPE_OPTIONS.map(({ type, icon }) => {
+          const isSelected = outputType === type;
+          return (
+            <button
+              key={type}
+              type="button"
+              onClick={() => handleOutputTypeChange(type)}
+              disabled={disabled || saving}
+              className={`
+                flex items-center gap-2 px-4 py-2.5 rounded-full text-sm font-medium
+                transition-all duration-150
+                ${disabled ? "cursor-not-allowed opacity-60" : "cursor-pointer"}
+                ${isSelected
+                  ? "bg-primary text-white shadow-sm ring-2 ring-primary/20"
+                  : "bg-gray-50 text-gray-600 border border-gray-200 hover:bg-gray-100 hover:border-gray-300"
+                }
+              `}
+            >
+              <span className="text-base leading-none">{icon}</span>
               {OUTPUT_TYPE_LABELS[type]}
-            </option>
-          ))}
-        </select>
+            </button>
+          );
+        })}
       </div>
 
       {/* Helper text for non-bill types */}
