@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import Image from 'next/image'
+import HeroAnimation from './HeroAnimation'
 
 export default function HeroSection() {
   return (
@@ -23,18 +23,9 @@ export default function HeroSection() {
         </div>
       </div>
 
-      {/* Screenshot */}
+      {/* Animation */}
       <div className="flex-1">
-        <div className="overflow-hidden rounded-brand-lg shadow-float">
-          <Image
-            src="/images/review-ui-screenshot.png"
-            alt="Docket review interface showing a PDF invoice side-by-side with extracted data fields"
-            width={1200}
-            height={800}
-            className="h-auto w-full"
-            priority
-          />
-        </div>
+        <HeroAnimation />
       </div>
     </section>
   )
