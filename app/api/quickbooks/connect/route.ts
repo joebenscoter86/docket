@@ -37,6 +37,19 @@ export async function GET(request: NextRequest) {
       path: "/",
     });
 
+    // Store returnTo for post-OAuth redirect (validated against allowlist)
+    const returnTo = request.nextUrl.searchParams.get("returnTo");
+    const ALLOWED_RETURN_PATHS = ["/settings", "/onboarding/connect"];
+    if (returnTo && ALLOWED_RETURN_PATHS.includes(returnTo)) {
+      response.cookies.set("qbo_oauth_return_to", returnTo, {
+        httpOnly: true,
+        secure: request.nextUrl.protocol === "https:",
+        sameSite: "lax",
+        maxAge: 600,
+        path: "/",
+      });
+    }
+
     logger.info("qbo.oauth_initiated", {
       userId: user.id,
       durationMs: Date.now() - startTime,
