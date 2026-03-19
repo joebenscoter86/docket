@@ -48,3 +48,4 @@ next-env.d.ts
 scripts/sandbox/test-invoice.pdf
 scripts/sandbox/fixtures/*.pdf
 scripts/sandbox/fixtures/extraction-results.json
+.worktrees/

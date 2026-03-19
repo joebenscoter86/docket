@@ -22,11 +22,18 @@ export async function GET(request: NextRequest) {
 
   const baseUrl = request.nextUrl.origin;
 
+  // Read returnTo cookie for post-OAuth redirect destination
+  const returnToCookie = request.cookies.get("qbo_oauth_return_to")?.value;
+  const ALLOWED_RETURN_PATHS = ["/settings", "/onboarding/connect"];
+  const returnTo = returnToCookie && ALLOWED_RETURN_PATHS.includes(returnToCookie)
+    ? returnToCookie
+    : "/settings";
+
   // Handle user denying authorization
   if (error) {
     logger.warn("qbo.oauth_denied", { error });
     return NextResponse.redirect(
-      `${baseUrl}/settings?qbo_error=${encodeURIComponent("QuickBooks connection was not authorized.")}`
+      `${baseUrl}${returnTo}?qbo_error=${encodeURIComponent("QuickBooks connection was not authorized.")}`
     );
   }
 
@@ -38,7 +45,7 @@ export async function GET(request: NextRequest) {
       hasRealmId: String(!!realmId),
     });
     return NextResponse.redirect(
-      `${baseUrl}/settings?qbo_error=${encodeURIComponent("Connection failed. Missing required parameters.")}`
+      `${baseUrl}${returnTo}?qbo_error=${encodeURIComponent("Connection failed. Missing required parameters.")}`
     );
   }
 
@@ -51,9 +58,10 @@ export async function GET(request: NextRequest) {
       stateMatch: String(savedState === state),
     });
     const response = NextResponse.redirect(
-      `${baseUrl}/settings?qbo_error=${encodeURIComponent("Connection failed. Please try again.")}`
+      `${baseUrl}${returnTo}?qbo_error=${encodeURIComponent("Connection failed. Please try again.")}`
     );
     response.cookies.delete("qbo_oauth_state");
+    response.cookies.delete("qbo_oauth_return_to");
     return response;
   }
 
@@ -64,7 +72,7 @@ export async function GET(request: NextRequest) {
 
     if (!user) {
       return NextResponse.redirect(
-        `${baseUrl}/login?redirect=/settings`
+        `${baseUrl}/login?redirect=${returnTo}`
       );
     }
 
@@ -79,7 +87,7 @@ export async function GET(request: NextRequest) {
     if (!membership) {
       logger.error("qbo.oauth_no_org", { userId: user.id });
       return NextResponse.redirect(
-        `${baseUrl}/settings?qbo_error=${encodeURIComponent("No organization found. Please contact support.")}`
+        `${baseUrl}${returnTo}?qbo_error=${encodeURIComponent("No organization found. Please contact support.")}`
       );
     }
 
@@ -98,11 +106,12 @@ export async function GET(request: NextRequest) {
       durationMs: Date.now() - startTime,
     });
 
-    // Redirect to settings with success, and clear the state cookie
+    // Redirect to returnTo destination with success, and clear cookies
     const response = NextResponse.redirect(
-      `${baseUrl}/settings?qbo_success=${encodeURIComponent("QuickBooks connected successfully!")}`
+      `${baseUrl}${returnTo}?qbo_success=${encodeURIComponent("QuickBooks connected successfully!")}`
     );
     response.cookies.delete("qbo_oauth_state");
+    response.cookies.delete("qbo_oauth_return_to");
     return response;
   } catch (err) {
     logger.error("qbo.oauth_callback_failed", {
@@ -110,7 +119,7 @@ export async function GET(request: NextRequest) {
       durationMs: Date.now() - startTime,
     });
     return NextResponse.redirect(
-      `${baseUrl}/settings?qbo_error=${encodeURIComponent("Failed to connect QuickBooks. Please try again.")}`
+      `${baseUrl}${returnTo}?qbo_error=${encodeURIComponent("Failed to connect QuickBooks. Please try again.")}`
     );
   }
 }
