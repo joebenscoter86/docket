@@ -51,7 +51,7 @@ export default function SignupPage() {
       return
     }
 
-    router.push('/invoices')
+    router.push('/onboarding')
     router.refresh()
   }
 
