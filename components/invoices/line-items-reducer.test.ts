@@ -17,6 +17,9 @@ const MOCK_LINE_ITEMS: ExtractedLineItemRow[] = [
     amount: 6000,
     gl_account_id: null,
     sort_order: 0,
+    suggested_gl_account_id: null,
+    gl_suggestion_source: null,
+    is_user_confirmed: false,
   },
   {
     id: "li-2",
@@ -26,6 +29,9 @@ const MOCK_LINE_ITEMS: ExtractedLineItemRow[] = [
     amount: 120,
     gl_account_id: null,
     sort_order: 1,
+    suggested_gl_account_id: null,
+    gl_suggestion_source: null,
+    is_user_confirmed: false,
   },
 ];
 
@@ -77,7 +83,7 @@ describe("initLineItemsState", () => {
 
   it("handles null values in extracted items", () => {
     const items: ExtractedLineItemRow[] = [
-      { id: "li-x", description: null, quantity: null, unit_price: null, amount: null, gl_account_id: null, sort_order: 0 },
+      { id: "li-x", description: null, quantity: null, unit_price: null, amount: null, gl_account_id: null, sort_order: 0, suggested_gl_account_id: null, gl_suggestion_source: null, is_user_confirmed: false },
     ];
     const state = initLineItemsState(items);
     expect(state.items[0].values.description).toBeNull();

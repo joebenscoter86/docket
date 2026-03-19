@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import type { ExtractionResult } from "./types";
 
 // ---------------------------------------------------------------------------
@@ -159,6 +159,7 @@ const MOCK_RESULT: ExtractionResult = {
         unitPrice: 90,
         amount: 900,
         sortOrder: 0,
+        suggestedGlAccountId: null,
       },
     ],
   },

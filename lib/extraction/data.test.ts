@@ -318,7 +318,7 @@ describe("updateLineItemField", () => {
 
   it("rejects updates to non-editable fields", async () => {
     await expect(
-      updateLineItemField("item-1", "is_user_confirmed", true)
+      updateLineItemField("item-1", "is_user_confirmed", true as unknown as string)
     ).rejects.toThrow("Field 'is_user_confirmed' is not editable on line items");
   });
 
