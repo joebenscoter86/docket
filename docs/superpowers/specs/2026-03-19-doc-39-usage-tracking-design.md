@@ -23,6 +23,7 @@ Two functions:
 interface UsageInfo {
   used: number;
   limit: number | null;       // null = unlimited
+  percentUsed: number | null; // null when unlimited, 0-100+ otherwise
   periodStart: Date;
   periodEnd: Date;
   isDesignPartner: boolean;
@@ -33,10 +34,10 @@ async function getUsageThisPeriod(orgId: string, userId: string): Promise<UsageI
 
 **Period calculation:**
 - **Design partners:** Calendar month (1st of current month → 1st of next month)
-- **Active subscribers:** Stripe billing cycle (`subscription.current_period_start` → `current_period_end`). Fetched via Stripe SDK using the user's `stripe_customer_id`. Falls back to calendar month if Stripe data unavailable.
+- **Active subscribers:** Stripe billing cycle (`current_period_start` → `current_period_end`). These dates are cached on the `users` table (new columns: `billing_period_start`, `billing_period_end`) and updated by the existing Stripe webhook when the subscription renews. This avoids a Stripe API call on every upload. Falls back to calendar month if period data is not yet populated.
 - **Trial users / no subscription:** Calendar month (usage is tracked even if not enforced)
 
-**Count query:** Count invoices where `org_id = X` AND `status != 'uploading'` AND `uploaded_at >= periodStart`. Uses the admin client to bypass RLS (billing check, not data access).
+**Count query:** Count invoices where `org_id = X` AND `status NOT IN ('uploading', 'error')` AND `uploaded_at >= periodStart`. Excludes `uploading` (incomplete) and `error` (failed extraction — users shouldn't lose a slot for a corrupt PDF). Uses the admin client to bypass RLS (billing check, not data access).
 
 ```typescript
 async function checkUsageLimit(orgId: string, userId: string): Promise<
@@ -54,14 +55,15 @@ In [upload/route.ts](app/api/invoices/upload/route.ts), after the existing `chec
 ```typescript
 const usageCheck = await checkUsageLimit(orgId, user.id);
 if (!usageCheck.allowed) {
-  return forbiddenError("Monthly invoice limit reached (100/month). Your limit resets on [date].", {
-    code: "USAGE_LIMIT_REACHED",
+  return usageLimitError("Monthly invoice limit reached (100/month).", {
     used: usageCheck.usage.used,
     limit: usageCheck.usage.limit,
     resetsAt: usageCheck.usage.periodEnd.toISOString(),
   });
 }
 ```
+
+Uses a new `usageLimitError` helper (HTTP 429, code `USAGE_LIMIT_REACHED`) added to `lib/utils/errors.ts`. Not `forbiddenError` (403/AUTH_ERROR) — this is a billing limit, not an auth failure.
 
 This runs **before** file parsing/upload so we fail fast without wasting bandwidth.
 
@@ -104,7 +106,7 @@ We do NOT need a `usage_events` table. The `invoices` table already has `org_id`
 
 | Scenario | Behavior |
 |----------|----------|
-| Stripe API unavailable for billing period lookup | Fall back to calendar month |
+| Billing period columns not yet populated | Fall back to calendar month |
 | User has no `stripe_customer_id` | Use calendar month |
 | Count query fails | Let upload proceed (fail-open for billing, not security) |
 | Race condition (two concurrent uploads at limit) | Both may succeed — off-by-one at the boundary is acceptable for MVP |
@@ -115,12 +117,14 @@ We do NOT need a `usage_events` table. The `invoices` table already has `org_id`
 |------|--------|
 | `lib/billing/usage.ts` | **New** — `getUsageThisPeriod()`, `checkUsageLimit()` |
 | `lib/billing/usage.test.ts` | **New** — Unit tests |
+| `lib/utils/errors.ts` | Add `usageLimitError` helper (429, `USAGE_LIMIT_REACHED`) |
 | `app/api/invoices/upload/route.ts` | Add usage limit check after access check |
 | `app/(dashboard)/upload/page.tsx` | Fetch usage info, pass to gate/warning components |
-| `components/billing/UsageLimitBanner.tsx` | **New** — Warning/limit-reached banner for upload page |
+| `components/settings/UsageLimitBanner.tsx` | **New** — Warning/limit-reached banner for upload page |
 | `components/settings/BillingCard.tsx` | Accept `UsageInfo`, add progress bar for design partners |
 | `app/(dashboard)/settings/page.tsx` | Replace inline count with `getUsageThisPeriod()` |
-| `supabase/migrations/YYYYMMDD_add_usage_index.sql` | Add `(org_id, uploaded_at)` index |
+| `app/api/stripe/webhook/route.ts` | Cache `billing_period_start`/`billing_period_end` on subscription events |
+| `supabase/migrations/YYYYMMDD_add_usage_tracking.sql` | Add `(org_id, uploaded_at)` index + `billing_period_start`/`billing_period_end` columns on `users` |
 
 ## Out of Scope
 
