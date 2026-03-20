@@ -642,10 +642,23 @@ All four checks must pass before a PR can be merged. No exceptions.
 - **Production redirect URI must be registered separately.** The sandbox app and production app have independent redirect URI lists in the Intuit developer portal. Add `https://dockett.app/api/auth/callback/quickbooks` to the production app's Redirect URIs tab — forgetting this causes "redirect_uri is invalid" error on OAuth.
 - **Preview and production share the same Supabase database currently.** This means sandbox QBO tokens and production QBO tokens coexist in `accounting_connections`. Disconnect sandbox connection before connecting production to avoid stale token issues.
 
-**Xero (Phase 2, document findings from FND-10 here):**
-- Bills are created via PUT (not POST) to the Invoices endpoint with Type "ACCPAY"
-- Uses ContactID (not VendorRef) for vendor references
-- Different token lifetimes than QBO
+**Xero (Phase 2 — validated 2026-03-20, DOC-53):**
+- **Granular scopes required for post-March-2026 apps.** `accounting.transactions` is invalid — use `accounting.invoices`, `accounting.payments`, `accounting.banktransactions`, `accounting.manualjournals` instead. Immediate auth blocker if wrong.
+- **Access token lifetime is 30 minutes** (not 1 hour like QBO). Set refresh threshold to <5 min remaining.
+- **Refresh tokens rotate.** Old refresh token is invalidated on every use. Must store the new token from every refresh response — if lost, user must re-authorize.
+- **Bill creation uses PUT, not POST** to `/api.xro/2.0/Invoices` with `Type: "ACCPAY"`. Contact creation uses POST as expected.
+- **Line items reference `AccountCode` (string like "500"), not `AccountID` (UUID).** Filter accounts by `Class=="EXPENSE"` (OData-style where clause). No hierarchy — flat `Name` only, no `FullyQualifiedName`.
+- **ContactID is a UUID** (e.g., `"2e465f38-..."`), not a numeric string like QBO's `Id`. Primary display field is `Name` — no `CompanyName` vs `Name` ambiguity.
+- **No SyncToken.** Xero has no version counter for updates — unlike QBO which requires SyncToken for PUT.
+- **Bills start as DRAFT status.** QBO bills are immediately active. Handle DRAFT → AUTHORISED transitions if needed.
+- **Attachment response is XML, not JSON.** Raw binary body upload to `POST /api.xro/2.0/Invoices/{InvoiceID}/Attachments/{FileName}` — simpler than QBO's multipart, but response must be XML-parsed.
+- **Invalid account codes produce warnings, not errors.** Bill is created without account mapping. Must validate AccountCode before submission or check response Warnings array.
+- **Duplicate invoice numbers are allowed.** No API-level idempotency guard. Must implement via `sync_log` (same as QBO).
+- **Dates use Microsoft `/Date(milliseconds+offset)/` format**, not ISO. Need a parser.
+- **Error casing is consistent PascalCase** (both auth and validation) — unlike QBO's inconsistent casing. Auth errors: `{ Title, Status, Detail }`. Validation errors: `{ Elements[].ValidationErrors[].Message }`.
+- **All IDs are UUIDs.** Unlike QBO's numeric strings.
+- **Rate limit headers are returned** (`x-minlimit-remaining`, `x-daylimit-remaining`). 60/min/tenant, 1000/day/tenant. Easy to implement backoff.
+- Required header on every API call: `xero-tenant-id: {tenantId}`. Tenant UUID obtained from `GET https://api.xero.com/connections` after auth.
 
 **Supabase:**
 - Do NOT insert auth users via SQL. Use the Auth Admin API with `email_confirm: true`.
