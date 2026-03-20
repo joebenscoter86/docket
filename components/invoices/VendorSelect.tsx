@@ -14,6 +14,7 @@ interface VendorSelectProps {
   disabled?: boolean;
   vendorAddress?: string | null;
   onVendorCreated?: (vendor: VendorOption) => void;
+  providerLabel?: string;
 }
 
 export default function VendorSelect({
@@ -27,6 +28,7 @@ export default function VendorSelect({
   disabled = false,
   vendorAddress = null,
   onVendorCreated,
+  providerLabel = "your accounting software",
 }: VendorSelectProps) {
   const [search, setSearch] = useState("");
   const [isOpen, setIsOpen] = useState(false);
@@ -41,7 +43,7 @@ export default function VendorSelect({
   const [createError, setCreateError] = useState<string | null>(null);
   const createErrorTimer = useRef<ReturnType<typeof setTimeout>>();
 
-  // Auto-match on first load: if no vendor_ref but vendor_name matches a QBO vendor
+  // Auto-match on first load: if no vendor_ref but vendor_name matches an accounting vendor
   useEffect(() => {
     if (
       autoMatchedRef.current ||
@@ -169,10 +171,10 @@ export default function VendorSelect({
     return (
       <div className="mt-2">
         <label className="flex items-center gap-2 text-sm font-medium text-text mb-1">
-          QuickBooks Vendor
+          {providerLabel} Vendor
         </label>
         <p className="text-sm text-warning">
-          {error ?? "Connect QuickBooks in Settings to map vendors."}
+          {error ?? `Connect ${providerLabel} in Settings to map vendors.`}
         </p>
       </div>
     );
@@ -183,7 +185,7 @@ export default function VendorSelect({
     return (
       <div className="mt-2">
         <label className="flex items-center gap-2 text-sm font-medium text-text mb-1">
-          QuickBooks Vendor
+          {providerLabel} Vendor
         </label>
         <div className="flex items-center gap-2 text-sm text-muted">
           <svg className="h-3.5 w-3.5 animate-spin" viewBox="0 0 24 24" fill="none">
@@ -199,7 +201,7 @@ export default function VendorSelect({
   return (
     <div className="mt-2" ref={containerRef}>
       <label className="flex items-center gap-2 text-sm font-medium text-text mb-1">
-        QuickBooks Vendor
+        {providerLabel} Vendor
         {saving && (
           <svg className="h-3.5 w-3.5 animate-spin text-muted" viewBox="0 0 24 24" fill="none">
             <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
@@ -251,7 +253,7 @@ export default function VendorSelect({
               vendors.length === 0 && connected
                 ? "Type to search or create a vendor..."
                 : vendors.length === 0
-                  ? "No vendors found in QuickBooks"
+                  ? `No vendors found in ${providerLabel}`
                   : "Search vendors..."
             }
             value={search}
@@ -298,7 +300,7 @@ export default function VendorSelect({
                       Creating...
                     </>
                   ) : (
-                    <>+ Create &quot;{vendorName.trim()}&quot; in QuickBooks</>
+                    <>+ Create &quot;{vendorName.trim()}&quot; in {providerLabel}</>
                   )}
                 </button>
                 {createError && (
@@ -312,7 +314,7 @@ export default function VendorSelect({
 
       {!selectedRef && vendors.length > 0 && !isOpen && (
         <p className="mt-1 text-xs text-warning">
-          Select a QuickBooks vendor before syncing.
+          Select a vendor before syncing.
         </p>
       )}
     </div>

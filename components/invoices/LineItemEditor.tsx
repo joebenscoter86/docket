@@ -21,7 +21,7 @@ interface LineItemEditorProps {
   onMissingGlCountChange?: (count: number) => void;
   accounts: AccountOption[];
   accountsLoading: boolean;
-  qboConnected: boolean;
+  accountingConnected: boolean;
   disabled?: boolean;
 }
 
@@ -41,7 +41,7 @@ export default function LineItemEditor({
   onMissingGlCountChange,
   accounts,
   accountsLoading,
-  qboConnected,
+  accountingConnected,
   disabled = false,
 }: LineItemEditorProps) {
   const [state, dispatch] = useReducer(lineItemsReducer, lineItems, initLineItemsState);
@@ -414,7 +414,7 @@ export default function LineItemEditor({
             <GlAccountSelect
               accounts={accounts}
               loading={accountsLoading}
-              connected={qboConnected}
+              connected={accountingConnected}
               currentAccountId={item.values.gl_account_id as string | null}
               onSelect={(accountId) => handleGlAccountSelect(item.id, accountId)}
               disabled={disabled}

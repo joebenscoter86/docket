@@ -32,7 +32,7 @@ export default async function InvoicesPage({ searchParams }: InvoicesPageProps) 
   const toastMessage =
     resolvedParams.toast === "all-reviewed" ? "All invoices reviewed!" : null;
 
-  // Fetch org membership for QBO connection check
+  // Fetch org membership for accounting connection check
   const { data: membership } = await supabase
     .from("org_memberships")
     .select("org_id")
@@ -40,7 +40,7 @@ export default async function InvoicesPage({ searchParams }: InvoicesPageProps) 
     .limit(1)
     .single();
 
-  const isQboConnected = membership
+  const isAccountingConnected = membership
     ? await isOrgConnected(createAdminClient(), membership.org_id)
     : false;
 
@@ -100,7 +100,7 @@ export default async function InvoicesPage({ searchParams }: InvoicesPageProps) 
         currentOutputType={params.output_type}
         currentBatchId={resolvedParams.batch_id}
         toastMessage={toastMessage}
-        isQboConnected={isQboConnected}
+        isAccountingConnected={isAccountingConnected}
       />
     </div>
   );

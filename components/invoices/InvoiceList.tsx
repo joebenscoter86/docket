@@ -24,7 +24,7 @@ interface InvoiceListProps {
   currentOutputType: string;
   currentBatchId?: string;
   toastMessage?: string | null;
-  isQboConnected?: boolean;
+  isAccountingConnected?: boolean;
 }
 
 const FILTER_TABS: { key: keyof InvoiceListCounts; label: string }[] = [
@@ -96,7 +96,7 @@ function getBatchEmptyState(
   const allSynced = invoices.every((inv) => inv.status === "synced");
   if (allSynced) {
     return {
-      message: "Batch complete \u2014 all invoices synced to QuickBooks.",
+      message: "Batch complete \u2014 all invoices synced.",
       color: "#065F46",
       icon: "check",
     };
@@ -126,7 +126,7 @@ export default function InvoiceList({
   currentOutputType,
   currentBatchId,
   toastMessage,
-  isQboConnected,
+  isAccountingConnected,
 }: InvoiceListProps) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -344,7 +344,7 @@ export default function InvoiceList({
             invoices={row.invoices}
             isExpanded={isExpanded}
             onToggle={() => toggleBatch(row.batchId)}
-            isQboConnected={isQboConnected}
+            isAccountingConnected={isAccountingConnected}
           />
           {isExpanded && (
             <div className="border-l-2 border-blue-200 ml-3">
@@ -376,7 +376,7 @@ export default function InvoiceList({
           invoices={row.invoices}
           isExpanded={isExpanded}
           onToggle={() => toggleBatch(row.batchId)}
-          isQboConnected={isQboConnected}
+          isAccountingConnected={isAccountingConnected}
         />
         {isExpanded && (
           <div className="border-l-2 border-blue-200 ml-3 space-y-2 pb-2">

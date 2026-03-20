@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import type { VendorOption, AccountOption } from "@/lib/accounting";
 
-interface QboOptionsState {
+interface AccountingOptionsState {
   vendors: VendorOption[];
   accounts: AccountOption[];
   loading: boolean;
@@ -11,8 +11,8 @@ interface QboOptionsState {
   error: string | null;
 }
 
-export function useQboOptions(): QboOptionsState & { addVendor: (vendor: VendorOption) => void } {
-  const [state, setState] = useState<QboOptionsState>({
+export function useAccountingOptions(): AccountingOptionsState & { addVendor: (vendor: VendorOption) => void } {
+  const [state, setState] = useState<AccountingOptionsState>({
     vendors: [],
     accounts: [],
     loading: true,

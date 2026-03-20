@@ -47,11 +47,11 @@ function sleep(ms: number): Promise<void> {
 // ─── Core function ───
 
 /**
- * Processes a list of approved invoices for QBO sync sequentially.
+ * Processes a list of approved invoices for accounting provider sync sequentially.
  * Called via waitUntil() from the batch sync route — runs in the background.
  *
  * Per-invoice failures are logged and skipped; the batch continues.
- * QBO 429 rate-limit responses trigger exponential backoff + retry.
+ * 429 rate-limit responses trigger exponential backoff + retry.
  */
 export async function processBatchSync(
   adminSupabase: SupabaseAdminClient,
@@ -88,7 +88,7 @@ export async function processBatchSync(
         .from("sync_log")
         .select("provider_bill_id")
         .eq("invoice_id", invoiceId)
-        .eq("provider", "quickbooks")
+        .eq("provider", providerType)
         .eq("status", "success")
         .eq("transaction_type", transactionType)
         .limit(1)

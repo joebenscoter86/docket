@@ -16,7 +16,7 @@ import LineItemEditor from "./LineItemEditor";
 import ActionBar from "./ActionBar";
 import SyncStatusPanel from "./SyncStatusPanel";
 import OutputTypeSelector from "./OutputTypeSelector";
-import { useQboOptions } from "./hooks/useQboOptions";
+import { useAccountingOptions } from "./hooks/useAccountingOptions";
 import VendorSelect from "./VendorSelect";
 import type { AccountingProviderType } from "@/lib/accounting/types";
 import { getProviderLabel } from "@/lib/accounting/links";
@@ -89,7 +89,7 @@ export default function ExtractionForm({
   const [currentStatus, setCurrentStatus] = useState(invoiceStatus);
   const confidenceScore = extractedData.confidence_score;
 
-  const qboOptions = useQboOptions();
+  const accountingOptions = useAccountingOptions();
   const [vendorRef, setVendorRef] = useState<string | null>(
     extractedData.vendor_ref ?? null
   );
@@ -287,7 +287,7 @@ export default function ExtractionForm({
   // Compute sync blockers for ActionBar
   const providerLabel = accountingProvider ? getProviderLabel(accountingProvider) : "your accounting software";
   const syncBlockers: string[] = [];
-  if (!qboOptions.connected) {
+  if (!accountingOptions.connected) {
     syncBlockers.push(`Connect ${providerLabel} in Settings`);
   }
   if (!vendorRef) syncBlockers.push(`Select a ${providerLabel} vendor`);
@@ -426,7 +426,7 @@ export default function ExtractionForm({
         orgDefaultPaymentAccountId={orgDefaults.defaultPaymentAccountId}
         orgDefaultPaymentAccountName={orgDefaults.defaultPaymentAccountName}
         disabled={currentStatus === "synced"}
-        qboConnected={qboOptions.connected}
+        accountingConnected={accountingOptions.connected}
         onOutputTypeChange={setCurrentOutputType}
         onPaymentAccountChange={(id, name) => {
           setCurrentPaymentAccountId(id);
@@ -435,7 +435,7 @@ export default function ExtractionForm({
       />
 
       {/* Accounting disconnection warning */}
-      {!qboOptions.loading && !qboOptions.connected && (
+      {!accountingOptions.loading && !accountingOptions.connected && (
         <div className="flex items-start gap-2 bg-error/5 border border-error/20 rounded-md p-3">
           <svg
             className="h-5 w-5 text-error shrink-0 mt-0.5"
@@ -456,7 +456,7 @@ export default function ExtractionForm({
                 : "No accounting provider connected"}
             </p>
             <p className="text-muted mt-0.5">
-              {qboOptions.error ?? "Reconnect in Settings to sync invoices."}
+              {accountingOptions.error ?? "Reconnect in Settings to sync invoices."}
               {" "}
               <a
                 href="/settings"
@@ -498,16 +498,17 @@ export default function ExtractionForm({
         <div className="space-y-4">
           {renderField("vendor_name")}
           <VendorSelect
-            vendors={qboOptions.vendors}
-            loading={qboOptions.loading}
-            connected={qboOptions.connected}
-            error={qboOptions.error}
+            vendors={accountingOptions.vendors}
+            loading={accountingOptions.loading}
+            connected={accountingOptions.connected}
+            error={accountingOptions.error}
             currentVendorRef={vendorRef}
             vendorName={state.values.vendor_name as string | null}
             onSelect={handleVendorSelect}
             disabled={currentStatus === "synced"}
             vendorAddress={state.values.vendor_address as string | null}
-            onVendorCreated={qboOptions.addVendor}
+            onVendorCreated={accountingOptions.addVendor}
+            providerLabel={providerLabel}
           />
           {renderField("vendor_address")}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -532,9 +533,9 @@ export default function ExtractionForm({
         currency={currency}
         onSubtotalChange={handleSubtotalChange}
         onMissingGlCountChange={setLineItemsMissingGl}
-        accounts={qboOptions.accounts}
-        accountsLoading={qboOptions.loading}
-        qboConnected={qboOptions.connected}
+        accounts={accountingOptions.accounts}
+        accountsLoading={accountingOptions.loading}
+        accountingConnected={accountingOptions.connected}
         disabled={currentStatus === "synced"}
       />
 

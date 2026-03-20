@@ -42,7 +42,7 @@ const defaultProps = {
   onSubtotalChange: vi.fn(),
   accounts: [],
   accountsLoading: false,
-  qboConnected: false,
+  accountingConnected: false,
 };
 
 describe("LineItemEditor", () => {

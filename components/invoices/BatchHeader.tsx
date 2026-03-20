@@ -13,7 +13,7 @@ interface BatchHeaderProps {
   totalCount?: number;
   isExpanded: boolean;
   onToggle: () => void;
-  isQboConnected?: boolean;
+  isAccountingConnected?: boolean;
 }
 
 interface RetryResult {
@@ -54,7 +54,7 @@ export default function BatchHeader({
   totalCount,
   isExpanded,
   onToggle,
-  isQboConnected,
+  isAccountingConnected,
 }: BatchHeaderProps) {
   const router = useRouter();
 
@@ -241,7 +241,7 @@ export default function BatchHeader({
       </>
     );
   } else {
-    syncButtonLabel = `Sync ${summary.approved} to QuickBooks`;
+    syncButtonLabel = `Sync ${summary.approved} to accounting`;
   }
 
   return (
@@ -264,7 +264,7 @@ export default function BatchHeader({
               clipRule="evenodd"
             />
           </svg>
-          Batch complete &mdash; {invoices.length} invoice{invoices.length !== 1 ? "s" : ""} synced to QuickBooks
+          Batch complete &mdash; {invoices.length} invoice{invoices.length !== 1 ? "s" : ""} synced
         </div>
       )}
 
@@ -322,7 +322,7 @@ export default function BatchHeader({
               : { color: "#065F46", backgroundColor: "#D1FAE5" }
           }
         >
-          {syncResult.synced} synced to QuickBooks
+          {syncResult.synced} synced
           {syncResult.failed > 0 && <>, {syncResult.failed} failed</>}
         </div>
       )}
@@ -481,8 +481,8 @@ export default function BatchHeader({
             </button>
           )}
 
-          {/* Sync N to QuickBooks */}
-          {summary.approved > 0 && isQboConnected && (
+          {/* Sync N to accounting */}
+          {summary.approved > 0 && isAccountingConnected && (
             <button
               type="button"
               onClick={handleSyncAll}

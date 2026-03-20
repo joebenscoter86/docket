@@ -77,7 +77,7 @@ export default function PaymentAccountSelect({
   if (accounts.length === 0) {
     return (
       <p className="text-xs text-warning">
-        No {accountTypeLabel} accounts found in QuickBooks. Add one in QBO first.
+        No {accountTypeLabel} accounts found. Add one in your accounting software first.
       </p>
     );
   }

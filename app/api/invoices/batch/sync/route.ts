@@ -22,7 +22,7 @@ const UUID_REGEX =
 /**
  * POST /api/invoices/batch/sync
  *
- * Fires off batch sync to QBO for all approved invoices in a batch.
+ * Fires off batch sync to the connected accounting provider for all approved invoices in a batch.
  * Returns immediately after pre-flight validation; sync runs in the background
  * via waitUntil().
  *
@@ -101,7 +101,7 @@ export async function POST(request: Request) {
   const connected = await isOrgConnected(admin, orgId);
   if (!connected) {
     return validationError(
-      "Connect QuickBooks in Settings before syncing invoices."
+      "Connect an accounting provider in Settings before syncing invoices."
     );
   }
 
@@ -234,7 +234,7 @@ export async function POST(request: Request) {
       skippedInvoices.push({
         id: inv.id,
         fileName: inv.file_name,
-        reason: "No QuickBooks vendor mapped. Please select a vendor.",
+        reason: "No vendor mapped. Please select a vendor.",
       });
       continue;
     }
