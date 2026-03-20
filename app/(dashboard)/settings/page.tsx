@@ -1,6 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { loadConnection } from "@/lib/quickbooks/auth";
+import { getOrgConnection } from "@/lib/accounting";
 import { QBOConnectionCard } from "@/components/settings/QBOConnectionCard";
 import { SettingsAlert } from "@/components/settings/SettingsAlert";
 import { BillingCard } from "@/components/settings/BillingCard";
@@ -52,13 +52,13 @@ export default async function SettingsPage({
 
   if (orgId) {
     const adminSupabase = createAdminClient();
-    const connection = await loadConnection(adminSupabase, orgId);
+    const connection = await getOrgConnection(adminSupabase, orgId);
     if (connection) {
       qboConnection = {
         connected: true,
-        companyId: connection.company_id,
-        companyName: connection.company_name ?? undefined,
-        connectedAt: connection.connected_at,
+        companyId: connection.companyId,
+        companyName: connection.companyName ?? undefined,
+        connectedAt: connection.connectedAt,
       };
     }
   }

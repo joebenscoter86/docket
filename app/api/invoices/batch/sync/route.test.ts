@@ -95,12 +95,14 @@ vi.mock("@/lib/billing/access", () => ({
   checkInvoiceAccess: (...args: unknown[]) => mockCheckInvoiceAccess(...args),
 }));
 
-// ─── Mock: QBO isConnected ───
+// ─── Mock: accounting connection helpers ───
 
-const mockIsConnected = vi.fn();
+const mockIsOrgConnected = vi.fn();
+const mockGetOrgProvider = vi.fn();
 
-vi.mock("@/lib/quickbooks/auth", () => ({
-  isConnected: (...args: unknown[]) => mockIsConnected(...args),
+vi.mock("@/lib/accounting", () => ({
+  isOrgConnected: (...args: unknown[]) => mockIsOrgConnected(...args),
+  getOrgProvider: (...args: unknown[]) => mockGetOrgProvider(...args),
 }));
 
 // ─── Helpers ───
@@ -163,7 +165,8 @@ describe("POST /api/invoices/batch/sync", () => {
     mockCheckInvoiceAccess.mockResolvedValue({ allowed: true, reason: "active_subscription" });
 
     // Default: QBO connected
-    mockIsConnected.mockResolvedValue(true);
+    mockIsOrgConnected.mockResolvedValue(true);
+    mockGetOrgProvider.mockResolvedValue("quickbooks");
 
     // Default: invoices, extracted data, line items
     mockAdminInvoicesSelectIn.mockResolvedValue({ data: fakeApprovedInvoices, error: null });
@@ -225,7 +228,8 @@ describe("POST /api/invoices/batch/sync", () => {
   });
 
   it("returns 400 when no QBO connection", async () => {
-    mockIsConnected.mockResolvedValue(false);
+    mockIsOrgConnected.mockResolvedValue(false);
+    mockGetOrgProvider.mockResolvedValue(null);
 
     const res = await POST(makeRequest());
     const body = await res.json();

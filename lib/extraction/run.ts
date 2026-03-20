@@ -2,7 +2,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { getExtractionProvider } from "./provider";
 import { mapToExtractedDataRow, mapToLineItemRows } from "./mapper";
 import { logger } from "@/lib/utils/logger";
-import { queryAccounts } from "@/lib/quickbooks/api";
+import { getAccountingProvider, getOrgProvider } from "@/lib/accounting";
 import { lookupGlMappings } from "./gl-mappings";
 import { normalizeForMatching } from "@/lib/utils/normalize";
 import { trackServerEvent, AnalyticsEvents } from "@/lib/analytics/events";
@@ -86,14 +86,16 @@ export async function runExtraction(params: {
     let accountContext: ExtractionContext | undefined;
     let validAccountIds: Set<string> | undefined;
     try {
-      const accounts = await queryAccounts(admin, orgId);
+      const providerType = await getOrgProvider(admin, orgId);
+      let accounts: Array<{ id: string; name: string }> = [];
+      if (providerType) {
+        const provider = getAccountingProvider(providerType);
+        const accountOptions = await provider.fetchAccounts(admin, orgId);
+        accounts = accountOptions.map((a) => ({ id: a.value, name: a.label }));
+      }
       if (accounts.length > 0) {
-        const mappedAccounts = accounts.map((a) => ({
-          id: a.Id,
-          name: a.SubAccount ? a.FullyQualifiedName : a.Name,
-        }));
-        accountContext = { accounts: mappedAccounts };
-        validAccountIds = new Set(mappedAccounts.map((a) => a.id));
+        accountContext = { accounts };
+        validAccountIds = new Set(accounts.map((a) => a.id));
       }
     } catch (err) {
       // Non-fatal: no QBO connection, expired token, API error — all handled here.
