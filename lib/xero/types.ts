@@ -109,3 +109,22 @@ export interface XeroValidationError {
     }>;
   }>;
 }
+
+// ─── Xero Account Types ───
+
+/** A single account from Xero's Chart of Accounts API. */
+export interface XeroAccount {
+  AccountID: string;     // UUID
+  Code: string;          // e.g., "500" — line items reference this
+  Name: string;          // display name
+  Status: "ACTIVE" | "ARCHIVED";
+  Type: string;          // "EXPENSE" | "DIRECTCOSTS" | "OVERHEADS" | etc.
+  Class: string;         // "EXPENSE" | "REVENUE" | "ASSET" | etc.
+  Description?: string;
+  TaxType?: string;
+}
+
+/** Wrapper for Xero Accounts API list response. */
+export interface XeroAccountsResponse {
+  Accounts: XeroAccount[];
+}
