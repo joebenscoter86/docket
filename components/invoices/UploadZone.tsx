@@ -7,17 +7,44 @@ type UploadState = "idle" | "dragging" | "uploading" | "success";
 
 const ACCEPTED_TYPES = ["application/pdf", "image/jpeg", "image/png"];
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
+const MAX_FILES = 25;
+
+interface SelectedFile {
+  file: File;
+  id: string;
+  valid: boolean;
+  error?: string;
+}
 
 interface UploadZoneProps {
   onUploadComplete?: (invoiceId: string) => void;
+  onUploadStart?: (files: File[]) => void;
 }
 
-export default function UploadZone({ onUploadComplete }: UploadZoneProps) {
+function formatFileSize(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+function validateFile(file: File): string | null {
+  if (!ACCEPTED_TYPES.includes(file.type)) {
+    return "Unsupported file type. Please upload a PDF, JPG, or PNG.";
+  }
+  if (file.size > MAX_FILE_SIZE) {
+    return "File exceeds 10MB limit.";
+  }
+  return null;
+}
+
+export default function UploadZone({ onUploadComplete, onUploadStart }: UploadZoneProps) {
   const [state, setState] = useState<UploadState>("idle");
   const [error, setError] = useState<string | null>(null);
   const [progress, setProgress] = useState(0);
   const [fileName, setFileName] = useState<string | null>(null);
   const [statusAnnouncement, setStatusAnnouncement] = useState("");
+  const [selectedFiles, setSelectedFiles] = useState<SelectedFile[]>([]);
+  const [capWarning, setCapWarning] = useState<string | null>(null);
 
   const inputRef = useRef<HTMLInputElement>(null);
   const dragCounterRef = useRef(0);
@@ -29,10 +56,7 @@ export default function UploadZone({ onUploadComplete }: UploadZoneProps) {
     if (state === "uploading") {
       progressIntervalRef.current = setInterval(() => {
         setProgress((prev) => {
-          // Ease toward 90% but never reach it — the final jump to 100%
-          // happens when the API responds
           if (prev >= 90) return prev;
-          // Fast at first, slows down as it approaches 90
           const increment = Math.max(0.5, (90 - prev) * 0.08);
           return Math.min(90, prev + increment);
         });
@@ -51,25 +75,14 @@ export default function UploadZone({ onUploadComplete }: UploadZoneProps) {
     };
   }, [state]);
 
-  const validateFile = useCallback(
-    (file: File): string | null => {
-      if (!ACCEPTED_TYPES.includes(file.type)) {
-        return "Unsupported file type. Please upload a PDF, JPG, or PNG.";
-      }
-      if (file.size > MAX_FILE_SIZE) {
-        return "File exceeds 10MB limit.";
-      }
-      return null;
-    },
-    []
-  );
-
   const uploadFile = useCallback(
     async (file: File) => {
       setState("uploading");
       setError(null);
+      setCapWarning(null);
       setProgress(0);
       setFileName(file.name);
+      setSelectedFiles([]);
       setStatusAnnouncement(`Uploading ${file.name}`);
 
       try {
@@ -93,7 +106,6 @@ export default function UploadZone({ onUploadComplete }: UploadZoneProps) {
         setProgress(100);
         setState("success");
         setStatusAnnouncement("Upload complete");
-        // Notify parent with invoiceId for realtime tracking
         if (onUploadComplete && body.data?.invoiceId) {
           onUploadComplete(body.data.invoiceId);
         }
@@ -111,24 +123,59 @@ export default function UploadZone({ onUploadComplete }: UploadZoneProps) {
       if (state === "uploading") return;
 
       const fileArray = Array.from(files);
-      if (fileArray.length > 1) {
-        setError("Please upload one file at a time.");
-        setState("idle");
-        return;
-      }
       if (fileArray.length === 0) return;
 
-      const file = fileArray[0];
-      const validationError = validateFile(file);
-      if (validationError) {
-        setError(validationError);
-        setState("idle");
-        return;
-      }
+      setError(null);
+      setCapWarning(null);
 
-      uploadFile(file);
+      const newEntries: SelectedFile[] = fileArray.map((file) => {
+        const validationError = validateFile(file);
+        return {
+          file,
+          id: crypto.randomUUID(),
+          valid: validationError === null,
+          error: validationError ?? undefined,
+        };
+      });
+
+      setSelectedFiles((prev) => {
+        const remaining = MAX_FILES - prev.length;
+        if (remaining <= 0) return prev;
+        const accepted = newEntries.slice(0, remaining);
+        if (newEntries.length > remaining) {
+          const rejected = newEntries.length - remaining;
+          setCapWarning(`Maximum ${MAX_FILES} files allowed. ${rejected} file${rejected > 1 ? "s were" : " was"} not added.`);
+        }
+        return [...prev, ...accepted];
+      });
+      setState("idle");
     },
-    [state, validateFile, uploadFile]
+    [state]
+  );
+
+  const handleRemoveFile = useCallback((id: string) => {
+    setSelectedFiles((prev) => prev.filter((f) => f.id !== id));
+    setCapWarning(null);
+  }, []);
+
+  const validFiles = selectedFiles.filter((f) => f.valid);
+  const validCount = validFiles.length;
+
+  const handleUploadClick = useCallback(
+    (e: React.MouseEvent) => {
+      e.stopPropagation();
+      const filesToUpload = selectedFiles.filter((f) => f.valid).map((f) => f.file);
+      if (filesToUpload.length === 0) return;
+
+      if (filesToUpload.length > 1 && onUploadStart) {
+        // Multiple files: use batch upload flow
+        onUploadStart(filesToUpload);
+      } else {
+        // Single file: always use inline upload + onUploadComplete path
+        uploadFile(filesToUpload[0]);
+      }
+    },
+    [selectedFiles, onUploadStart, uploadFile]
   );
 
   const handleInputChange = useCallback(
@@ -216,9 +263,11 @@ export default function UploadZone({ onUploadComplete }: UploadZoneProps) {
       e.stopPropagation();
       setState("idle");
       setError(null);
+      setCapWarning(null);
       setProgress(0);
       setFileName(null);
       setStatusAnnouncement("");
+      setSelectedFiles([]);
     },
     []
   );
@@ -226,6 +275,14 @@ export default function UploadZone({ onUploadComplete }: UploadZoneProps) {
   const isDragging = state === "dragging";
   const isUploading = state === "uploading";
   const isSuccess = state === "success";
+  const hasError = !!(error || capWarning);
+
+  const uploadButtonText =
+    validCount === 0
+      ? "No valid files to upload"
+      : validCount === 1
+      ? "Upload 1 File"
+      : `Upload ${validCount} Files`;
 
   return (
     <div>
@@ -234,7 +291,7 @@ export default function UploadZone({ onUploadComplete }: UploadZoneProps) {
         role="button"
         tabIndex={0}
         aria-label="Upload invoice file"
-        aria-describedby={error ? "upload-error" : undefined}
+        aria-describedby={hasError ? "upload-error" : undefined}
         className={`
           relative flex flex-col items-center justify-center
           w-[80%] mx-auto min-h-[360px]
@@ -261,6 +318,7 @@ export default function UploadZone({ onUploadComplete }: UploadZoneProps) {
           ref={inputRef}
           type="file"
           accept=".pdf,.jpg,.jpeg,.png"
+          multiple
           className="hidden"
           onChange={handleInputChange}
         />
@@ -379,10 +437,111 @@ export default function UploadZone({ onUploadComplete }: UploadZoneProps) {
         )}
       </div>
 
-      {/* Error message */}
-      {error && (
-        <p id="upload-error" className="mt-2 text-sm text-error">
-          {error}
+      {/* File list */}
+      {selectedFiles.length > 0 && state === "idle" && (
+        <div className="w-[80%] mx-auto mt-4 space-y-2">
+          {selectedFiles.map((entry) => (
+            <div
+              key={entry.id}
+              className={`flex items-center gap-3 px-3 py-2 rounded-brand-md ${
+                entry.valid ? "bg-white" : "bg-red-50"
+              }`}
+            >
+              {/* Validation icon */}
+              {entry.valid ? (
+                <svg
+                  className="h-5 w-5 flex-shrink-0 text-green-600"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                  strokeWidth={2}
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                  />
+                </svg>
+              ) : (
+                <svg
+                  className="h-5 w-5 flex-shrink-0 text-red-600"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                  strokeWidth={2}
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M9.75 9.75l4.5 4.5m0-4.5l-4.5 4.5M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                  />
+                </svg>
+              )}
+
+              {/* File info */}
+              <div className="flex-1 min-w-0">
+                <p
+                  className={`text-sm truncate ${
+                    entry.valid ? "text-text" : "text-text line-through"
+                  }`}
+                >
+                  {entry.file.name}
+                </p>
+                {entry.error && (
+                  <p className="text-xs text-error">{entry.error}</p>
+                )}
+              </div>
+
+              {/* File size */}
+              <span className="text-xs text-muted flex-shrink-0">
+                {formatFileSize(entry.file.size)}
+              </span>
+
+              {/* Remove button */}
+              <button
+                type="button"
+                aria-label={`Remove ${entry.file.name}`}
+                className="text-muted hover:text-text flex-shrink-0 p-1 transition-colors"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleRemoveFile(entry.id);
+                }}
+              >
+                <svg
+                  className="h-4 w-4"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                  strokeWidth={2}
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M6 18L18 6M6 6l12 12"
+                  />
+                </svg>
+              </button>
+            </div>
+          ))}
+
+          {/* Upload button */}
+          <div className="pt-2">
+            <Button
+              variant="primary"
+              type="button"
+              disabled={validCount === 0}
+              onClick={handleUploadClick}
+            >
+              {uploadButtonText}
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {/* Error / cap warning message */}
+      {hasError && (
+        <p id="upload-error" className="mt-2 text-sm text-error w-[80%] mx-auto">
+          {error || capWarning}
         </p>
       )}
 
