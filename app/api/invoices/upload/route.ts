@@ -14,6 +14,7 @@ import {
 } from "@/lib/utils/errors";
 import { logger } from "@/lib/utils/logger";
 import { enqueueExtraction } from "@/lib/extraction/queue";
+import { trackServerEvent, AnalyticsEvents } from "@/lib/analytics/events";
 import { waitUntil } from "@vercel/functions";
 
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -263,6 +264,11 @@ export async function POST(request: Request) {
       batchId,
       durationMs,
       status: "success",
+    });
+
+    trackServerEvent(user.id, AnalyticsEvents.INVOICE_UPLOADED, {
+      fileType,
+      fileSizeBytes: fileSize,
     });
 
     // 8. Auto-trigger extraction (fire-and-forget via waitUntil)

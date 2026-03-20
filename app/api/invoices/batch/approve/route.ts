@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { checkInvoiceAccess } from "@/lib/billing/access";
 import { logger } from "@/lib/utils/logger";
+import { trackServerEvent, AnalyticsEvents } from "@/lib/analytics/events";
 import {
   authError,
   validationError,
@@ -219,6 +220,11 @@ export async function POST(request: Request) {
     approved: toApprove.length,
     skipped: skippedInvoices.length,
     durationMs: Date.now() - start,
+  });
+
+  trackServerEvent(user.id, AnalyticsEvents.BATCH_APPROVED, {
+    batchId,
+    count: toApprove.length,
   });
 
   return apiSuccess({

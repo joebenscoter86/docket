@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
+import posthog from "posthog-js";
 import { createClient } from '@/lib/supabase/client'
 
 export default function SignupPage() {
@@ -51,6 +52,7 @@ export default function SignupPage() {
       return
     }
 
+    posthog.capture("signup");
     router.push('/onboarding')
     router.refresh()
   }

@@ -6,6 +6,7 @@ import { checkInvoiceAccess } from "@/lib/billing/access";
 import { processBatchSync } from "@/lib/quickbooks/batch-sync";
 import type { BatchSyncInvoice } from "@/lib/quickbooks/batch-sync";
 import { logger } from "@/lib/utils/logger";
+import { trackServerEvent, AnalyticsEvents } from "@/lib/analytics/events";
 import {
   authError,
   validationError,
@@ -285,6 +286,11 @@ export async function POST(request: Request) {
     toSync: toSync.length,
     skipped: skippedInvoices.length,
     durationMs: Date.now() - start,
+  });
+
+  trackServerEvent(user.id, AnalyticsEvents.BATCH_SYNCED, {
+    batchId,
+    count: toSync.length,
   });
 
   // 11. Fire background sync for valid invoices

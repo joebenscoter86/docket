@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import AppShell from '@/components/layout/AppShell'
+import PostHogIdentify from '@/components/providers/PostHogIdentify'
 import OnboardingBanner from '@/components/onboarding/OnboardingBanner'
 
 export default async function DashboardLayout({
@@ -58,6 +59,7 @@ export default async function DashboardLayout({
 
   return (
     <AppShell userEmail={user.email ?? ''} orgName={orgName}>
+      <PostHogIdentify userId={user.id} email={user.email ?? ""} />
       {!onboardingCompleted && (
         <OnboardingBanner hasConnection={hasConnection} hasInvoices={hasInvoices} />
       )}
