@@ -8,7 +8,7 @@
 
 After uploading a batch of invoices (5–25 files), users need to track extraction progress, work through reviews efficiently, and retry failures. This issue adds batch-aware grouping to the existing invoice list page and batch navigation to the review page.
 
-**Approach:** Client-side grouping. The server returns a flat list of invoices (unchanged API shape). The client groups invoices sharing a `batch_id` into accordion sections. No new tables, no new API response formats.
+**Approach:** Client-side grouping. The server returns a flat list of invoices with `batch_id` included in the response. The client groups invoices sharing a `batch_id` into accordion sections. No new tables, no new API endpoints.
 
 ## Design Decisions
 
@@ -20,6 +20,31 @@ After uploading a batch of invoices (5–25 files), users need to track extracti
 | Review nav on extracting invoice | Land on it, show progress, auto-transition | Keeps users in flow without missing anything. |
 | After last review | Redirect to filtered list + success toast | Next step is batch-level actions (Approve All/Sync All from DOC-83), which live on the list page. |
 | Retry execution | Sequential, not parallel | Avoids hammering the extraction queue. |
+| Single-invoice batch | Render as individual row | Accordion for 1 invoice is unnecessary overhead. |
+
+---
+
+## 0. Data Layer Prerequisites
+
+Before any UI work, the following server-side changes are needed:
+
+### Add `batch_id` to invoice list response
+
+- Add `batch_id` to the `InvoiceListItem` type in `lib/invoices/types.ts`.
+- Add `batch_id` to the `select()` call in `fetchInvoiceList()` in `lib/invoices/queries.ts`.
+- Add `batch_id` to the invoice `select()` on the review page in `app/(dashboard)/invoices/[id]/review/page.tsx`.
+
+### Server-side `batch_id` filtering
+
+The API route (`app/api/invoices/route.ts`) and the server page (`app/(dashboard)/invoices/page.tsx`) must support an optional `batch_id` query parameter:
+
+- When `batch_id` is present: add `.eq('batch_id', batchId)` to the query and **skip pagination** (return all invoices in the batch). Safe because batches are capped at 25 files.
+- When `batch_id` is absent: existing behavior unchanged.
+- Both the page's `fetchInvoiceList` call and the API route must accept this parameter.
+
+### Batch manifest query
+
+Add `fetchBatchManifest(supabase, batchId)` to `lib/invoices/queries.ts`. Returns `{ id, status, uploaded_at }[]` for all invoices in the batch, ordered by `uploaded_at` ascending. Used by the review page for batch navigation.
 
 ---
 
@@ -27,12 +52,13 @@ After uploading a batch of invoices (5–25 files), users need to track extracti
 
 ### Grouping Logic
 
-The `InvoiceList` component receives the existing flat invoice array from the server. Client-side logic:
+The `InvoiceList` component receives the flat invoice array (now including `batch_id`) from the server. Client-side logic:
 
 1. Group invoices by `batch_id` — invoices with the same non-null `batch_id` form a group.
-2. Invoices with `batch_id = null` render as individual rows (unchanged from today).
-3. Groups are positioned in the list by the earliest `uploaded_at` of their member invoices.
-4. Within a group, invoices are sorted by `uploaded_at` ascending (upload order).
+2. **Single-invoice batches** (only 1 invoice with a given `batch_id`) render as individual rows, same as null `batch_id`. No accordion for a batch of one.
+3. Invoices with `batch_id = null` render as individual rows (unchanged from today).
+4. Groups are positioned in the list by the earliest `uploaded_at` of their member invoices.
+5. Within a group, invoices are sorted by `uploaded_at` ascending (upload order).
 
 ### Collapsed State (Default)
 
@@ -42,9 +68,9 @@ A single row representing the batch:
 [▶ chevron]  Batch uploaded Mar 18 — 12 invoices    [8 ready · 3 extracting · 1 failed]    [Review Next]
 ```
 
-- **Left:** Chevron icon (rotates on expand), batch label with relative date and invoice count.
+- **Left:** Chevron icon (rotates on expand), batch label with date and invoice count. Date format: `formatRelativeTime` for batches uploaded within 7 days ("2 hours ago"), absolute date for older batches ("Mar 18").
 - **Center-right:** Status pills — colored inline badges showing non-zero status counts:
-  - Blue pulsing: "N extracting"
+  - Blue pulsing: "N processing" (combines `uploaded` + `extracting` — both are pre-review states)
   - Amber: "N ready for review"
   - Green: "N synced"
   - Red: "N failed"
@@ -96,9 +122,10 @@ Action buttons appear on the right side of the batch header row, visible in both
 - **Visible when:** At least one invoice in the batch has `status = 'error'`.
 - **Hidden when:** No failed invoices.
 - **Label:** "Retry N Failed" where N is the count of failed invoices.
-- **Click behavior:** Calls `POST /api/invoices/[id]/retry` for each failed invoice, sequentially (one at a time to avoid hammering the extraction queue).
+- **Click behavior:** Calls `POST /api/invoices/[id]/retry` for each failed invoice, sequentially (one at a time to avoid hammering the extraction queue). Continues through all retries even if some fail.
 - **In-progress state:** Button disabled, label changes to "Retrying…" with spinner.
 - **Completion:** Button re-evaluates visibility based on updated statuses (Realtime will update).
+- **Partial failure:** If some retries fail (e.g., network error on the retry call itself), show a toast: "Retried N invoices. M could not be retried." The failed-to-retry invoices remain in `error` status and the "Retry All Failed" button stays visible for them.
 
 ---
 
@@ -118,12 +145,16 @@ When viewing a review page for an invoice with a non-null `batch_id`, a navigati
 
 ### Navigation Logic
 
+Navigation uses standard Next.js `router.push()` — each Previous/Next click is a full page navigation. This is acceptable because the review page auto-saves field edits on change (no "unsaved state" to lose).
+
 **"Next" button:**
 1. Find the next invoice in upload order (`uploaded_at` ascending).
 2. If `pending_review` → navigate to its review page.
 3. If `uploaded` or `extracting` → navigate to its review page (shows extraction progress via existing `ReviewProcessingState`, auto-transitions to review form on completion).
 4. If `approved` or `synced` → skip, jump to the next invoice that is `pending_review`, `uploaded`, or `extracting`.
 5. If no more eligible invoices → disabled.
+
+Note: "Next" may skip invoice positions (e.g., jump from Invoice 3 to Invoice 7) because it skips approved/synced invoices. The "Invoice N of M" counter shows absolute position in the batch, not position among remaining reviews.
 
 **"Previous" button:**
 - Goes to the prior invoice in upload order regardless of status (so users can re-check approved invoices).
@@ -138,12 +169,14 @@ When the user approves an invoice and no `pending_review`, `uploaded`, or `extra
 
 ### Data Fetching
 
-On mount, the review page fetches the batch manifest — a lightweight query returning `{ id, status, uploaded_at }` for all invoices in the batch. This powers:
+The review page server component fetches the invoice row including `batch_id`. If `batch_id` is non-null, it also fetches the batch manifest via `fetchBatchManifest(batchId)` server-side and passes it to `BatchNavigation` as a prop.
+
+The manifest is a lightweight query returning `{ id, status, uploaded_at }[]` for all invoices in the batch. This powers:
 - "Invoice N of M" counter
 - Previous/Next navigation decisions
 - "Last invoice" detection for redirect logic
 
-This is a single Supabase query: `select('id, status, uploaded_at').eq('batch_id', batchId).order('uploaded_at')`.
+`BatchNavigation` is a client component. It uses the server-provided manifest as initial state, and refreshes it via a client-side Supabase query when Realtime updates indicate a status change in the batch (so "Next" logic always uses current statuses).
 
 ### Non-Batch Invoices
 
@@ -155,15 +188,18 @@ If the invoice's `batch_id` is null, no navigation bar appears. The review page 
 
 ### Invoice List Realtime
 
-The `InvoiceList` component uses the existing `useInvoiceStatuses` hook (from DOC-68) to subscribe to status changes for invoices in non-terminal states.
+The `InvoiceList` component currently receives server-rendered invoice data as props. To support live updates, it needs to maintain local state that overlays Realtime updates onto the initial server data.
 
-**Subscription strategy:**
-1. On mount/data change: collect invoice IDs from all batches that have at least one invoice in `uploaded` or `extracting` status.
-2. Pass these IDs to `useInvoiceStatuses` for Realtime subscription.
-3. As statuses update, batch header pills re-render live (e.g., "3 extracting" → "2 extracting", "9 ready" → "10 ready").
-4. When all invoices in a batch reach terminal states (`pending_review`, `approved`, `synced`, `error`), remove those IDs from the subscription set.
+**State management pattern:**
+1. On mount: initialize local state from server-provided props (`invoices` array).
+2. Collect invoice IDs from all batches that have at least one invoice in `uploaded` or `extracting` status.
+3. Pass these IDs to `useInvoiceStatuses` for Realtime subscription.
+4. When Realtime delivers a status update, merge it into local state (update the matching invoice's `status` field). This triggers re-render of batch header pills and status badges without a full page refresh.
+5. When all invoices in a batch reach terminal states (`pending_review`, `approved`, `synced`, `error`), remove those IDs from the subscription set.
 
 **Works for collapsed batches too** — the status pills in the collapsed header row update without expanding.
+
+**Hydration note:** Status can change between server render and client hydration. The Realtime hook handles this by fetching current statuses on mount (existing behavior of `useInvoiceStatuses`), which overwrites any stale server-rendered values.
 
 ### Review Page Realtime
 
@@ -185,7 +221,17 @@ Empty state messages appear inside the expanded accordion area, below the indivi
 
 ---
 
-## 6. Files to Modify/Create
+## 6. Mobile Responsiveness
+
+The existing `InvoiceList` has separate desktop (table) and mobile (card) layouts. Batch features adapt accordingly:
+
+- **Batch header (mobile):** Renders as a card with the batch label, status pills stacked vertically, and action buttons full-width below. Chevron tap expands/collapses.
+- **Expanded batch (mobile):** Individual invoice cards indented with a left border, same as desktop.
+- **Navigation bar on review page (mobile):** Stacks into two rows — "Back to batch" on top, "Invoice N of M" + Previous/Next on bottom. Buttons remain tap-friendly (min 44px touch targets).
+
+---
+
+## 7. Files to Modify/Create
 
 | File | Change |
 |------|--------|
@@ -193,15 +239,16 @@ Empty state messages appear inside the expanded accordion area, below the indivi
 | `components/invoices/BatchHeader.tsx` | **New.** Batch summary row with status pills and action buttons |
 | `components/invoices/BatchNavigation.tsx` | **New.** Review page navigation bar (Back, N of M, Previous/Next) |
 | `app/(dashboard)/invoices/page.tsx` | Accept `batch_id` query parameter, pass to InvoiceList |
-| `app/api/invoices/route.ts` | Support `batch_id` filter parameter in query |
-| `app/(dashboard)/invoices/[id]/review/page.tsx` | Fetch batch manifest, render BatchNavigation, handle redirect after last review |
-| `lib/invoices/queries.ts` | Add `fetchBatchManifest(batchId)` query helper |
+| `app/api/invoices/route.ts` | Support `batch_id` filter parameter, skip pagination when filtering by batch |
+| `app/(dashboard)/invoices/[id]/review/page.tsx` | Add `batch_id` to invoice select, fetch batch manifest, render BatchNavigation, handle redirect after last review |
+| `lib/invoices/queries.ts` | Add `batch_id` to `fetchInvoiceList` select, add `fetchBatchManifest(batchId)` query helper, support `batch_id` filter |
+| `lib/invoices/types.ts` | Add `batch_id: string \| null` to `InvoiceListItem` type |
 
 ---
 
-## 7. Non-Goals
+## 8. Non-Goals
 
 - **No separate `batches` table.** Batch identity is a lightweight `batch_id` grouping on the invoices table.
 - **No batch-level approve/sync.** That's DOC-83.
 - **No polling.** All status updates via Supabase Realtime.
-- **No new API response shapes.** Server returns flat invoice list; client groups.
+- **No new API endpoints.** Existing endpoints gain `batch_id` support.
