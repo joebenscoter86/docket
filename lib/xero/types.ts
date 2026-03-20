@@ -56,3 +56,56 @@ export interface AccountingConnectionRow {
   status?: string;
   refresh_token_expires_at?: string | null;
 }
+
+// ─── Xero API Response Types ───
+
+/** A single Xero Contact as returned by GET /api.xro/2.0/Contacts */
+export interface XeroContact {
+  ContactID: string; // UUID
+  Name: string;
+  ContactStatus: "ACTIVE" | "ARCHIVED" | "GDPRREQUEST";
+  IsSupplier: boolean;
+  IsCustomer: boolean;
+  EmailAddress?: string;
+  AccountNumber?: string;
+  Addresses?: XeroAddress[];
+}
+
+export interface XeroAddress {
+  AddressType: "POBOX" | "STREET";
+  AddressLine1?: string;
+  City?: string;
+  Region?: string;
+  PostalCode?: string;
+  Country?: string;
+}
+
+/** Response shape from GET /api.xro/2.0/Contacts */
+export interface XeroContactsResponse {
+  Contacts: XeroContact[];
+}
+
+/** Response shape from POST /api.xro/2.0/Contacts (single contact) */
+export interface XeroContactCreateResponse {
+  Contacts: XeroContact[];
+}
+
+// ─── Xero Error Types ───
+
+/** Xero auth error shape (401/403). PascalCase — consistent unlike QBO. */
+export interface XeroAuthError {
+  Title: string;
+  Status: number;
+  Detail: string;
+}
+
+/** Xero validation error shape (400). */
+export interface XeroValidationError {
+  StatusCode: number;
+  Message: string;
+  Elements?: Array<{
+    ValidationErrors?: Array<{
+      Message: string;
+    }>;
+  }>;
+}
