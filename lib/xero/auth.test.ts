@@ -625,6 +625,55 @@ describe("refreshXeroTokens", () => {
     expect(result.tenantId).toBe("tenant-1");
     expect(mockUpdate).toHaveBeenCalledTimes(3);
   });
+
+  it("retries Xero HTTP call up to 3 times on transient 500 errors", async () => {
+    let fetchCallCount = 0;
+    globalThis.fetch = vi.fn().mockImplementation(async () => {
+      fetchCallCount++;
+      if (fetchCallCount <= 2) {
+        return { ok: false, status: 500, text: async () => "Internal Server Error" };
+      }
+      return { ok: true, json: async () => MOCK_REFRESH_RESPONSE };
+    }) as typeof fetch;
+
+    const mockUpdate = vi.fn().mockReturnValue({
+      eq: vi.fn().mockResolvedValue({ error: null }),
+    });
+    const mockSupabase = {
+      from: vi.fn().mockReturnValue({ update: mockUpdate }),
+    };
+
+    const { refreshXeroTokens } = await import("./auth");
+    const result = await refreshXeroTokens(
+      mockSupabase as never,
+      "enc_old_refresh",
+      "conn-123",
+      "org-1",
+      "tenant-1"
+    );
+
+    expect(result.accessToken).toBe("new_access");
+    expect(fetchCallCount).toBe(3);
+  });
+
+  it("does not retry on 400/invalid_grant errors", async () => {
+    let fetchCallCount = 0;
+    globalThis.fetch = vi.fn().mockImplementation(async () => {
+      fetchCallCount++;
+      return { ok: false, status: 400, text: async () => '{"error":"invalid_grant"}' };
+    }) as typeof fetch;
+
+    const mockSupabase = {
+      from: vi.fn().mockReturnValue({ update: vi.fn() }),
+    };
+
+    const { refreshXeroTokens } = await import("./auth");
+    await expect(
+      refreshXeroTokens(mockSupabase as never, "enc_old_refresh", "conn-123", "org-1", "tenant-1")
+    ).rejects.toThrow("400");
+
+    expect(fetchCallCount).toBe(1); // No retries
+  });
 });
 
 // ─── Task 6: getValidAccessToken — status checks ───

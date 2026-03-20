@@ -305,8 +305,45 @@ export async function refreshXeroTokens(
   const startTime = Date.now();
   const decryptedRefresh = decrypt(encryptedRefreshToken);
 
-  // Call Xero token endpoint
-  const tokenResponse = await refreshAccessToken(decryptedRefresh);
+  // Retry Xero HTTP call up to 3 times for transient errors (500s, network errors).
+  // Permanent failures (400/invalid_grant) are re-thrown immediately without retry.
+  const HTTP_MAX_RETRIES = 3;
+  const HTTP_BACKOFF_BASE_MS = 100;
+  let tokenResponse: XeroTokenResponse | undefined;
+
+  for (let attempt = 1; attempt <= HTTP_MAX_RETRIES; attempt++) {
+    try {
+      tokenResponse = await refreshAccessToken(decryptedRefresh);
+      break; // success — exit retry loop
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : String(err);
+
+      // 400/invalid_grant = permanent failure (expired/revoked token); never retry
+      if (errorMessage.includes("400") || errorMessage.includes("invalid_grant")) {
+        throw err;
+      }
+
+      if (attempt < HTTP_MAX_RETRIES) {
+        logger.error("xero.token_refresh_failed", {
+          orgId,
+          connectionId,
+          attempt: String(attempt),
+          maxAttempts: String(HTTP_MAX_RETRIES),
+          error: errorMessage,
+        });
+        await new Promise((r) =>
+          setTimeout(r, HTTP_BACKOFF_BASE_MS * Math.pow(2, attempt - 1))
+        );
+      } else {
+        throw err; // exhausted retries
+      }
+    }
+  }
+
+  // tokenResponse is always set here (loop throws on exhausted retries)
+  if (!tokenResponse) {
+    throw new Error("Token refresh failed: no response received");
+  }
 
   // Encrypt new tokens
   const encryptedAccess = encrypt(tokenResponse.access_token);
