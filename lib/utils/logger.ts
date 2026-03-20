@@ -1,3 +1,5 @@
+import * as Sentry from "@sentry/nextjs";
+
 type LogLevel = "info" | "warn" | "error";
 
 interface LogEntry {
@@ -9,6 +11,7 @@ interface LogEntry {
   durationMs?: number;
   status?: string;
   error?: string;
+  exception?: Error; // pass actual Error object to preserve stack traces in Sentry
   [key: string]: unknown;
 }
 
@@ -28,6 +31,13 @@ function log(entry: LogEntry): void {
     case "error":
       // eslint-disable-next-line no-console
       console.error(formatted);
+      Sentry.captureException(
+        entry.exception || new Error(entry.error || entry.action),
+        {
+          tags: { action: entry.action },
+          extra: { invoiceId: entry.invoiceId, orgId: entry.orgId, userId: entry.userId },
+        }
+      );
       break;
     case "warn":
       // eslint-disable-next-line no-console
