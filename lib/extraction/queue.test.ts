@@ -9,6 +9,17 @@ vi.mock("./run", () => ({
   runExtraction: (...args: unknown[]) => mockRunExtraction(...args),
 }));
 
+const mockAdminUpdate = vi.fn().mockReturnValue({
+  eq: vi.fn().mockResolvedValue({ error: null }),
+});
+vi.mock("@/lib/supabase/admin", () => ({
+  createAdminClient: () => ({
+    from: () => ({
+      update: (...args: unknown[]) => mockAdminUpdate(...args),
+    }),
+  }),
+}));
+
 vi.mock("@/lib/utils/logger", () => ({
   logger: {
     info: vi.fn(),
@@ -32,6 +43,11 @@ const baseParams = {
 describe("enqueueExtraction", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.useFakeTimers();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
   });
 
   it("calls runExtraction with provided params", async () => {
@@ -78,6 +94,9 @@ describe("enqueueExtraction", () => {
       enqueueExtraction({ ...baseParams, invoiceId: `inv-${i}` })
     );
 
+    // Advance timers to let queued items process
+    await vi.advanceTimersByTimeAsync(500);
+
     await Promise.all(promises);
 
     expect(mockRunExtraction).toHaveBeenCalledTimes(10);
@@ -91,4 +110,62 @@ describe("enqueueExtraction", () => {
       "Extraction failed"
     );
   });
+
+  it("times out queued extractions after 120 seconds", async () => {
+    // Fill all 5 slots with extractions that resolve only when we say so
+    const blockerResolvers: Array<() => void> = [];
+    mockRunExtraction.mockImplementation(() => {
+      return new Promise<{ success: boolean }>((resolve) => {
+        blockerResolvers.push(() => resolve({ success: true }));
+      });
+    });
+
+    // Fill all 5 concurrency slots — catch to prevent unhandled rejection warnings
+    const blockerPromises = Array.from({ length: 5 }, (_, i) =>
+      enqueueExtraction({ ...baseParams, invoiceId: `blocker-${i}` }).catch(() => {})
+    );
+
+    // This 6th extraction should queue and eventually time out.
+    // Attach .catch() BEFORE advancing timers so the rejection is handled.
+    let timeoutError: Error | null = null;
+    const timeoutPromise = enqueueExtraction({
+      ...baseParams,
+      invoiceId: "timeout-victim",
+    }).catch((err: Error) => {
+      timeoutError = err;
+    });
+
+    // Advance past the 120s timeout
+    await vi.advanceTimersByTimeAsync(120_001);
+    await timeoutPromise;
+
+    expect(timeoutError).not.toBeNull();
+    expect(timeoutError!.message).toBe(
+      "Extraction queue timed out. Please retry."
+    );
+
+    // Should set invoice status to error
+    expect(mockAdminUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        status: "error",
+        error_message: "Extraction queue timed out. Please retry.",
+      })
+    );
+
+    // Should log the timeout
+    expect(logger.error).toHaveBeenCalledWith(
+      "extraction_queue_timeout",
+      expect.objectContaining({
+        invoiceId: "timeout-victim",
+        timeoutMs: 120_000,
+      })
+    );
+
+    // Clean up: resolve blockers so promises settle
+    blockerResolvers.forEach((r) => r());
+    await Promise.all(blockerPromises);
+  });
 });
+
+// Need afterEach import
+import { afterEach } from "vitest";
