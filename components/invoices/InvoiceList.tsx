@@ -24,6 +24,7 @@ interface InvoiceListProps {
   currentOutputType: string;
   currentBatchId?: string;
   toastMessage?: string | null;
+  isQboConnected?: boolean;
 }
 
 const FILTER_TABS: { key: keyof InvoiceListCounts; label: string }[] = [
@@ -125,6 +126,7 @@ export default function InvoiceList({
   currentOutputType,
   currentBatchId,
   toastMessage,
+  isQboConnected,
 }: InvoiceListProps) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -342,6 +344,7 @@ export default function InvoiceList({
             invoices={row.invoices}
             isExpanded={isExpanded}
             onToggle={() => toggleBatch(row.batchId)}
+            isQboConnected={isQboConnected}
           />
           {isExpanded && (
             <div className="border-l-2 border-blue-200 ml-3">
@@ -373,6 +376,7 @@ export default function InvoiceList({
           invoices={row.invoices}
           isExpanded={isExpanded}
           onToggle={() => toggleBatch(row.batchId)}
+          isQboConnected={isQboConnected}
         />
         {isExpanded && (
           <div className="border-l-2 border-blue-200 ml-3 space-y-2 pb-2">
