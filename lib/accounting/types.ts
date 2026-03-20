@@ -12,6 +12,8 @@ export interface AccountingConnectionInfo {
   companyId: string;
   companyName?: string;
   connectedAt: string;
+  status?: 'active' | 'expired' | 'error';
+  refreshTokenExpiresAt?: string | null;
 }
 
 // ─── Dropdown Option Types ───
@@ -117,5 +119,24 @@ export class AccountingApiError extends Error {
     this.errorCode = params.errorCode;
     this.detail = params.detail;
     this.element = params.element;
+  }
+}
+
+// ─── Connection Error ───
+
+/**
+ * Thrown when an accounting connection's refresh token is expired, revoked,
+ * or otherwise unusable. Signals that the user must re-authorize.
+ * Shared across QBO and Xero.
+ */
+export class ConnectionExpiredError extends Error {
+  public readonly provider: AccountingProviderType;
+  public readonly orgId: string;
+
+  constructor(provider: AccountingProviderType, orgId: string, message?: string) {
+    super(message ?? `${provider} connection expired for org ${orgId}`);
+    this.name = "ConnectionExpiredError";
+    this.provider = provider;
+    this.orgId = orgId;
   }
 }
