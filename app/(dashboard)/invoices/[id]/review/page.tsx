@@ -5,8 +5,10 @@ import { getExtractedData } from "@/lib/extraction/data";
 import { logger } from "@/lib/utils/logger";
 import ReviewLayout from "@/components/invoices/ReviewLayout";
 import ReviewProcessingState from "@/components/invoices/ReviewProcessingState";
+import { BatchNavigation } from "@/components/invoices/BatchNavigation";
 import Link from "next/link";
 import type { InvoiceStatus, ExtractedDataRow, OutputType } from "@/lib/types/invoice";
+import { fetchBatchManifest, type BatchManifestItem } from "@/lib/invoices/queries";
 
 const PROCESSING_STATUSES: InvoiceStatus[] = ["uploading", "extracting", "error"];
 
@@ -20,7 +22,7 @@ export default async function ReviewPage({
   // Fetch invoice row
   const { data: invoice, error: invoiceError } = await supabase
     .from("invoices")
-    .select("id, status, file_path, file_name, file_type, error_message, output_type, payment_account_id, payment_account_name")
+    .select("id, status, file_path, file_name, file_type, error_message, output_type, payment_account_id, payment_account_name, batch_id")
     .eq("id", params.id)
     .single();
 
@@ -33,13 +35,28 @@ export default async function ReviewPage({
     redirect("/invoices");
   }
 
+  // Fetch batch manifest if this is a batch invoice
+  let batchManifest: BatchManifestItem[] = [];
+  if (invoice.batch_id) {
+    batchManifest = await fetchBatchManifest(supabase, invoice.batch_id);
+  }
+
   // If still processing or errored, show processing state
   if (PROCESSING_STATUSES.includes(invoice.status as InvoiceStatus)) {
     return (
-      <ReviewProcessingState
-        invoiceId={invoice.id}
-        initialStatus={invoice.status as InvoiceStatus}
-      />
+      <>
+        {invoice.batch_id && batchManifest.length > 1 && (
+          <BatchNavigation
+            currentInvoiceId={invoice.id}
+            batchId={invoice.batch_id}
+            initialManifest={batchManifest}
+          />
+        )}
+        <ReviewProcessingState
+          invoiceId={invoice.id}
+          initialStatus={invoice.status as InvoiceStatus}
+        />
+      </>
     );
   }
 
@@ -91,24 +108,26 @@ export default async function ReviewPage({
   return (
     <ReviewLayout
       invoice={{
-        id: invoice.id,
-        fileName: invoice.file_name,
-        fileType: invoice.file_type,
-        status: invoice.status as InvoiceStatus,
-        errorMessage: invoice.error_message,
-        outputType: (invoice.output_type ?? "bill") as OutputType,
-        paymentAccountId: invoice.payment_account_id ?? null,
-        paymentAccountName: invoice.payment_account_name ?? null,
-      }}
-      signedUrl={signedUrlResult.data.signedUrl}
-      // getExtractedData returns Supabase-inferred types where confidence_score
-      // is string | null. The DB CHECK constraint guarantees valid values.
-      extractedData={extractedData as unknown as ExtractedDataRow}
-      orgDefaults={{
-        defaultOutputType: (orgResult?.default_output_type ?? "bill") as OutputType,
-        defaultPaymentAccountId: orgResult?.default_payment_account_id ?? null,
-        defaultPaymentAccountName: orgResult?.default_payment_account_name ?? null,
-      }}
-    />
+          id: invoice.id,
+          fileName: invoice.file_name,
+          fileType: invoice.file_type,
+          status: invoice.status as InvoiceStatus,
+          errorMessage: invoice.error_message,
+          outputType: (invoice.output_type ?? "bill") as OutputType,
+          paymentAccountId: invoice.payment_account_id ?? null,
+          paymentAccountName: invoice.payment_account_name ?? null,
+          batchId: invoice.batch_id ?? null,
+        }}
+        signedUrl={signedUrlResult.data.signedUrl}
+        // getExtractedData returns Supabase-inferred types where confidence_score
+        // is string | null. The DB CHECK constraint guarantees valid values.
+        extractedData={extractedData as unknown as ExtractedDataRow}
+        orgDefaults={{
+          defaultOutputType: (orgResult?.default_output_type ?? "bill") as OutputType,
+          defaultPaymentAccountId: orgResult?.default_payment_account_id ?? null,
+          defaultPaymentAccountName: orgResult?.default_payment_account_name ?? null,
+        }}
+        batchManifest={batchManifest}
+      />
   );
 }

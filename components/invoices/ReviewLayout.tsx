@@ -16,7 +16,9 @@ const PdfViewer = dynamic(() => import("./PdfViewer"), {
   ),
 });
 import ExtractionForm from "./ExtractionForm";
+import { BatchNavigation } from "./BatchNavigation";
 import type { InvoiceStatus, ExtractedDataRow, OutputType } from "@/lib/types/invoice";
+import type { BatchManifestItem } from "@/lib/invoices/queries";
 
 interface ReviewLayoutProps {
   invoice: {
@@ -28,6 +30,7 @@ interface ReviewLayoutProps {
     outputType: OutputType;
     paymentAccountId: string | null;
     paymentAccountName: string | null;
+    batchId: string | null;
   };
   signedUrl: string;
   extractedData: ExtractedDataRow | null;
@@ -36,6 +39,7 @@ interface ReviewLayoutProps {
     defaultPaymentAccountId: string | null;
     defaultPaymentAccountName: string | null;
   };
+  batchManifest?: { id: string; status: string }[];
 }
 
 type MobileTab = "document" | "details";
@@ -51,6 +55,7 @@ export default function ReviewLayout({
   signedUrl,
   extractedData,
   orgDefaults,
+  batchManifest,
 }: ReviewLayoutProps) {
   const [activeTab, setActiveTab] = useState<MobileTab>("document");
 
@@ -58,26 +63,36 @@ export default function ReviewLayout({
 
   return (
     <div className="flex flex-col h-full -m-6">
+      {/* Batch navigation bar */}
+      {invoice.batchId && batchManifest && batchManifest.length > 1 && (
+        <BatchNavigation
+          currentInvoiceId={invoice.id}
+          batchId={invoice.batchId}
+          initialManifest={batchManifest as BatchManifestItem[]}
+        />
+      )}
       {/* Page header */}
       <div className="flex items-center gap-3 border-b border-border bg-white px-4 py-3 md:px-6">
-        {/* Back button */}
-        <Link
-          href="/invoices"
-          className="flex items-center gap-1 text-sm text-muted hover:text-text transition-colors shrink-0"
-        >
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            fill="none"
-            viewBox="0 0 24 24"
-            strokeWidth={1.5}
-            stroke="currentColor"
-            className="h-4 w-4"
+        {/* Back button — hidden when batch nav is present (it has its own "Back to batch") */}
+        {!invoice.batchId && (
+          <Link
+            href="/invoices"
+            className="flex items-center gap-1 text-sm text-muted hover:text-text transition-colors shrink-0"
           >
-            <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5" />
-          </svg>
-          <span className="hidden md:inline">Back to Invoices</span>
-          <span className="sr-only md:hidden">Back</span>
-        </Link>
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              fill="none"
+              viewBox="0 0 24 24"
+              strokeWidth={1.5}
+              stroke="currentColor"
+              className="h-4 w-4"
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5" />
+            </svg>
+            <span className="hidden md:inline">Back to Invoices</span>
+            <span className="sr-only md:hidden">Back</span>
+          </Link>
+        )}
 
         {/* File name */}
         <span className="truncate text-sm font-medium text-text min-w-0">
@@ -159,6 +174,8 @@ export default function ReviewLayout({
                 paymentAccountId={invoice.paymentAccountId}
                 paymentAccountName={invoice.paymentAccountName}
                 orgDefaults={orgDefaults}
+                batchId={invoice.batchId}
+                batchManifest={batchManifest}
               />
             ) : (
               <div className="flex items-center justify-center h-full text-sm text-muted">

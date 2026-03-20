@@ -14,6 +14,7 @@ interface InvoicesPageProps {
     limit?: string;
     output_type?: string;
     batch_id?: string;
+    toast?: string;
   }>;
 }
 
@@ -26,6 +27,8 @@ export default async function InvoicesPage({ searchParams }: InvoicesPageProps) 
   }
 
   const resolvedParams = await searchParams;
+  const toastMessage =
+    resolvedParams.toast === "all-reviewed" ? "All invoices reviewed!" : null;
   const params = validateListParams({
     status: resolvedParams.status,
     sort: resolvedParams.sort,
@@ -80,6 +83,8 @@ export default async function InvoicesPage({ searchParams }: InvoicesPageProps) 
         currentDirection={params.direction}
         hasCursor={!!resolvedParams.cursor}
         currentOutputType={params.output_type}
+        currentBatchId={resolvedParams.batch_id}
+        toastMessage={toastMessage}
       />
     </div>
   );

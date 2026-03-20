@@ -1,10 +1,14 @@
 "use client";
 
+import { useState, useEffect, useMemo } from "react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { InvoiceListItem, InvoiceListCounts } from "@/lib/invoices/types";
 import { TRANSACTION_TYPE_SHORT_LABELS, OutputType } from "@/lib/types/invoice";
+import { groupInvoicesByBatch, type InvoiceRow } from "@/lib/invoices/batch-utils";
+import { useInvoiceStatuses } from "@/lib/hooks/useInvoiceStatuses";
 import InvoiceStatusBadge from "./InvoiceStatusBadge";
+import BatchHeader from "./BatchHeader";
 import Button from "@/components/ui/Button";
 import { formatCurrency } from "@/lib/utils/currency";
 import { formatRelativeTime } from "@/lib/utils/date";
@@ -18,6 +22,8 @@ interface InvoiceListProps {
   currentDirection: string;
   hasCursor: boolean;
   currentOutputType: string;
+  currentBatchId?: string;
+  toastMessage?: string | null;
 }
 
 const FILTER_TABS: { key: keyof InvoiceListCounts; label: string }[] = [
@@ -72,6 +78,42 @@ function formatDate(dateString: string | null): string {
   });
 }
 
+/** Determine batch-level empty state message, if applicable */
+function getBatchEmptyState(
+  invoices: InvoiceListItem[]
+): { message: string; color: string; icon?: "check" } | null {
+  if (invoices.length === 0) return null;
+
+  const allError = invoices.every((inv) => inv.status === "error");
+  if (allError) {
+    return {
+      message: "All extractions failed. Check file quality and retry.",
+      color: "#991B1B",
+    };
+  }
+
+  const allSynced = invoices.every((inv) => inv.status === "synced");
+  if (allSynced) {
+    return {
+      message: "Batch complete \u2014 all invoices synced to QuickBooks.",
+      color: "#065F46",
+      icon: "check",
+    };
+  }
+
+  const allApprovedOrSynced = invoices.every(
+    (inv) => inv.status === "approved" || inv.status === "synced"
+  );
+  if (allApprovedOrSynced && !allSynced) {
+    return {
+      message: "All invoices reviewed! Ready to sync.",
+      color: "#1D4ED8",
+    };
+  }
+
+  return null;
+}
+
 export default function InvoiceList({
   invoices,
   counts,
@@ -81,10 +123,72 @@ export default function InvoiceList({
   currentDirection,
   hasCursor,
   currentOutputType,
+  currentBatchId,
+  toastMessage,
 }: InvoiceListProps) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const router = useRouter();
+
+  // Local state overlays Realtime updates onto server-rendered data
+  const [statusOverrides, setStatusOverrides] = useState<Record<string, string>>({});
+
+  // Merge server data with Realtime overrides
+  const mergedInvoices = useMemo(
+    () =>
+      invoices.map((inv) => ({
+        ...inv,
+        status: (statusOverrides[inv.id] as InvoiceListItem["status"]) ?? inv.status,
+      })),
+    [invoices, statusOverrides]
+  );
+
+  // Group into batch rows
+  const rows = useMemo(() => groupInvoicesByBatch(mergedInvoices), [mergedInvoices]);
+
+  // Collect IDs needing Realtime subscription (uploaded/extracting)
+  const realtimeIds = useMemo(
+    () =>
+      invoices
+        .filter((inv) =>
+          ["uploaded", "extracting"].includes(
+            (statusOverrides[inv.id] as string) ?? inv.status
+          )
+        )
+        .map((inv) => inv.id),
+    [invoices, statusOverrides]
+  );
+
+  const { statuses: realtimeStatuses } = useInvoiceStatuses(realtimeIds);
+
+  // Merge Realtime status updates into overrides
+  useEffect(() => {
+    const newOverrides: Record<string, string> = {};
+    for (const [id, entry] of Object.entries(realtimeStatuses)) {
+      newOverrides[id] = entry.status;
+    }
+    if (Object.keys(newOverrides).length > 0) {
+      setStatusOverrides((prev) => ({ ...prev, ...newOverrides }));
+    }
+  }, [realtimeStatuses]);
+
+  // Accordion expand/collapse state
+  const [expandedBatches, setExpandedBatches] = useState<Set<string>>(() => {
+    if (currentBatchId) return new Set([currentBatchId]);
+    return new Set();
+  });
+
+  function toggleBatch(batchId: string) {
+    setExpandedBatches((prev) => {
+      const next = new Set(prev);
+      if (next.has(batchId)) {
+        next.delete(batchId);
+      } else {
+        next.add(batchId);
+      }
+      return next;
+    });
+  }
 
   // Empty state: no invoices at all
   if (counts.all === 0) {
@@ -100,8 +204,209 @@ export default function InvoiceList({
     );
   }
 
+  /** Render a single invoice as a desktop table row */
+  function renderDesktopInvoiceRow(invoice: InvoiceListItem, indented?: boolean) {
+    return (
+      <tr
+        key={invoice.id}
+        className={`border-b border-[#F1F5F9] transition-all duration-150 ease-in-out hover:bg-background group cursor-pointer ${
+          indented ? "bg-white" : ""
+        }`}
+        onClick={() => router.push(`/invoices/${invoice.id}/review`)}
+      >
+        <td className="py-3.5 px-3 text-[14px] text-text truncate max-w-[200px]">
+          {invoice.file_name}
+        </td>
+        <td className="py-3.5 px-3 text-[14px] font-medium text-text">
+          {invoice.extracted_data?.vendor_name ?? (
+            <span className="text-muted">Pending</span>
+          )}
+        </td>
+        <td className="py-3.5 px-3 font-mono text-[13px] text-[#475569]">
+          {invoice.extracted_data?.invoice_number ?? "\u2014"}
+        </td>
+        <td className="py-3.5 px-3 font-mono text-[13px] text-[#475569]">
+          {formatDate(invoice.extracted_data?.invoice_date ?? null)}
+        </td>
+        <td className="py-3.5 px-3 text-[14px] text-right font-mono">
+          {invoice.extracted_data?.total_amount != null
+            ? formatCurrency(invoice.extracted_data.total_amount, null)
+            : "\u2014"}
+        </td>
+        <td className="py-3.5 px-3">
+          <span className="inline-flex items-center gap-2">
+            <InvoiceStatusBadge status={invoice.status} />
+            {invoice.status === "synced" && invoice.output_type && (
+              <span className="text-xs text-muted">
+                {TRANSACTION_TYPE_SHORT_LABELS[invoice.output_type as OutputType]}
+              </span>
+            )}
+          </span>
+        </td>
+        <td className="py-3.5 px-3 text-[14px] text-muted">
+          {formatRelativeTime(invoice.uploaded_at)}
+        </td>
+      </tr>
+    );
+  }
+
+  /** Render a single invoice as a mobile card */
+  function renderMobileInvoiceCard(invoice: InvoiceListItem) {
+    return (
+      <Link
+        key={invoice.id}
+        href={`/invoices/${invoice.id}/review`}
+        className="block bg-surface border border-border rounded-lg p-4 hover:border-primary/30 transition-all duration-150"
+      >
+        <div className="flex items-center justify-between mb-1">
+          <span className="text-sm font-medium text-text truncate max-w-[200px]">
+            {invoice.file_name}
+          </span>
+          <span className="inline-flex items-center gap-2">
+            <InvoiceStatusBadge status={invoice.status} />
+            {invoice.status === "synced" && invoice.output_type && (
+              <span className="text-xs text-muted">
+                {TRANSACTION_TYPE_SHORT_LABELS[invoice.output_type as OutputType]}
+              </span>
+            )}
+          </span>
+        </div>
+        <div className="text-sm text-muted mb-1">
+          {invoice.extracted_data?.vendor_name ?? (
+            <span className="text-muted">Pending</span>
+          )}
+          {invoice.extracted_data?.invoice_number && (
+            <span className="text-muted ml-2 font-mono text-[13px]">
+              #{invoice.extracted_data.invoice_number}
+            </span>
+          )}
+        </div>
+        <div className="flex items-center justify-between text-sm">
+          <span className="font-mono">
+            {invoice.extracted_data?.total_amount != null
+              ? formatCurrency(invoice.extracted_data.total_amount, null)
+              : "\u2014"}
+          </span>
+          <span className="text-muted text-xs">
+            {formatRelativeTime(invoice.uploaded_at)}
+          </span>
+        </div>
+      </Link>
+    );
+  }
+
+  /** Render batch empty state banner */
+  function renderBatchEmptyState(batchInvoices: InvoiceListItem[]) {
+    const emptyState = getBatchEmptyState(batchInvoices);
+    if (!emptyState) return null;
+
+    return (
+      <div
+        className="px-4 py-3 text-sm font-medium flex items-center gap-2"
+        style={{ color: emptyState.color }}
+      >
+        {emptyState.icon === "check" && (
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            fill="none"
+            viewBox="0 0 24 24"
+            strokeWidth={2}
+            stroke="currentColor"
+            className="h-4 w-4"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+            />
+          </svg>
+        )}
+        {emptyState.message}
+      </div>
+    );
+  }
+
+  /** Render desktop rows for a single InvoiceRow (batch or individual) */
+  function renderDesktopRow(row: InvoiceRow) {
+    if (row.type === "individual") {
+      return renderDesktopInvoiceRow(row.invoices[0]);
+    }
+
+    // Batch row
+    const isExpanded = expandedBatches.has(row.batchId);
+    return (
+      <tr key={`batch-${row.batchId}`}>
+        <td colSpan={7} className="p-0">
+          <BatchHeader
+            batchId={row.batchId}
+            invoices={row.invoices}
+            isExpanded={isExpanded}
+            onToggle={() => toggleBatch(row.batchId)}
+          />
+          {isExpanded && (
+            <div className="border-l-2 border-blue-200 ml-3">
+              <table className="w-full">
+                <tbody>
+                  {row.invoices.map((inv) => renderDesktopInvoiceRow(inv, true))}
+                </tbody>
+              </table>
+              {renderBatchEmptyState(row.invoices)}
+            </div>
+          )}
+        </td>
+      </tr>
+    );
+  }
+
+  /** Render mobile cards for a single InvoiceRow (batch or individual) */
+  function renderMobileRow(row: InvoiceRow) {
+    if (row.type === "individual") {
+      return renderMobileInvoiceCard(row.invoices[0]);
+    }
+
+    // Batch row
+    const isExpanded = expandedBatches.has(row.batchId);
+    return (
+      <div key={`batch-${row.batchId}`}>
+        <BatchHeader
+          batchId={row.batchId}
+          invoices={row.invoices}
+          isExpanded={isExpanded}
+          onToggle={() => toggleBatch(row.batchId)}
+        />
+        {isExpanded && (
+          <div className="border-l-2 border-blue-200 ml-3 space-y-2 pb-2">
+            {row.invoices.map((inv) => renderMobileInvoiceCard(inv))}
+            {renderBatchEmptyState(row.invoices)}
+          </div>
+        )}
+      </div>
+    );
+  }
+
   return (
     <div>
+      {/* Toast Message */}
+      {toastMessage && (
+        <div className="mb-4 px-4 py-3 rounded-md bg-[#D1FAE5] text-[#065F46] text-sm font-medium flex items-center gap-2">
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            fill="none"
+            viewBox="0 0 24 24"
+            strokeWidth={2}
+            stroke="currentColor"
+            className="h-4 w-4"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+            />
+          </svg>
+          {toastMessage}
+        </div>
+      )}
+
       {/* Filter Tabs */}
       <div className="flex gap-2 mb-6">
         {FILTER_TABS.map((tab) => {
@@ -224,89 +529,14 @@ export default function InvoiceList({
                 </tr>
               </thead>
               <tbody>
-                {invoices.map((invoice) => (
-                  <tr key={invoice.id} className="border-b border-[#F1F5F9] transition-all duration-150 ease-in-out hover:bg-background group cursor-pointer" onClick={() => router.push(`/invoices/${invoice.id}/review`)}>
-                    <td className="py-3.5 px-3 text-[14px] text-text truncate max-w-[200px]">
-                      {invoice.file_name}
-                    </td>
-                    <td className="py-3.5 px-3 text-[14px] font-medium text-text">
-                      {invoice.extracted_data?.vendor_name ?? (
-                        <span className="text-muted">Pending</span>
-                      )}
-                    </td>
-                    <td className="py-3.5 px-3 font-mono text-[13px] text-[#475569]">
-                      {invoice.extracted_data?.invoice_number ?? "\u2014"}
-                    </td>
-                    <td className="py-3.5 px-3 font-mono text-[13px] text-[#475569]">
-                      {formatDate(invoice.extracted_data?.invoice_date ?? null)}
-                    </td>
-                    <td className="py-3.5 px-3 text-[14px] text-right font-mono">
-                      {invoice.extracted_data?.total_amount != null
-                        ? formatCurrency(invoice.extracted_data.total_amount, null)
-                        : "\u2014"}
-                    </td>
-                    <td className="py-3.5 px-3">
-                      <span className="inline-flex items-center gap-2">
-                        <InvoiceStatusBadge status={invoice.status} />
-                        {invoice.status === "synced" && invoice.output_type && (
-                          <span className="text-xs text-muted">
-                            {TRANSACTION_TYPE_SHORT_LABELS[invoice.output_type as OutputType]}
-                          </span>
-                        )}
-                      </span>
-                    </td>
-                    <td className="py-3.5 px-3 text-[14px] text-muted">
-                      {formatRelativeTime(invoice.uploaded_at)}
-                    </td>
-                  </tr>
-                ))}
+                {rows.map((row) => renderDesktopRow(row))}
               </tbody>
             </table>
           </div>
 
           {/* Mobile Cards */}
           <div className="md:hidden space-y-3">
-            {invoices.map((invoice) => (
-              <Link
-                key={invoice.id}
-                href={`/invoices/${invoice.id}/review`}
-                className="block bg-surface border border-border rounded-lg p-4 hover:border-primary/30 transition-all duration-150"
-              >
-                <div className="flex items-center justify-between mb-1">
-                  <span className="text-sm font-medium text-text truncate max-w-[200px]">
-                    {invoice.file_name}
-                  </span>
-                  <span className="inline-flex items-center gap-2">
-                    <InvoiceStatusBadge status={invoice.status} />
-                    {invoice.status === "synced" && invoice.output_type && (
-                      <span className="text-xs text-muted">
-                        {TRANSACTION_TYPE_SHORT_LABELS[invoice.output_type as OutputType]}
-                      </span>
-                    )}
-                  </span>
-                </div>
-                <div className="text-sm text-muted mb-1">
-                  {invoice.extracted_data?.vendor_name ?? (
-                    <span className="text-muted">Pending</span>
-                  )}
-                  {invoice.extracted_data?.invoice_number && (
-                    <span className="text-muted ml-2 font-mono text-[13px]">
-                      #{invoice.extracted_data.invoice_number}
-                    </span>
-                  )}
-                </div>
-                <div className="flex items-center justify-between text-sm">
-                  <span className="font-mono">
-                    {invoice.extracted_data?.total_amount != null
-                      ? formatCurrency(invoice.extracted_data.total_amount, null)
-                      : "\u2014"}
-                  </span>
-                  <span className="text-muted text-xs">
-                    {formatRelativeTime(invoice.uploaded_at)}
-                  </span>
-                </div>
-              </Link>
-            ))}
+            {rows.map((row) => renderMobileRow(row))}
           </div>
 
           {/* Pagination */}
