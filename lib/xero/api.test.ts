@@ -195,3 +195,66 @@ describe("getContactOptions", () => {
     ]);
   });
 });
+
+describe("createContact", () => {
+  it("creates a supplier contact and returns VendorOption", async () => {
+    server.use(
+      http.post(`${XERO_BASE}/Contacts`, async ({ request }) => {
+        const body = await request.json() as Record<string, unknown>;
+        expect(body.Name).toBe("New Vendor LLC");
+        expect(body.IsSupplier).toBe(true);
+        return HttpResponse.json({
+          Contacts: [
+            {
+              ContactID: "cccc-3333",
+              Name: "New Vendor LLC",
+              ContactStatus: "ACTIVE",
+              IsSupplier: true,
+              IsCustomer: false,
+            },
+          ],
+        });
+      })
+    );
+
+    const { createContact } = await import("@/lib/xero/api");
+    const mockSupabase = {} as Parameters<typeof createContact>[0];
+    const vendor = await createContact(mockSupabase, "org-1", "New Vendor LLC");
+
+    expect(vendor).toEqual({
+      value: "cccc-3333",
+      label: "New Vendor LLC",
+    });
+  });
+
+  it("creates a contact with parsed address", async () => {
+    server.use(
+      http.post(`${XERO_BASE}/Contacts`, async ({ request }) => {
+        const body = await request.json() as Record<string, unknown>;
+        expect(body.Addresses).toBeDefined();
+        return HttpResponse.json({
+          Contacts: [
+            {
+              ContactID: "dddd-4444",
+              Name: "Address Vendor",
+              ContactStatus: "ACTIVE",
+              IsSupplier: true,
+              IsCustomer: false,
+            },
+          ],
+        });
+      })
+    );
+
+    const { createContact } = await import("@/lib/xero/api");
+    const mockSupabase = {} as Parameters<typeof createContact>[0];
+    const vendor = await createContact(
+      mockSupabase,
+      "org-1",
+      "Address Vendor",
+      "123 Main St, Springfield, IL 62704"
+    );
+
+    expect(vendor.value).toBe("dddd-4444");
+  });
+});
