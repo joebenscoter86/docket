@@ -522,3 +522,102 @@ describe("disconnect", () => {
     expect(mockDelete).toHaveBeenCalled();
   });
 });
+
+// ─── Task 5: refreshXeroTokens ───
+
+describe("refreshXeroTokens", () => {
+  const MOCK_REFRESH_RESPONSE = {
+    id_token: "id_tok",
+    access_token: "new_access",
+    expires_in: 1800,
+    token_type: "Bearer" as const,
+    refresh_token: "new_refresh",
+    scope: "openid offline_access",
+  };
+
+  beforeEach(() => {
+    vi.restoreAllMocks();
+    process.env.XERO_CLIENT_ID = "test_client_id";
+    process.env.XERO_CLIENT_SECRET = "test_client_secret";
+
+    globalThis.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => MOCK_REFRESH_RESPONSE,
+    }) as typeof fetch;
+  });
+
+  it("decrypts old token, calls Xero, encrypts new tokens, updates DB with status and expiry", async () => {
+    const mockUpdate = vi.fn().mockReturnValue({
+      eq: vi.fn().mockResolvedValue({ error: null }),
+    });
+    const mockSupabase = {
+      from: vi.fn().mockReturnValue({ update: mockUpdate }),
+    };
+
+    const { refreshXeroTokens } = await import("./auth");
+    const result = await refreshXeroTokens(
+      mockSupabase as never,
+      "enc_old_refresh",
+      "conn-123",
+      "org-1",
+      "tenant-1"
+    );
+
+    expect(result.accessToken).toBe("new_access");
+    expect(result.tenantId).toBe("tenant-1");
+
+    const [updateData] = mockUpdate.mock.calls[0];
+    expect(updateData.access_token).toBe("enc_new_access");
+    expect(updateData.refresh_token).toBe("enc_new_refresh");
+    expect(updateData.status).toBe("active");
+    expect(updateData.refresh_token_expires_at).toBeDefined();
+  });
+
+  it("retries DB writes up to 3 times on failure", async () => {
+    let updateCallCount = 0;
+    const mockUpdate = vi.fn().mockImplementation(() => {
+      updateCallCount++;
+      return {
+        eq: vi.fn().mockResolvedValue({
+          error: updateCallCount <= 2 ? { message: "DB error" } : null,
+        }),
+      };
+    });
+    const mockSupabase = {
+      from: vi.fn().mockReturnValue({ update: mockUpdate }),
+    };
+
+    const { refreshXeroTokens } = await import("./auth");
+    await refreshXeroTokens(
+      mockSupabase as never,
+      "enc_old_refresh",
+      "conn-123",
+      "org-1",
+      "tenant-1"
+    );
+
+    expect(updateCallCount).toBe(3);
+  });
+
+  it("returns in-memory tokens when all 3 DB writes fail", async () => {
+    const mockUpdate = vi.fn().mockReturnValue({
+      eq: vi.fn().mockResolvedValue({ error: { message: "persistent DB error" } }),
+    });
+    const mockSupabase = {
+      from: vi.fn().mockReturnValue({ update: mockUpdate }),
+    };
+
+    const { refreshXeroTokens } = await import("./auth");
+    const result = await refreshXeroTokens(
+      mockSupabase as never,
+      "enc_old_refresh",
+      "conn-123",
+      "org-1",
+      "tenant-1"
+    );
+
+    expect(result.accessToken).toBe("new_access");
+    expect(result.tenantId).toBe("tenant-1");
+    expect(mockUpdate).toHaveBeenCalledTimes(3);
+  });
+});
