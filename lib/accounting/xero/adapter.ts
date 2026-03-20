@@ -18,6 +18,10 @@ import {
   type TransactionResult,
   type AttachmentResult,
 } from "../types";
+import { logger } from "@/lib/utils/logger";
+
+/** Xero attachment size limit: 4 MB */
+const XERO_ATTACHMENT_MAX_BYTES = 4 * 1024 * 1024;
 
 type SupabaseAdminClient = ReturnType<
   typeof import("@/lib/supabase/admin").createAdminClient
@@ -176,6 +180,20 @@ export class XeroAccountingAdapter implements AccountingProvider {
     fileName: string
   ): Promise<AttachmentResult> {
     try {
+      if (fileBuffer.byteLength > XERO_ATTACHMENT_MAX_BYTES) {
+        const sizeMb = (fileBuffer.byteLength / (1024 * 1024)).toFixed(1);
+        logger.warn("xero.attachment_too_large", {
+          orgId,
+          entityId,
+          fileName,
+          fileSizeBytes: fileBuffer.byteLength,
+          limitBytes: XERO_ATTACHMENT_MAX_BYTES,
+        });
+        throw new Error(
+          `File is ${sizeMb} MB — exceeds Xero's 4 MB attachment limit. You can attach it manually in Xero.`
+        );
+      }
+
       const response = await attachDocumentToInvoice(
         supabase,
         orgId,
