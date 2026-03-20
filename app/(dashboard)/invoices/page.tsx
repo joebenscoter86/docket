@@ -1,7 +1,9 @@
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { validateListParams, fetchInvoiceList, fetchInvoiceCounts } from "@/lib/invoices/queries";
+import { isConnected } from "@/lib/quickbooks/auth";
 import InvoiceList from "@/components/invoices/InvoiceList";
 import Button from "@/components/ui/Button";
 
@@ -29,6 +31,19 @@ export default async function InvoicesPage({ searchParams }: InvoicesPageProps) 
   const resolvedParams = await searchParams;
   const toastMessage =
     resolvedParams.toast === "all-reviewed" ? "All invoices reviewed!" : null;
+
+  // Fetch org membership for QBO connection check
+  const { data: membership } = await supabase
+    .from("org_memberships")
+    .select("org_id")
+    .eq("user_id", user.id)
+    .limit(1)
+    .single();
+
+  const isQboConnected = membership
+    ? await isConnected(createAdminClient(), membership.org_id)
+    : false;
+
   const params = validateListParams({
     status: resolvedParams.status,
     sort: resolvedParams.sort,
@@ -85,6 +100,7 @@ export default async function InvoicesPage({ searchParams }: InvoicesPageProps) 
         currentOutputType={params.output_type}
         currentBatchId={resolvedParams.batch_id}
         toastMessage={toastMessage}
+        isQboConnected={isQboConnected}
       />
     </div>
   );
