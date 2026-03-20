@@ -1,6 +1,7 @@
 import type { AccountingProvider } from "./provider";
 import type { AccountingProviderType } from "./types";
 import { QuickBooksAccountingAdapter } from "./quickbooks/adapter";
+import { XeroAccountingAdapter } from "./xero/adapter";
 
 // ─── Factory ───
 
@@ -19,11 +20,7 @@ export function getAccountingProvider(
     case "quickbooks":
       return new QuickBooksAccountingAdapter();
     case "xero":
-      // Xero adapter deferred to Phase 2 — kept here so the switch is exhaustive
-      // and TypeScript enforces it as a compile-time error when the adapter is added.
-      throw new Error(
-        "Xero accounting adapter is not yet implemented. Phase 2 feature."
-      );
+      return new XeroAccountingAdapter();
     default: {
       // Exhaustive check — this line is unreachable at runtime if all cases are handled
       const _unreachable: never = provider;

@@ -39,7 +39,7 @@ export function useQboOptions(): QboOptionsState & { addVendor: (vendor: VendorO
             accounts: [],
             loading: false,
             connected: false,
-            error: "QuickBooks connection expired. Reconnect in Settings.",
+            error: "Accounting connection expired. Reconnect in Settings.",
           });
           return;
         }
@@ -68,7 +68,7 @@ export function useQboOptions(): QboOptionsState & { addVendor: (vendor: VendorO
           accounts: [],
           loading: false,
           connected: false,
-          error: "Failed to load QuickBooks data.",
+          error: "Failed to load accounting data.",
         });
       }
     }
