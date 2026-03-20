@@ -13,8 +13,11 @@ import {
   usageLimitError,
 } from "@/lib/utils/errors";
 import { logger } from "@/lib/utils/logger";
-import { runExtraction } from "@/lib/extraction/run";
+import { enqueueExtraction } from "@/lib/extraction/queue";
 import { waitUntil } from "@vercel/functions";
+
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const BATCH_SIZE_CAP = 25;
 
 export async function POST(request: Request) {
   const startTime = Date.now();
@@ -89,6 +92,17 @@ export async function POST(request: Request) {
       return validationError("No file provided.");
     }
 
+    // 3b. Parse optional batch_id
+    const rawBatchId = formData.get("batch_id");
+    let batchId: string | null = null;
+    if (rawBatchId) {
+      const batchIdStr = String(rawBatchId);
+      if (!UUID_REGEX.test(batchIdStr)) {
+        return validationError("batch_id must be a valid UUID.");
+      }
+      batchId = batchIdStr;
+    }
+
     // Extract file metadata — File extends Blob, but in some environments
     // FormData may return a Blob with a name property instead of a File instance.
     const fileName = file instanceof File ? file.name : (file as Blob & { name?: string }).name || "upload";
@@ -116,8 +130,39 @@ export async function POST(request: Request) {
       );
     }
 
-    // 5. Upload to Supabase Storage
+    // 4b. Batch size cap enforcement
     const admin = createAdminClient();
+    if (batchId) {
+      const { count, error: countError } = await admin
+        .from("invoices")
+        .select("id", { count: "exact", head: true })
+        .eq("batch_id", batchId);
+
+      if (countError) {
+        logger.error("invoice_upload_batch_count_failed", {
+          userId,
+          orgId,
+          batchId,
+          error: countError.message,
+        });
+        return internalError("Upload failed. Please try again.");
+      }
+
+      if ((count ?? 0) >= BATCH_SIZE_CAP) {
+        logger.warn("invoice_upload_batch_size_exceeded", {
+          userId,
+          orgId,
+          batchId,
+          count,
+          cap: BATCH_SIZE_CAP,
+        });
+        return validationError(
+          `Batch limit reached. Maximum ${BATCH_SIZE_CAP} invoices per batch.`
+        );
+      }
+    }
+
+    // 5. Upload to Supabase Storage
     const invoiceId = crypto.randomUUID();
     const storagePath = `${orgId}/${invoiceId}/${fileName}`;
 
@@ -139,17 +184,22 @@ export async function POST(request: Request) {
     }
 
     // 6. Create invoice row
+    const insertData: Record<string, unknown> = {
+      id: invoiceId,
+      org_id: orgId,
+      status: "uploaded",
+      file_path: storagePath,
+      file_name: fileName,
+      file_type: fileType,
+      file_size_bytes: fileSize,
+    };
+    if (batchId) {
+      insertData.batch_id = batchId;
+    }
+
     const { error: insertError } = await admin
       .from("invoices")
-      .insert({
-        id: invoiceId,
-        org_id: orgId,
-        status: "uploading",
-        file_path: storagePath,
-        file_name: fileName,
-        file_type: fileType,
-        file_size_bytes: fileSize,
-      })
+      .insert(insertData)
       .select("id")
       .single();
 
@@ -160,26 +210,34 @@ export async function POST(request: Request) {
         invoiceId,
         error: insertError.message,
       });
+
+      // Orphan cleanup: delete the uploaded file from storage since DB insert failed
+      await admin.storage
+        .from("invoices")
+        .remove([storagePath])
+        .then(({ error: removeError }) => {
+          if (removeError) {
+            logger.error("invoice_upload_orphan_cleanup_failed", {
+              userId,
+              orgId,
+              invoiceId,
+              storagePath,
+              error: removeError.message,
+            });
+          } else {
+            logger.info("invoice_upload_orphan_cleanup_success", {
+              userId,
+              orgId,
+              invoiceId,
+              storagePath,
+            });
+          }
+        });
+
       return internalError("Upload failed. Please try again.");
     }
 
-    // 7. Update status to extracting
-    const { error: updateError } = await admin
-      .from("invoices")
-      .update({ status: "extracting" })
-      .eq("id", invoiceId);
-
-    if (updateError) {
-      logger.error("invoice_upload_status_update_failed", {
-        userId,
-        orgId,
-        invoiceId,
-        error: updateError.message,
-      });
-      // Non-fatal: invoice exists, extraction can still proceed
-    }
-
-    // 8. Generate signed URL
+    // 7. Generate signed URL
     const { data: signedUrlData, error: signedUrlError } = await admin.storage
       .from("invoices")
       .createSignedUrl(storagePath, 3600); // 1 hour
@@ -202,16 +260,17 @@ export async function POST(request: Request) {
       fileName,
       fileType,
       fileSizeBytes: fileSize,
+      batchId,
       durationMs,
       status: "success",
     });
 
-    // 9. Auto-trigger extraction (fire-and-forget via waitUntil)
+    // 8. Auto-trigger extraction (fire-and-forget via waitUntil)
     // Extraction progress is tracked via realtime subscription on the client.
     // waitUntil keeps the serverless function alive after the response is sent,
     // so the extraction promise completes instead of being killed by Vercel.
     waitUntil(
-      runExtraction({
+      enqueueExtraction({
         invoiceId,
         orgId: orgId!,
         userId: userId!,
