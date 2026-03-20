@@ -1,6 +1,7 @@
 import {
   getContactOptions,
   createContact,
+  fetchAccounts as xeroFetchAccounts,
   XeroApiError,
 } from "@/lib/xero/api";
 import type { AccountingProvider } from "../provider";
@@ -28,6 +29,7 @@ function wrapXeroError(err: unknown): never {
       statusCode: err.statusCode,
       errorCode: err.errorCode,
       detail: err.detail,
+      element: err.element,
     });
   }
   throw err;
@@ -65,12 +67,14 @@ export class XeroAccountingAdapter implements AccountingProvider {
   /* eslint-disable @typescript-eslint/no-unused-vars */
 
   async fetchAccounts(
-    _supabase: SupabaseAdminClient,
-    _orgId: string
+    supabase: SupabaseAdminClient,
+    orgId: string
   ): Promise<AccountOption[]> {
-    throw new Error(
-      "Xero fetchAccounts not yet implemented. See DOC-57."
-    );
+    try {
+      return await xeroFetchAccounts(supabase, orgId);
+    } catch (err) {
+      wrapXeroError(err);
+    }
   }
 
   async fetchPaymentAccounts(
