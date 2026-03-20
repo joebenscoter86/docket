@@ -4,10 +4,17 @@ import {
   fetchAccounts as xeroFetchAccounts,
   fetchPaymentAccounts as xeroFetchPaymentAccounts,
   createInvoice,
+  createBankTransaction,
   attachDocumentToInvoice,
+  attachDocumentToBankTransaction,
   XeroApiError,
 } from "@/lib/xero/api";
-import type { XeroInvoicePayload, XeroLineItem } from "@/lib/xero/types";
+import type {
+  XeroInvoicePayload,
+  XeroLineItem,
+  XeroBankTransactionPayload,
+  XeroBankTransactionLineItem,
+} from "@/lib/xero/types";
 import type { AccountingProvider } from "../provider";
 import {
   AccountingApiError,
@@ -137,33 +144,31 @@ export class XeroAccountingAdapter implements AccountingProvider {
     orgId: string,
     input: CreatePurchaseInput
   ): Promise<TransactionResult> {
-    // Xero doesn't have a direct "Purchase" entity like QBO.
-    // Non-bill transactions (Check/Cash/CreditCard) map to Bank Transactions in Xero.
-    // For now, create as ACCPAY invoice (bill) since Xero handles payments differently.
-    // TODO: Implement Xero Bank Transactions for non-bill output types when DOC-57 lands.
-    const lineItems: XeroLineItem[] = input.lineItems.map((item) => ({
+    // Xero Bank Transactions (Type: "SPEND") are the equivalent of QBO's Purchase entity.
+    // Used for Check, Cash, and Credit Card expense types.
+    const lineItems: XeroBankTransactionLineItem[] = input.lineItems.map((item) => ({
       Description: item.description ?? "",
       Quantity: 1,
       UnitAmount: item.amount,
       AccountCode: item.glAccountId,
     }));
 
-    const payload: XeroInvoicePayload = {
-      Type: "ACCPAY",
+    const payload: XeroBankTransactionPayload = {
+      Type: "SPEND",
+      Status: "AUTHORISED",
       Contact: { ContactID: input.vendorRef },
+      BankAccount: { AccountID: input.paymentAccountRef },
       LineItems: lineItems,
-      ...(input.invoiceDate ? { DateString: input.invoiceDate } : {}),
-      ...(input.invoiceNumber
-        ? { InvoiceNumber: input.invoiceNumber, Reference: input.invoiceNumber }
-        : {}),
+      ...(input.invoiceDate ? { Date: input.invoiceDate } : {}),
+      ...(input.invoiceNumber ? { Reference: input.invoiceNumber } : {}),
     };
 
     try {
-      const response = await createInvoice(supabase, orgId, payload);
-      const invoice = response.Invoices[0];
+      const response = await createBankTransaction(supabase, orgId, payload);
+      const txn = response.BankTransactions[0];
       return {
-        entityId: invoice.InvoiceID,
-        entityType: "Bill",
+        entityId: txn.BankTransactionID,
+        entityType: "Purchase",
         providerResponse: response as unknown as Record<string, unknown>,
       };
     } catch (err) {
@@ -175,7 +180,7 @@ export class XeroAccountingAdapter implements AccountingProvider {
     supabase: SupabaseAdminClient,
     orgId: string,
     entityId: string,
-    _entityType: "Bill" | "Purchase",
+    entityType: "Bill" | "Purchase",
     fileBuffer: Buffer,
     fileName: string
   ): Promise<AttachmentResult> {
@@ -194,13 +199,10 @@ export class XeroAccountingAdapter implements AccountingProvider {
         );
       }
 
-      const response = await attachDocumentToInvoice(
-        supabase,
-        orgId,
-        entityId,
-        fileBuffer,
-        fileName
-      );
+      // Route to correct Xero endpoint based on entity type
+      const response = entityType === "Purchase"
+        ? await attachDocumentToBankTransaction(supabase, orgId, entityId, fileBuffer, fileName)
+        : await attachDocumentToInvoice(supabase, orgId, entityId, fileBuffer, fileName);
       const attachmentId = response.Attachments?.[0]?.AttachmentID ?? null;
       return { attachmentId, success: true };
     } catch {

@@ -178,6 +178,50 @@ export interface XeroInvoiceResponse {
   Invoices: XeroInvoice[];
 }
 
+// ─── Xero Bank Transaction Types ───
+
+/** A single line item in a Xero Bank Transaction payload. Same shape as invoice line items. */
+export interface XeroBankTransactionLineItem {
+  Description: string;
+  Quantity: number;
+  UnitAmount: number;
+  AccountCode: string;
+}
+
+/**
+ * Payload for creating a SPEND bank transaction via PUT /api.xro/2.0/BankTransactions.
+ * Used for Check, Cash, and Credit Card expense types.
+ * Xero uses PUT for creation (same as invoices).
+ */
+export interface XeroBankTransactionPayload {
+  Type: "SPEND";
+  Contact: { ContactID: string };
+  BankAccount: { AccountID: string };
+  LineItems: XeroBankTransactionLineItem[];
+  Date?: string;        // YYYY-MM-DD
+  Reference?: string;
+  Status?: "AUTHORISED" | "DRAFT";
+}
+
+/** A Xero Bank Transaction as returned by the API. */
+export interface XeroBankTransaction {
+  BankTransactionID: string;   // UUID
+  Type: "SPEND" | "RECEIVE";
+  Contact: { ContactID: string; Name: string };
+  BankAccount: { AccountID: string; Name: string; Code: string };
+  DateString: string;
+  Reference?: string;
+  Total: number;
+  Status: string;
+  LineItems: XeroBankTransactionLineItem[];
+  Warnings?: Array<{ Message: string }>;
+}
+
+/** Response shape from PUT /api.xro/2.0/BankTransactions. */
+export interface XeroBankTransactionResponse {
+  BankTransactions: XeroBankTransaction[];
+}
+
 // ─── Xero Attachment Types ───
 
 /** Response shape from POST /api.xro/2.0/Invoices/{id}/Attachments/{filename}. */

@@ -12,6 +12,8 @@ import type {
   XeroAccountsResponse,
   XeroInvoicePayload,
   XeroInvoiceResponse,
+  XeroBankTransactionPayload,
+  XeroBankTransactionResponse,
   XeroAttachmentResponse,
 } from "./types";
 import type { VendorOption, AccountOption, PaymentAccount } from "@/lib/accounting/types";
@@ -432,6 +434,53 @@ export async function createInvoice(
   return response;
 }
 
+// ─── Bank Transaction (Purchase) Creation ───
+
+/**
+ * Create a SPEND bank transaction in Xero.
+ * Used for Check, Cash, and Credit Card expense types.
+ * Xero uses PUT (not POST) for creation — same as invoices.
+ *
+ * Requires `accounting.banktransactions` scope.
+ */
+export async function createBankTransaction(
+  supabase: SupabaseAdminClient,
+  orgId: string,
+  payload: XeroBankTransactionPayload
+): Promise<XeroBankTransactionResponse> {
+  const startTime = Date.now();
+
+  const response = await xeroFetch<XeroBankTransactionResponse>(
+    supabase,
+    orgId,
+    "/BankTransactions",
+    { method: "PUT", body: payload }
+  );
+
+  const txn = response.BankTransactions?.[0];
+
+  // Check for warnings (same pattern as invoice creation)
+  if (txn?.Warnings && txn.Warnings.length > 0) {
+    const warningMessages = txn.Warnings.map((w) => w.Message).join("; ");
+    logger.warn("xero.bank_transaction_created_with_warnings", {
+      orgId,
+      bankTransactionId: txn.BankTransactionID,
+      warnings: warningMessages,
+      durationMs: Date.now() - startTime,
+    });
+  }
+
+  logger.info("xero.bank_transaction_created", {
+    orgId,
+    bankTransactionId: txn?.BankTransactionID ?? "unknown",
+    type: txn?.Type ?? "unknown",
+    status: txn?.Status ?? "unknown",
+    durationMs: Date.now() - startTime,
+  });
+
+  return response;
+}
+
 // ─── Document Attachment ───
 
 /**
@@ -491,6 +540,69 @@ export async function attachDocumentToInvoice(
   logger.info("xero.attachment_uploaded", {
     orgId,
     invoiceId,
+    fileName,
+    attachmentId: result.Attachments?.[0]?.AttachmentID ?? "unknown",
+    durationMs: Date.now() - startTime,
+  });
+
+  return result;
+}
+
+/**
+ * Attach a file (PDF/image) to an existing Xero bank transaction.
+ * Same binary upload pattern as invoice attachments, different endpoint path.
+ */
+export async function attachDocumentToBankTransaction(
+  supabase: SupabaseAdminClient,
+  orgId: string,
+  bankTransactionId: string,
+  fileBuffer: Buffer,
+  fileName: string
+): Promise<XeroAttachmentResponse> {
+  const startTime = Date.now();
+
+  const { accessToken, tenantId } = await getValidAccessToken(supabase, orgId);
+  const url = `${XERO_API_BASE}/BankTransactions/${bankTransactionId}/Attachments/${encodeURIComponent(fileName)}?IncludeOnline=true`;
+
+  const mimeType = fileName.endsWith(".pdf")
+    ? "application/pdf"
+    : fileName.endsWith(".png")
+      ? "image/png"
+      : fileName.endsWith(".jpg") || fileName.endsWith(".jpeg")
+        ? "image/jpeg"
+        : "application/octet-stream";
+
+  const response = await fetch(url, {
+    method: "PUT",
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      "xero-tenant-id": tenantId,
+      "Content-Type": mimeType,
+      Accept: "application/json",
+    },
+    body: new Uint8Array(fileBuffer),
+  });
+
+  if (!response.ok) {
+    let errorBody: unknown;
+    try {
+      errorBody = await response.json();
+    } catch {
+      throw new XeroApiError({
+        message: `Attachment upload failed: ${response.status}`,
+        statusCode: response.status,
+        errorCode: String(response.status),
+        detail: await response.text().catch(() => "(unreadable)"),
+      });
+    }
+    throw parseXeroError(response.status, errorBody);
+  }
+
+  const result = (await response.json()) as XeroAttachmentResponse;
+
+  logger.info("xero.bank_transaction_attachment_uploaded", {
+    orgId,
+    bankTransactionId,
     fileName,
     attachmentId: result.Attachments?.[0]?.AttachmentID ?? "unknown",
     durationMs: Date.now() - startTime,
