@@ -373,6 +373,54 @@ describe("XeroAccountingAdapter", () => {
   });
 
   describe("attachDocument", () => {
+    it("returns failure without calling API when file exceeds 4MB", async () => {
+      const largeBuffer = Buffer.alloc(4 * 1024 * 1024 + 1); // 4MB + 1 byte
+
+      const adapter = await getAdapter();
+      const result = await adapter.attachDocument(
+        mockSupabase,
+        "org-1",
+        "inv-uuid",
+        "Bill",
+        largeBuffer,
+        "large-invoice.pdf"
+      );
+
+      expect(result.success).toBe(false);
+      expect(result.attachmentId).toBeNull();
+      expect(mockAttachDocument).not.toHaveBeenCalled();
+    });
+
+    it("proceeds with upload when file is exactly 4MB", async () => {
+      mockAttachDocument.mockResolvedValue({
+        Attachments: [
+          {
+            AttachmentID: "att-uuid-exact",
+            FileName: "invoice.pdf",
+            Url: "https://api.xero.com/...",
+            MimeType: "application/pdf",
+            ContentLength: 4 * 1024 * 1024,
+          },
+        ],
+      });
+
+      const exactBuffer = Buffer.alloc(4 * 1024 * 1024); // exactly 4MB
+
+      const adapter = await getAdapter();
+      const result = await adapter.attachDocument(
+        mockSupabase,
+        "org-1",
+        "inv-uuid",
+        "Bill",
+        exactBuffer,
+        "invoice.pdf"
+      );
+
+      expect(result.success).toBe(true);
+      expect(result.attachmentId).toBe("att-uuid-exact");
+      expect(mockAttachDocument).toHaveBeenCalled();
+    });
+
     it("delegates to attachDocumentToInvoice and returns success", async () => {
       mockAttachDocument.mockResolvedValue({
         Attachments: [

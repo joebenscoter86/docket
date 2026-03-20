@@ -537,13 +537,15 @@ describe("createInvoice", () => {
 // ─── attachDocumentToInvoice ───
 
 describe("attachDocumentToInvoice", () => {
-  it("uploads a PDF attachment via PUT", async () => {
+  it("uploads a PDF attachment via PUT with IncludeOnline=true", async () => {
     let capturedContentType = "";
+    let capturedUrl = "";
     server.use(
       http.put(
         `${XERO_BASE}/Invoices/inv-uuid-123/Attachments/invoice.pdf`,
         ({ request }) => {
           capturedContentType = request.headers.get("content-type") ?? "";
+          capturedUrl = request.url;
           return HttpResponse.json({
             Attachments: [
               {
@@ -571,6 +573,7 @@ describe("attachDocumentToInvoice", () => {
 
     expect(capturedContentType).toBe("application/pdf");
     expect(result.Attachments[0].AttachmentID).toBe("att-uuid-1");
+    expect(capturedUrl).toContain("IncludeOnline=true");
   });
 
   it("sets correct MIME type for PNG files", async () => {

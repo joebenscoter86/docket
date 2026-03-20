@@ -401,7 +401,7 @@ export async function attachDocumentToInvoice(
   const startTime = Date.now();
 
   const { accessToken, tenantId } = await getValidAccessToken(supabase, orgId);
-  const url = `${XERO_API_BASE}/Invoices/${invoiceId}/Attachments/${encodeURIComponent(fileName)}`;
+  const url = `${XERO_API_BASE}/Invoices/${invoiceId}/Attachments/${encodeURIComponent(fileName)}?IncludeOnline=true`;
 
   // Determine MIME type from file extension
   const mimeType = fileName.endsWith(".pdf")
