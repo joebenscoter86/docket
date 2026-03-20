@@ -1,5 +1,6 @@
 export type InvoiceStatus =
   | "uploading"
+  | "uploaded"
   | "extracting"
   | "pending_review"
   | "approved"
