@@ -434,7 +434,7 @@ export default function ExtractionForm({
         }}
       />
 
-      {/* QBO disconnection warning */}
+      {/* Accounting disconnection warning */}
       {!qboOptions.loading && !qboOptions.connected && (
         <div className="flex items-start gap-2 bg-error/5 border border-error/20 rounded-md p-3">
           <svg
@@ -450,7 +450,11 @@ export default function ExtractionForm({
             />
           </svg>
           <div className="text-sm">
-            <p className="text-error font-medium">QuickBooks disconnected</p>
+            <p className="text-error font-medium">
+              {accountingProvider
+                ? `${getProviderLabel(accountingProvider)} disconnected`
+                : "No accounting provider connected"}
+            </p>
             <p className="text-muted mt-0.5">
               {qboOptions.error ?? "Reconnect in Settings to sync invoices."}
               {" "}

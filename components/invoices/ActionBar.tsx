@@ -2,7 +2,8 @@
 
 import { useState, useRef, useCallback, useEffect } from "react";
 import type { InvoiceStatus, OutputType } from "@/lib/types/invoice";
-import { getQuickBooksTransactionUrl } from "@/lib/quickbooks/links";
+import { getTransactionUrl, getProviderLabel } from "@/lib/accounting/links";
+import type { AccountingProviderType } from "@/lib/accounting/types";
 
 type ActionBarState =
   | "idle"
@@ -21,6 +22,7 @@ interface ActionBarProps {
   syncBlockers: string[];
   isRetry?: boolean;
   outputType: OutputType;
+  provider: AccountingProviderType | null;
   onStatusChange: (newStatus: InvoiceStatus) => void;
 }
 
@@ -32,6 +34,7 @@ export default function ActionBar({
   syncBlockers,
   isRetry = false,
   outputType,
+  provider,
   onStatusChange,
 }: ActionBarProps) {
   const [barState, setBarState] = useState<ActionBarState>("idle");
@@ -233,7 +236,9 @@ export default function ActionBar({
           <svg className="h-5 w-5 text-accent shrink-0" viewBox="0 0 20 20" fill="currentColor">
             <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
           </svg>
-          <span className="text-sm text-accent">This invoice has been synced to QuickBooks.</span>
+          <span className="text-sm text-accent">
+            This invoice has been synced to {provider ? getProviderLabel(provider) : "your accounting software"}.
+          </span>
         </div>
         {warning && <WarningBanner message={warning} />}
       </div>
@@ -248,7 +253,9 @@ export default function ActionBar({
     { label: string; className: string; disabled: boolean }
   > = {
     idle: {
-      label: isRetry ? "Retry Sync to QuickBooks" : "Sync to QuickBooks",
+      label: isRetry
+        ? `Retry Sync to ${provider ? getProviderLabel(provider) : "Accounting"}`
+        : `Sync to ${provider ? getProviderLabel(provider) : "Accounting"}`,
       className: syncBlockers.length > 0
         ? "bg-border text-muted cursor-not-allowed"
         : "bg-primary text-white hover:bg-primary-hover",
@@ -301,15 +308,17 @@ export default function ActionBar({
           {barState === "synced" ? (
             <>
               <span className="h-2 w-2 rounded-full bg-accent shrink-0" />
-              <span className="text-accent">Invoice synced to QuickBooks.</span>
+              <span className="text-accent">
+                Invoice synced to {provider ? getProviderLabel(provider) : "accounting"}.
+              </span>
               {syncedEntityId && (
                 <a
-                  href={getQuickBooksTransactionUrl(outputType, syncedEntityId)}
+                  href={provider ? getTransactionUrl(provider, outputType, syncedEntityId) : "#"}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="text-accent hover:text-green-700 font-medium flex items-center gap-1 ml-1"
                 >
-                  View in QuickBooks
+                  View in {provider ? getProviderLabel(provider) : "accounting"}
                   <ExternalLinkIcon />
                 </a>
               )}
@@ -330,7 +339,7 @@ export default function ActionBar({
               <span className="text-muted">
                 {barState === "failed" || isRetry
                   ? "Previous sync failed. Ready to retry."
-                  : "Ready to sync to QuickBooks."}
+                  : `Ready to sync to ${provider ? getProviderLabel(provider) : "accounting"}.`}
               </span>
             </>
           )}
