@@ -6,13 +6,6 @@ import { createClient } from "@/lib/supabase/client";
 import { BatchManifestItem } from "@/lib/invoices/queries";
 import { InvoiceStatus } from "@/lib/types/invoice";
 
-const NAVIGABLE_STATUSES: InvoiceStatus[] = [
-  "pending_review",
-  "uploaded",
-  "extracting",
-  "error",
-];
-
 interface BatchNavigationProps {
   currentInvoiceId: string;
   batchId: string;
@@ -62,9 +55,8 @@ export function BatchNavigation({
   const previousInvoice =
     currentIndex > 0 ? manifest[currentIndex - 1] : null;
 
-  const nextInvoice = manifest
-    .slice(currentIndex + 1)
-    .find((m) => NAVIGABLE_STATUSES.includes(m.status)) ?? null;
+  const nextInvoice =
+    currentIndex < manifest.length - 1 ? manifest[currentIndex + 1] : null;
 
   const handleBack = () => {
     router.push(`/invoices?batch_id=${batchId}`);
