@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useMemo, useRef, useEffect, useCallback } from "react";
-import type { VendorOption } from "@/lib/types/qbo";
+import type { VendorOption } from "@/lib/accounting";
 
 interface VendorSelectProps {
   vendors: VendorOption[];
@@ -127,7 +127,7 @@ export default function VendorSelect({
     setCreateError(null);
 
     try {
-      const res = await fetch("/api/quickbooks/vendors", {
+      const res = await fetch("/api/accounting/vendors", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
