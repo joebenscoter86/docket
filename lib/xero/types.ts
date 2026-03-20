@@ -118,10 +118,12 @@ export interface XeroAccount {
   Code: string;          // e.g., "500" — line items reference this
   Name: string;          // display name
   Status: "ACTIVE" | "ARCHIVED";
-  Type: string;          // "EXPENSE" | "DIRECTCOSTS" | "OVERHEADS" | etc.
+  Type: string;          // "EXPENSE" | "DIRECTCOSTS" | "OVERHEADS" | "BANK" | etc.
   Class: string;         // "EXPENSE" | "REVENUE" | "ASSET" | etc.
+  BankAccountType?: "BANK" | "CREDITCARD" | "";  // Only set on Type="BANK" accounts
   Description?: string;
   TaxType?: string;
+  CurrencyCode?: string;
 }
 
 /** Wrapper for Xero Accounts API list response. */

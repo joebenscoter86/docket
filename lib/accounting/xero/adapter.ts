@@ -2,6 +2,7 @@ import {
   getContactOptions,
   createContact,
   fetchAccounts as xeroFetchAccounts,
+  fetchPaymentAccounts as xeroFetchPaymentAccounts,
   createInvoice,
   attachDocumentToInvoice,
   XeroApiError,
@@ -82,19 +83,17 @@ export class XeroAccountingAdapter implements AccountingProvider {
     }
   }
 
-  /* eslint-disable @typescript-eslint/no-unused-vars */
-
   async fetchPaymentAccounts(
-    _supabase: SupabaseAdminClient,
-    _orgId: string,
-    _accountType: "Bank" | "CreditCard"
+    supabase: SupabaseAdminClient,
+    orgId: string,
+    accountType: "Bank" | "CreditCard"
   ): Promise<PaymentAccount[]> {
-    throw new Error(
-      "Xero fetchPaymentAccounts not yet implemented. See DOC-57."
-    );
+    try {
+      return await xeroFetchPaymentAccounts(supabase, orgId, accountType);
+    } catch (err) {
+      wrapXeroError(err);
+    }
   }
-
-  /* eslint-enable @typescript-eslint/no-unused-vars */
 
   async createBill(
     supabase: SupabaseAdminClient,

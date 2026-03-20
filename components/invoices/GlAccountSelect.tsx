@@ -53,7 +53,7 @@ export default function GlAccountSelect({
 
   if (!connected && !loading) {
     return (
-      <span className="text-xs text-muted" title="Connect QuickBooks to map accounts">
+      <span className="text-xs text-muted" title="Connect an accounting provider to map accounts">
         —
       </span>
     );
@@ -96,7 +96,7 @@ export default function GlAccountSelect({
           value={currentAccountId ?? ""}
           onChange={handleChange}
           disabled={disabled || accounts.length === 0}
-          title={accounts.length === 0 ? "No expense accounts found in QuickBooks" : undefined}
+          title={accounts.length === 0 ? "No expense accounts found" : undefined}
         >
           <option value="">Select account...</option>
           {orderedAccounts.map((a) => (
