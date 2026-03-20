@@ -90,14 +90,6 @@ export async function GET() {
       durationMs: Date.now() - startTime,
     });
 
-    // Legacy: existing QBO helpers throw this message — return empty array
-    if (
-      error instanceof Error &&
-      error.message.includes("No QuickBooks connection")
-    ) {
-      return apiSuccess([]);
-    }
-
     return internalError("Failed to fetch vendors.");
   }
 }
@@ -181,6 +173,7 @@ export async function POST(request: Request) {
         durationMs: Date.now() - startTime,
       });
 
+      // QBO-specific: error 6240 = duplicate vendor name. Xero allows duplicates.
       if (error.errorCode === "6240") {
         return conflict(
           "A vendor with this name already exists. Try refreshing."

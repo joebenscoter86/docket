@@ -62,6 +62,8 @@ export class XeroAccountingAdapter implements AccountingProvider {
     }
   }
 
+  /* eslint-disable @typescript-eslint/no-unused-vars */
+
   async fetchAccounts(
     _supabase: SupabaseAdminClient,
     _orgId: string
@@ -113,4 +115,6 @@ export class XeroAccountingAdapter implements AccountingProvider {
       "Xero attachDocument not yet implemented. See DOC-58."
     );
   }
+
+  /* eslint-enable @typescript-eslint/no-unused-vars */
 }
