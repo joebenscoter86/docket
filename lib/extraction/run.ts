@@ -18,6 +18,51 @@ export async function runExtraction(params: {
   const admin = createAdminClient();
 
   try {
+    // 0. Double-extraction guard: skip if already extracting, otherwise set status
+    const { data: currentInvoice, error: statusQueryError } = await admin
+      .from("invoices")
+      .select("status")
+      .eq("id", invoiceId)
+      .single();
+
+    if (statusQueryError || !currentInvoice) {
+      throw new Error("Failed to query invoice status");
+    }
+
+    if (currentInvoice.status === "extracting") {
+      logger.warn("extraction_already_in_progress", {
+        action: "run_extraction",
+        invoiceId,
+        orgId,
+        userId,
+      });
+      return {
+        data: {
+          vendorName: null,
+          vendorAddress: null,
+          invoiceNumber: null,
+          invoiceDate: null,
+          dueDate: null,
+          subtotal: null,
+          taxAmount: null,
+          totalAmount: null,
+          currency: "USD",
+          paymentTerms: null,
+          confidenceScore: "low",
+          lineItems: [],
+        },
+        rawResponse: {},
+        modelVersion: "skipped",
+        durationMs: 0,
+      };
+    }
+
+    // Set status to extracting
+    await admin
+      .from("invoices")
+      .update({ status: "extracting", error_message: null })
+      .eq("id", invoiceId);
+
     // 1. Generate fresh signed URL
     const { data: signedUrlData, error: signedUrlError } = await admin.storage
       .from("invoices")

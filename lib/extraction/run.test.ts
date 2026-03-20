@@ -48,6 +48,9 @@ const mockInvoicesSelect = vi.fn();
 const mockExtractedDataDelete = vi.fn();
 const mockLineItemsDelete = vi.fn();
 
+// Configurable invoice status for the base mock (tests can override)
+let currentInvoiceStatus = "uploading";
+
 // Storage mock
 const mockCreateSignedUrl = vi.fn();
 
@@ -117,7 +120,7 @@ vi.mock("@/lib/supabase/admin", () => ({
             mockInvoicesSelect(cols);
             return {
               eq: () => ({
-                single: () => Promise.resolve({ data: { retry_count: 0 }, error: null }),
+                single: () => Promise.resolve({ data: { status: currentInvoiceStatus, retry_count: 0 }, error: null }),
               }),
             };
           },
@@ -209,6 +212,7 @@ function setupHappyPath() {
 describe("runExtraction", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    currentInvoiceStatus = "uploading";
   });
 
   it("runs the full pipeline successfully", async () => {
@@ -309,6 +313,46 @@ describe("runExtraction", () => {
     expect(mockInvoicesUpdate).toHaveBeenCalledWith(
       expect.objectContaining({
         status: "pending_review",
+        error_message: null,
+      })
+    );
+  });
+
+  it("skips extraction when invoice is already in extracting status", async () => {
+    setupHappyPath();
+    currentInvoiceStatus = "extracting";
+
+    const { runExtraction } = await import("./run");
+    const { logger: loggerMock } = await import("@/lib/utils/logger");
+
+    const result = await runExtraction(BASE_PARAMS);
+
+    // Should return a minimal result without calling the provider
+    expect(mockExtractInvoiceData).not.toHaveBeenCalled();
+    expect(result.modelVersion).toBe("skipped");
+    expect(result.durationMs).toBe(0);
+    expect(result.data.lineItems).toEqual([]);
+
+    // Should log a warning
+    expect(loggerMock.warn).toHaveBeenCalledWith(
+      "extraction_already_in_progress",
+      expect.objectContaining({
+        action: "run_extraction",
+        invoiceId: BASE_PARAMS.invoiceId,
+      })
+    );
+  });
+
+  it("sets invoice status to extracting before proceeding", async () => {
+    setupHappyPath();
+    const { runExtraction } = await import("./run");
+
+    await runExtraction(BASE_PARAMS);
+
+    // First update call should set status to "extracting"
+    expect(mockInvoicesUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        status: "extracting",
         error_message: null,
       })
     );
@@ -435,7 +479,7 @@ describe("runExtraction", () => {
               select: () => ({
                 eq: () => ({
                   single: () =>
-                    Promise.resolve({ data: { retry_count: 2 }, error: null }),
+                    Promise.resolve({ data: { status: "uploading", retry_count: 2 }, error: null }),
                 }),
               }),
             };
@@ -529,7 +573,7 @@ describe("runExtraction", () => {
                   mockInvoicesSelect(cols);
                   return {
                     eq: () => ({
-                      single: () => Promise.resolve({ data: { retry_count: 0 }, error: null }),
+                      single: () => Promise.resolve({ data: { status: "uploading", retry_count: 0 }, error: null }),
                     }),
                   };
                 },
@@ -802,7 +846,7 @@ describe("runExtraction", () => {
               },
               select: () => ({
                 eq: () => ({
-                  single: () => Promise.resolve({ data: { retry_count: 0 }, error: null }),
+                  single: () => Promise.resolve({ data: { status: "uploading", retry_count: 0 }, error: null }),
                 }),
               }),
             };
