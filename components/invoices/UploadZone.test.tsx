@@ -64,14 +64,15 @@ describe("UploadZone", () => {
   });
 
   describe("Validation", () => {
-    it("rejects files over 10MB", () => {
+    it("shows file with error for files over 10MB", () => {
       render(<UploadZone />);
       const bigFile = createFile("huge.pdf", 11 * 1024 * 1024, "application/pdf");
       selectFiles(getInput(), [bigFile]);
+      expect(screen.getByText("huge.pdf")).toBeInTheDocument();
       expect(screen.getByText("File exceeds 10MB limit.")).toBeInTheDocument();
     });
 
-    it("rejects unsupported file types", () => {
+    it("shows file with error for unsupported file types", () => {
       render(<UploadZone />);
       const docFile = createFile(
         "doc.docx",
@@ -79,6 +80,7 @@ describe("UploadZone", () => {
         "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
       );
       selectFiles(getInput(), [docFile]);
+      expect(screen.getByText("doc.docx")).toBeInTheDocument();
       expect(
         screen.getByText(
           "Unsupported file type. Please upload a PDF, JPG, or PNG."
@@ -86,40 +88,29 @@ describe("UploadZone", () => {
       ).toBeInTheDocument();
     });
 
-    it("accepts valid PDF and transitions to uploading state", () => {
+    it("accepts valid PDF and shows it in file list", () => {
       render(<UploadZone />);
       const pdfFile = createFile("invoice.pdf", 1024, "application/pdf");
       selectFiles(getInput(), [pdfFile]);
-      expect(screen.getByRole("progressbar")).toBeInTheDocument();
+      expect(screen.getByText("invoice.pdf")).toBeInTheDocument();
+      expect(screen.getByText("Upload 1 File")).toBeInTheDocument();
     });
 
-    it("accepts valid JPEG and transitions to uploading state", () => {
+    it("accepts valid JPEG and shows it in file list", () => {
       render(<UploadZone />);
       const jpegFile = createFile("photo.jpg", 1024, "image/jpeg");
       selectFiles(getInput(), [jpegFile]);
-      expect(screen.getByRole("progressbar")).toBeInTheDocument();
+      expect(screen.getByText("photo.jpg")).toBeInTheDocument();
     });
 
-    it("accepts valid PNG and transitions to uploading state", () => {
+    it("accepts valid PNG and shows it in file list", () => {
       render(<UploadZone />);
       const pngFile = createFile("scan.png", 1024, "image/png");
       selectFiles(getInput(), [pngFile]);
-      expect(screen.getByRole("progressbar")).toBeInTheDocument();
+      expect(screen.getByText("scan.png")).toBeInTheDocument();
     });
 
-    it("rejects multiple files", () => {
-      render(<UploadZone />);
-      const file1 = createFile("a.pdf", 1024, "application/pdf");
-      const file2 = createFile("b.pdf", 1024, "application/pdf");
-
-      fireEvent.drop(getZone(), createDropData([file1, file2]));
-
-      expect(
-        screen.getByText("Please upload one file at a time.")
-      ).toBeInTheDocument();
-    });
-
-    it("clears error when valid file is selected after invalid one", () => {
+    it("clears file list when valid file is selected after invalid one", () => {
       render(<UploadZone />);
       const input = getInput();
 
@@ -130,28 +121,22 @@ describe("UploadZone", () => {
         "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
       );
       selectFiles(input, [badFile]);
-      expect(
-        screen.getByText(
-          "Unsupported file type. Please upload a PDF, JPG, or PNG."
-        )
-      ).toBeInTheDocument();
+      expect(screen.getByText("doc.docx")).toBeInTheDocument();
 
-      // Second: valid file — error should clear
+      // Second: valid file — list should now contain the new file
       const goodFile = createFile("invoice.pdf", 1024, "application/pdf");
       selectFiles(input, [goodFile]);
-      expect(
-        screen.queryByText(
-          "Unsupported file type. Please upload a PDF, JPG, or PNG."
-        )
-      ).not.toBeInTheDocument();
+      expect(screen.getByText("invoice.pdf")).toBeInTheDocument();
     });
   });
 
-  describe("Upload lifecycle", () => {
-    it("shows progress bar and file name during upload", () => {
+  describe("Upload lifecycle (single file, no onUploadStart)", () => {
+    it("shows progress bar after clicking upload button", () => {
       render(<UploadZone />);
       const file = createFile("invoice.pdf", 1024, "application/pdf");
       selectFiles(getInput(), [file]);
+
+      fireEvent.click(screen.getByText("Upload 1 File"));
 
       expect(screen.getByRole("progressbar")).toBeInTheDocument();
       expect(screen.getByText("invoice.pdf")).toBeInTheDocument();
@@ -161,6 +146,8 @@ describe("UploadZone", () => {
       render(<UploadZone />);
       const file = createFile("invoice.pdf", 1024, "application/pdf");
       selectFiles(getInput(), [file]);
+
+      fireEvent.click(screen.getByText("Upload 1 File"));
 
       await waitFor(() => {
         expect(screen.getByText("Upload Another")).toBeInTheDocument();
@@ -173,6 +160,8 @@ describe("UploadZone", () => {
       render(<UploadZone onUploadComplete={onUploadComplete} />);
       const file = createFile("invoice.pdf", 1024, "application/pdf");
       selectFiles(getInput(), [file]);
+
+      fireEvent.click(screen.getByText("Upload 1 File"));
 
       await waitFor(() => {
         expect(onUploadComplete).toHaveBeenCalledWith("inv-1");
@@ -189,6 +178,8 @@ describe("UploadZone", () => {
       const file = createFile("invoice.pdf", 1024, "application/pdf");
       selectFiles(getInput(), [file]);
 
+      fireEvent.click(screen.getByText("Upload 1 File"));
+
       await waitFor(() => {
         expect(screen.getAllByText("Upload failed").length).toBeGreaterThan(0);
       });
@@ -200,6 +191,8 @@ describe("UploadZone", () => {
       const file = createFile("invoice.pdf", 1024, "application/pdf");
       selectFiles(getInput(), [file]);
 
+      fireEvent.click(screen.getByText("Upload 1 File"));
+
       await waitFor(() => {
         expect(screen.getByText("Upload Another")).toBeInTheDocument();
       });
@@ -209,6 +202,114 @@ describe("UploadZone", () => {
       expect(
         screen.getByText("Drag & drop invoices here")
       ).toBeInTheDocument();
+    });
+  });
+
+  describe("Multi-file selection", () => {
+    it("accepts multiple files via drop and shows file list", () => {
+      const onUploadStart = vi.fn();
+      render(<UploadZone onUploadStart={onUploadStart} />);
+      const file1 = createFile("a.pdf", 1024, "application/pdf");
+      const file2 = createFile("b.pdf", 2048, "application/pdf");
+
+      fireEvent.drop(getZone(), createDropData([file1, file2]));
+
+      expect(screen.getByText("a.pdf")).toBeInTheDocument();
+      expect(screen.getByText("b.pdf")).toBeInTheDocument();
+    });
+
+    it("accepts multiple files via file picker", () => {
+      render(<UploadZone />);
+      const input = getInput();
+      const file1 = createFile("a.pdf", 1024, "application/pdf");
+      const file2 = createFile("b.png", 2048, "image/png");
+      selectFiles(input, [file1, file2]);
+
+      expect(screen.getByText("a.pdf")).toBeInTheDocument();
+      expect(screen.getByText("b.png")).toBeInTheDocument();
+    });
+
+    it("enforces 25-file cap and shows warning", () => {
+      render(<UploadZone />);
+      const files = Array.from({ length: 30 }, (_, i) =>
+        createFile(`file-${i}.pdf`, 1024, "application/pdf")
+      );
+
+      fireEvent.drop(getZone(), createDropData(files));
+
+      // Should only have 25 files in the list
+      expect(screen.getByText("file-0.pdf")).toBeInTheDocument();
+      expect(screen.getByText("file-24.pdf")).toBeInTheDocument();
+      expect(screen.queryByText("file-25.pdf")).not.toBeInTheDocument();
+      expect(screen.getByText(/Maximum 25 files/)).toBeInTheDocument();
+    });
+
+    it("appends files on subsequent drops up to 25", () => {
+      render(<UploadZone />);
+      const file1 = createFile("a.pdf", 1024, "application/pdf");
+      fireEvent.drop(getZone(), createDropData([file1]));
+      expect(screen.getByText("a.pdf")).toBeInTheDocument();
+
+      const file2 = createFile("b.pdf", 1024, "application/pdf");
+      fireEvent.drop(getZone(), createDropData([file2]));
+      expect(screen.getByText("a.pdf")).toBeInTheDocument();
+      expect(screen.getByText("b.pdf")).toBeInTheDocument();
+    });
+
+    it("shows invalid files with error reason", () => {
+      render(<UploadZone />);
+      const valid = createFile("good.pdf", 1024, "application/pdf");
+      const invalid = createFile("bad.docx", 1024, "application/msword");
+
+      fireEvent.drop(getZone(), createDropData([valid, invalid]));
+
+      expect(screen.getByText("good.pdf")).toBeInTheDocument();
+      expect(screen.getByText("bad.docx")).toBeInTheDocument();
+      expect(screen.getByText(/Unsupported/)).toBeInTheDocument();
+    });
+
+    it("removes file from list when remove button is clicked", () => {
+      render(<UploadZone />);
+      const file1 = createFile("a.pdf", 1024, "application/pdf");
+      const file2 = createFile("b.pdf", 1024, "application/pdf");
+      fireEvent.drop(getZone(), createDropData([file1, file2]));
+
+      const removeButtons = screen.getAllByLabelText(/Remove/);
+      fireEvent.click(removeButtons[0]);
+
+      expect(screen.queryByText("a.pdf")).not.toBeInTheDocument();
+      expect(screen.getByText("b.pdf")).toBeInTheDocument();
+    });
+
+    it("shows 'Upload N Files' button counting only valid files", () => {
+      render(<UploadZone />);
+      const valid1 = createFile("a.pdf", 1024, "application/pdf");
+      const valid2 = createFile("b.pdf", 1024, "application/pdf");
+      const invalid = createFile("c.docx", 1024, "application/msword");
+      fireEvent.drop(getZone(), createDropData([valid1, valid2, invalid]));
+
+      expect(screen.getByText("Upload 2 Files")).toBeInTheDocument();
+    });
+
+    it("disables button when all files are invalid", () => {
+      render(<UploadZone />);
+      const invalid = createFile("c.docx", 1024, "application/msword");
+      fireEvent.drop(getZone(), createDropData([invalid]));
+
+      const button = screen.getByText("No valid files to upload");
+      expect(button).toBeDisabled();
+    });
+
+    it("calls onUploadStart with valid files when upload button is clicked", () => {
+      const onUploadStart = vi.fn();
+      render(<UploadZone onUploadStart={onUploadStart} />);
+      const valid = createFile("a.pdf", 1024, "application/pdf");
+      const invalid = createFile("b.docx", 1024, "application/msword");
+      fireEvent.drop(getZone(), createDropData([valid, invalid]));
+
+      fireEvent.click(screen.getByText("Upload 1 File"));
+
+      expect(onUploadStart).toHaveBeenCalledWith([valid]);
     });
   });
 
@@ -247,12 +348,11 @@ describe("UploadZone", () => {
 
     it("links error to zone via aria-describedby when error present", () => {
       render(<UploadZone />);
-      const badFile = createFile(
-        "doc.docx",
-        1024,
-        "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+      // Trigger a cap warning by adding >25 files
+      const files = Array.from({ length: 30 }, (_, i) =>
+        createFile(`f-${i}.pdf`, 1024, "application/pdf")
       );
-      selectFiles(getInput(), [badFile]);
+      fireEvent.drop(getZone(), createDropData(files));
 
       const zone = getZone();
       expect(zone).toHaveAttribute("aria-describedby", "upload-error");
@@ -264,6 +364,9 @@ describe("UploadZone", () => {
       render(<UploadZone />);
       const file = createFile("invoice.pdf", 1024, "application/pdf");
       selectFiles(getInput(), [file]);
+
+      // Click upload to trigger uploading state
+      fireEvent.click(screen.getByText("Upload 1 File"));
 
       const liveRegion = document.querySelector('[aria-live="polite"]');
       expect(liveRegion).toBeInTheDocument();
@@ -302,13 +405,14 @@ describe("UploadZone", () => {
       ).toBeInTheDocument();
     });
 
-    it("handles file drop and shows uploading state", () => {
+    it("handles file drop and shows file in list", () => {
       render(<UploadZone />);
       const file = createFile("invoice.pdf", 1024, "application/pdf");
 
       fireEvent.drop(getZone(), createDropData([file]));
 
-      expect(screen.getByRole("progressbar")).toBeInTheDocument();
+      expect(screen.getByText("invoice.pdf")).toBeInTheDocument();
+      expect(screen.getByText("Upload 1 File")).toBeInTheDocument();
     });
 
     it("shows validation error on invalid file drop", () => {
@@ -321,6 +425,7 @@ describe("UploadZone", () => {
 
       fireEvent.drop(getZone(), createDropData([file]));
 
+      expect(screen.getByText("doc.docx")).toBeInTheDocument();
       expect(
         screen.getByText(
           "Unsupported file type. Please upload a PDF, JPG, or PNG."
@@ -337,18 +442,19 @@ describe("UploadZone", () => {
       render(<UploadZone />);
       const input = getInput();
 
-      // Start upload
+      // Add file and start upload
       const file1 = createFile("first.pdf", 1024, "application/pdf");
       selectFiles(input, [file1]);
+      fireEvent.click(screen.getByText("Upload 1 File"));
       expect(screen.getByText("first.pdf")).toBeInTheDocument();
 
       // Try to upload another while uploading
       const file2 = createFile("second.pdf", 1024, "application/pdf");
       selectFiles(input, [file2]);
 
-      // Should still show first file
+      // Should still show first file in uploading state
       expect(screen.getByText("first.pdf")).toBeInTheDocument();
-      expect(screen.queryByText("second.pdf")).not.toBeInTheDocument();
+      expect(screen.getByRole("progressbar")).toBeInTheDocument();
     });
 
     it("ignores drop while uploading", () => {
@@ -357,17 +463,18 @@ describe("UploadZone", () => {
 
       render(<UploadZone />);
 
-      // Start upload via input
+      // Add file and start upload
       const file1 = createFile("first.pdf", 1024, "application/pdf");
       selectFiles(getInput(), [file1]);
+      fireEvent.click(screen.getByText("Upload 1 File"));
 
       // Try to drop while uploading
       const file2 = createFile("second.pdf", 1024, "application/pdf");
       fireEvent.drop(getZone(), createDropData([file2]));
 
-      // Should still show first file
+      // Should still show first file in uploading state
       expect(screen.getByText("first.pdf")).toBeInTheDocument();
-      expect(screen.queryByText("second.pdf")).not.toBeInTheDocument();
+      expect(screen.getByRole("progressbar")).toBeInTheDocument();
     });
   });
 
@@ -381,6 +488,7 @@ describe("UploadZone", () => {
       render(<UploadZone />);
       const file = createFile("invoice.pdf", 1024, "application/pdf");
       selectFiles(getInput(), [file]);
+      fireEvent.click(screen.getByText("Upload 1 File"));
 
       await waitFor(() => {
         expect(screen.getByText("File exceeds 10MB limit.")).toBeInTheDocument();
@@ -393,6 +501,7 @@ describe("UploadZone", () => {
       render(<UploadZone />);
       const file = createFile("invoice.pdf", 1024, "application/pdf");
       selectFiles(getInput(), [file]);
+      fireEvent.click(screen.getByText("Upload 1 File"));
 
       await waitFor(() => {
         expect(
