@@ -31,31 +31,24 @@ Xero uses OAuth2 with PKCE (Proof Key for Code Exchange) — a more secure auth 
 ### What it does
 
 1. Generates a PKCE code verifier + code challenge (RFC 7636)
-2. Spins up a temporary local HTTP server on port 3456 (avoids conflict with port 3000 which is pinned for QBO OAuth)
+2. Spins up a temporary local HTTP server on port 3000
 3. Opens the browser to Xero's authorization URL with:
    - `response_type=code`
    - `code_challenge` + `code_challenge_method=S256`
    - `scope=openid profile email accounting.transactions accounting.contacts accounting.settings`
-     - Identity scopes (`openid profile email`) are optional — included for completeness but not required for accounting operations
-     - Required scopes for our use case: `accounting.transactions accounting.contacts accounting.settings`
-   - `redirect_uri=http://localhost:3456/callback` (sandbox only — production will use `https://dockett.app/api/auth/callback/xero`)
+   - `redirect_uri=http://localhost:3000/api/auth/callback/xero`
 4. User clicks "Allow" in the browser (one-time manual step)
 5. Catches the callback, extracts the authorization code
 6. Exchanges the code + PKCE verifier for tokens via `POST https://identity.xero.com/connect/token`
 7. Fetches the tenant ID via `GET https://api.xero.com/connections`
-8. Tests token refresh: exchanges the refresh token for a new access/refresh pair via the same token endpoint, documents whether the refresh token rotates (i.e., is the old refresh token invalidated?)
-9. Prints tokens and tenant ID to console for manual copy to `.env.local`
-10. Shuts down the temporary server
-
-### App type clarification
-
-Xero has two OAuth app types: "Web app" (confidential client with client secret) and "PKCE app" (public client, no secret). Our Xero app is a **Web app** (confidential client) — it has both a client ID and client secret. PKCE is used as an additional security layer on top of the standard code exchange, not as a replacement for the client secret.
+8. Prints tokens and tenant ID to console for manual copy to `.env.local`
+9. Shuts down the temporary server
 
 ### Env vars needed
 
 ```
 XERO_CLIENT_ID=        # From Xero Developer Portal
-XERO_CLIENT_SECRET=    # From Xero Developer Portal (Web app type — confidential client)
+XERO_CLIENT_SECRET=    # From Xero Developer Portal
 ```
 
 ### Usage
@@ -70,7 +63,6 @@ npx tsx scripts/sandbox/xero-auth.ts
 - Confirm token response shape (access_token, refresh_token, expires_in, token_type, scope)
 - Confirm tenant ID retrieval via `/connections` endpoint
 - Document actual token lifetimes (docs say 30 min access, 60 day refresh — confirm empirically)
-- Confirm token refresh behavior: does the refresh token rotate? What's the response shape?
 
 ## Script 2: `test-xero.ts`
 
@@ -83,15 +75,7 @@ Reads tokens from `.env.local` and runs 5 test sections, matching the QBO script
 - `GET https://api.xero.com/api.xro/2.0/Contacts`
 - Xero header required: `xero-tenant-id: {tenantId}`
 - Document: field names, ID format (UUID vs numeric string), which field maps to "vendor display name"
-- Log response headers to capture any rate-limit or versioning headers (e.g., `X-Rate-Limit-Problem`, `Xero-Version`)
 - Key question to answer: ContactID format, CompanyName vs Name field reliability
-
-### Section 1b: Create a Contact (Xero's vendor creation)
-
-- `POST https://api.xero.com/api.xro/2.0/Contacts` (or PUT — confirm which method)
-- Create a test contact with minimal fields
-- Document: minimum required payload, response shape, ID format
-- Key question to answer: what fields are required vs optional for contact creation? (Maps to `AccountingProvider.createVendor()`)
 
 ### Section 2: Query Accounts (chart of accounts)
 
@@ -154,19 +138,13 @@ Append a new section to `scripts/sandbox/sandbox-notes.md` with this structure (
 
 ### Auth (OAuth2 + PKCE)
 - Token endpoint URLs
-- App type (Web app / confidential client)
 - Token lifetimes (confirmed empirically)
 - PKCE details (code_challenge_method, verifier length)
-- Refresh behavior (does refresh token rotate?)
+- Refresh behavior
 - Tenant ID retrieval
-- Required vs optional scopes
 
 ### Contact (Vendor) Response Shape
 - Key fields, ID format, naming conventions
-
-### Contact Creation
-- Endpoint, method
-- Minimum payload, response shape
 
 ### Account Response Shape
 - Key fields, expense filtering, hierarchy
@@ -222,7 +200,7 @@ XERO_TENANT_ID=
 3. All response shapes documented in sandbox-notes.md
 4. Error response shapes documented with comparison to QBO patterns
 5. Token lifetimes confirmed empirically (not just from docs)
-6. All unexpected behaviors documented in "Surprises / Gotchas" with explicit comparison to QBO equivalents
+6. At least 5 "Surprises / Gotchas" documented (there are always surprises)
 7. `.env.example` updated with Xero vars
 
 ## Dependencies
