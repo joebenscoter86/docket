@@ -20,11 +20,15 @@ vi.mock("@/lib/utils/logger", () => ({
   },
 }));
 
-// Mock queryAccounts — default to rejection (no QBO connection) so existing tests
+// Mock accounting provider — default to null (no connection) so existing tests
 // continue to work without adjustment. Individual tests override as needed.
-const mockQueryAccounts = vi.fn();
-vi.mock("@/lib/quickbooks/api", () => ({
-  queryAccounts: (...args: unknown[]) => mockQueryAccounts(...args),
+const mockFetchAccounts = vi.fn();
+const mockGetOrgProvider = vi.fn();
+vi.mock("@/lib/accounting", () => ({
+  getOrgProvider: (...args: unknown[]) => mockGetOrgProvider(...args),
+  getAccountingProvider: () => ({
+    fetchAccounts: (...args: unknown[]) => mockFetchAccounts(...args),
+  }),
 }));
 
 const mockLookupGlMappings = vi.fn();
@@ -198,8 +202,8 @@ function setupHappyPath() {
 
   mockExtractInvoiceData.mockResolvedValue(MOCK_RESULT);
 
-  // Default: no QBO connection → proceed without GL suggestions
-  mockQueryAccounts.mockRejectedValue(new Error("No QBO connection"));
+  // Default: no accounting connection → proceed without GL suggestions
+  mockGetOrgProvider.mockResolvedValue(null);
 
   // Default: no history mappings found
   mockLookupGlMappings.mockResolvedValue(new Map());
@@ -586,8 +590,11 @@ describe("runExtraction", () => {
       vi.doMock("./provider", () => ({
         getExtractionProvider: () => ({ extractInvoiceData: mockExtractInvoiceData }),
       }));
-      vi.doMock("@/lib/quickbooks/api", () => ({
-        queryAccounts: (...args: unknown[]) => mockQueryAccounts(...args),
+      vi.doMock("@/lib/accounting", () => ({
+        getOrgProvider: (...args: unknown[]) => mockGetOrgProvider(...args),
+        getAccountingProvider: () => ({
+          fetchAccounts: (...args: unknown[]) => mockFetchAccounts(...args),
+        }),
       }));
       vi.doMock("./gl-mappings", () => ({
         lookupGlMappings: (...args: unknown[]) => mockLookupGlMappings(...args),
@@ -601,14 +608,15 @@ describe("runExtraction", () => {
       vi.resetModules();
     });
 
-    it("fetches QBO accounts and passes them as context to provider", async () => {
+    it("fetches accounts and passes them as context to provider", async () => {
       setupHappyPath();
 
+      mockGetOrgProvider.mockResolvedValue("quickbooks");
       const mockAccounts = [
-        { Id: "84", Name: "Office Supplies", FullyQualifiedName: "Office Supplies", SubAccount: false },
-        { Id: "92", Name: "Travel", FullyQualifiedName: "Travel:Airfare", SubAccount: true },
+        { value: "84", label: "Office Supplies", accountType: "Expense" },
+        { value: "92", label: "Travel:Airfare", accountType: "Expense" },
       ];
-      mockQueryAccounts.mockResolvedValue(mockAccounts);
+      mockFetchAccounts.mockResolvedValue(mockAccounts);
 
       const { runExtraction } = await import("./run");
       await runExtraction(BASE_PARAMS);
@@ -618,16 +626,16 @@ describe("runExtraction", () => {
         BASE_PARAMS.fileType,
         {
           accounts: [
-            { id: "84", name: "Office Supplies" },    // SubAccount false → use Name
-            { id: "92", name: "Travel:Airfare" },     // SubAccount true → use FullyQualifiedName
+            { id: "84", name: "Office Supplies" },
+            { id: "92", name: "Travel:Airfare" },
           ],
         }
       );
     });
 
-    it("proceeds without suggestions when QBO account fetch fails", async () => {
+    it("proceeds without suggestions when account fetch fails", async () => {
       setupHappyPath();
-      // mockQueryAccounts is already set to reject in setupHappyPath
+      // mockGetOrgProvider returns null by default (no connection)
 
       const { runExtraction } = await import("./run");
       const result = await runExtraction(BASE_PARAMS);
@@ -644,8 +652,9 @@ describe("runExtraction", () => {
       setupHappyPath();
 
       // Only account "84" is real
-      mockQueryAccounts.mockResolvedValue([
-        { Id: "84", Name: "Office Supplies", FullyQualifiedName: "Office Supplies", SubAccount: false },
+      mockGetOrgProvider.mockResolvedValue("quickbooks");
+      mockFetchAccounts.mockResolvedValue([
+        { value: "84", label: "Office Supplies", accountType: "Expense" },
       ]);
 
       // Provider returns two line items: one with valid ID, one hallucinated
@@ -694,11 +703,12 @@ describe("runExtraction", () => {
     it("overrides AI suggestion with history mapping when exact match found", async () => {
       setupHappyPath();
 
+      mockGetOrgProvider.mockResolvedValue("quickbooks");
       const mockAccounts = [
-        { Id: "84", Name: "Office Supplies", FullyQualifiedName: "Office Supplies", SubAccount: false },
-        { Id: "92", Name: "Travel", FullyQualifiedName: "Travel", SubAccount: false },
+        { value: "84", label: "Office Supplies", accountType: "Expense" },
+        { value: "92", label: "Travel", accountType: "Expense" },
       ];
-      mockQueryAccounts.mockResolvedValue(mockAccounts);
+      mockFetchAccounts.mockResolvedValue(mockAccounts);
 
       // AI suggests "92" (Travel) for this line item
       const resultWithAiSuggestion: ExtractionResult = {
@@ -739,10 +749,11 @@ describe("runExtraction", () => {
       setupHappyPath();
 
       // Only account "92" is valid now
+      mockGetOrgProvider.mockResolvedValue("quickbooks");
       const mockAccounts = [
-        { Id: "92", Name: "Travel", FullyQualifiedName: "Travel", SubAccount: false },
+        { value: "92", label: "Travel", accountType: "Expense" },
       ];
-      mockQueryAccounts.mockResolvedValue(mockAccounts);
+      mockFetchAccounts.mockResolvedValue(mockAccounts);
 
       const resultWithAiSuggestion: ExtractionResult = {
         ...MOCK_RESULT,
