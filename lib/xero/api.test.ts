@@ -1,5 +1,5 @@
 // lib/xero/api.test.ts
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, vi, beforeAll, beforeEach, afterEach, afterAll } from "vitest";
 import { http, HttpResponse } from "msw";
 import { setupServer } from "msw/node";
 import type { XeroContact, XeroAccount } from "@/lib/xero/types";
@@ -25,12 +25,12 @@ const XERO_BASE = "https://api.xero.com/api.xro/2.0";
 
 const server = setupServer();
 
-beforeEach(() => server.listen({ onUnhandledRequest: "error" }));
+beforeAll(() => server.listen({ onUnhandledRequest: "error" }));
 afterEach(() => {
   server.resetHandlers();
   vi.clearAllMocks();
 });
-afterEach(() => server.close());
+afterAll(() => server.close());
 
 describe("XeroApiError", () => {
   it("stores statusCode, errorCode, detail, and element", async () => {
