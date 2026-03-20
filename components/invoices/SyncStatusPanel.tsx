@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { TransactionType, SYNC_SUCCESS_MESSAGES, TRANSACTION_TYPE_SHORT_LABELS } from "@/lib/types/invoice";
+import { getQuickBooksTransactionUrl } from "@/lib/quickbooks/links";
 
 interface SyncLogEntry {
   id: string;
@@ -151,9 +152,25 @@ export default function SyncStatusPanel({
             </div>
 
             {latestLog.status === "success" && latestLog.provider_bill_id && (
-              <p className="text-sm text-accent mt-1">
-                {getEntityLabel(latestLog)} ID: <span className="font-mono">{latestLog.provider_bill_id}</span>
-              </p>
+              <div className="flex items-center gap-3 mt-1">
+                <p className="text-sm text-accent">
+                  {getEntityLabel(latestLog)} ID: <span className="font-mono">{latestLog.provider_bill_id}</span>
+                </p>
+                {latestLog.transaction_type && (
+                  <a
+                    href={getQuickBooksTransactionUrl(latestLog.transaction_type, latestLog.provider_bill_id)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-sm text-accent hover:text-green-700 font-medium flex items-center gap-1"
+                  >
+                    View in QuickBooks
+                    <svg className="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor">
+                      <path d="M11 3a1 1 0 100 2h2.586l-6.293 6.293a1 1 0 101.414 1.414L15 6.414V9a1 1 0 102 0V4a1 1 0 00-1-1h-5z" />
+                      <path d="M5 5a2 2 0 00-2 2v8a2 2 0 002 2h8a2 2 0 002-2v-3a1 1 0 10-2 0v3H5V7h3a1 1 0 000-2H5z" />
+                    </svg>
+                  </a>
+                )}
+              </div>
             )}
 
             {latestLog.status === "failed" && (

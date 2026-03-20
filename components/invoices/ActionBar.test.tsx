@@ -24,6 +24,7 @@ describe("ActionBar — approve phase (pending_review)", () => {
     vendorName: "Acme Corp",
     totalAmount: 110,
     syncBlockers: [],
+    outputType: "bill" as const,
     onStatusChange: vi.fn(),
   };
 
@@ -106,6 +107,7 @@ describe("ActionBar — sync phase (approved)", () => {
     vendorName: "Acme Corp",
     totalAmount: 110,
     syncBlockers: [],
+    outputType: "bill" as const,
     onStatusChange: vi.fn(),
   };
 
@@ -242,6 +244,7 @@ describe("ActionBar — approve-to-sync transition", () => {
         vendorName="Acme Corp"
         totalAmount={110}
         syncBlockers={[]}
+        outputType="bill"
         onStatusChange={vi.fn()}
       />
     );
@@ -257,6 +260,7 @@ describe("ActionBar — approve-to-sync transition", () => {
         vendorName="Acme Corp"
         totalAmount={110}
         syncBlockers={[]}
+        outputType="bill"
         onStatusChange={vi.fn()}
       />
     );
@@ -275,6 +279,7 @@ describe("ActionBar — synced phase", () => {
         vendorName="Acme Corp"
         totalAmount={110}
         syncBlockers={[]}
+        outputType="bill"
         onStatusChange={vi.fn()}
       />
     );

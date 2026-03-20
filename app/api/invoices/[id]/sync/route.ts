@@ -390,6 +390,7 @@ export async function POST(
 
     return apiSuccess({
       billId: result.entityId,
+      transactionType,
       attachmentStatus,
       message: SYNC_SUCCESS_MESSAGES[outputType],
       ...(attachmentStatus === "failed"

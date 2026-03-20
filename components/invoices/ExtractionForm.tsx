@@ -556,6 +556,7 @@ export default function ExtractionForm({
             totalAmount={state.values.total_amount}
             syncBlockers={syncBlockers}
             isRetry={!!initialErrorMessage?.startsWith("Sync failed")}
+            outputType={currentOutputType}
             onStatusChange={handleStatusChange}
           />
         </>

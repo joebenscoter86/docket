@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useRef, useCallback, useEffect } from "react";
-import type { InvoiceStatus } from "@/lib/types/invoice";
+import type { InvoiceStatus, OutputType } from "@/lib/types/invoice";
+import { getQuickBooksTransactionUrl } from "@/lib/quickbooks/links";
 
 type ActionBarState =
   | "idle"
@@ -19,6 +20,7 @@ interface ActionBarProps {
   totalAmount: string | number | null;
   syncBlockers: string[];
   isRetry?: boolean;
+  outputType: OutputType;
   onStatusChange: (newStatus: InvoiceStatus) => void;
 }
 
@@ -29,11 +31,13 @@ export default function ActionBar({
   totalAmount,
   syncBlockers,
   isRetry = false,
+  outputType,
   onStatusChange,
 }: ActionBarProps) {
   const [barState, setBarState] = useState<ActionBarState>("idle");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [warning, setWarning] = useState<string | null>(null);
+  const [syncedEntityId, setSyncedEntityId] = useState<string | null>(null);
   const confirmTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const errorTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const approvedTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -136,6 +140,7 @@ export default function ActionBar({
         }
 
         setBarState("synced");
+        setSyncedEntityId(body.data?.billId ?? null);
 
         if (body.data?.warning) {
           setWarning(body.data.warning);
@@ -297,6 +302,17 @@ export default function ActionBar({
             <>
               <span className="h-2 w-2 rounded-full bg-accent shrink-0" />
               <span className="text-accent">Invoice synced to QuickBooks.</span>
+              {syncedEntityId && (
+                <a
+                  href={getQuickBooksTransactionUrl(outputType, syncedEntityId)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-accent hover:text-green-700 font-medium flex items-center gap-1 ml-1"
+                >
+                  View in QuickBooks
+                  <ExternalLinkIcon />
+                </a>
+              )}
             </>
           ) : errorMessage ? (
             <>
@@ -348,6 +364,15 @@ function CheckIcon() {
   return (
     <svg className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
       <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+    </svg>
+  );
+}
+
+function ExternalLinkIcon() {
+  return (
+    <svg className="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor">
+      <path d="M11 3a1 1 0 100 2h2.586l-6.293 6.293a1 1 0 101.414 1.414L15 6.414V9a1 1 0 102 0V4a1 1 0 00-1-1h-5z" />
+      <path d="M5 5a2 2 0 00-2 2v8a2 2 0 002 2h8a2 2 0 002-2v-3a1 1 0 10-2 0v3H5V7h3a1 1 0 000-2H5z" />
     </svg>
   );
 }
