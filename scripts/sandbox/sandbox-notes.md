@@ -207,9 +207,263 @@ All errors follow this structure:
 
 ---
 
-## Xero Sandbox (FND-10)
+## Xero Sandbox (DOC-53) — 2026-03-20
 
-Deferred to Phase 2. Xero requires a paid org or free trial for API testing. Key differences from QBO documented in CLAUDE.md from docs review (PUT vs POST, ContactID vs VendorRef, ACCPAY type).
+### Setup
+
+- **Developer portal:** developer.xero.com
+- **App type:** Web app (confidential client — client_id + client_secret)
+- **Demo company:** "Demo Company (US)"
+- **Tenant ID (UUID):** `9a073d07-da83-4eb5-8c54-a5611d714379`
+- **Tenant type:** ORGANISATION
+- **Base URL:** `https://api.xero.com/api.xro/2.0`
+- **Auth URL:** `https://login.xero.com/identity/connect/authorize`
+- **Token endpoint:** `https://identity.xero.com/connect/token`
+- **Connections endpoint:** `GET https://api.xero.com/connections` (returns tenant list)
+- **Required scopes:** `openid offline_access accounting.invoices accounting.contacts accounting.settings accounting.attachments`
+- **IMPORTANT:** Apps created after 2 March 2026 must use new granular scopes. The old `accounting.transactions` scope is replaced by `accounting.invoices`, `accounting.payments`, `accounting.banktransactions`, `accounting.manualjournals`. The scopes `accounting.contacts`, `accounting.settings`, `accounting.attachments` are unchanged.
+
+### Auth Token Lifetimes (confirmed)
+
+| Token | Lifetime | Notes |
+|-------|----------|-------|
+| Access token | 1800 seconds (30 min) | Much shorter than QBO's 1 hour. Auto-refresh before expiry. |
+| Refresh token | ~60 days | From docs; not confirmed empirically. Rotates on use. |
+
+**PKCE:** Used as additional security on top of client secret. `code_challenge_method=S256`, verifier is 43 chars (base64url of 32 random bytes).
+
+**Token auth:** Basic auth header with `base64(client_id:client_secret)` — same pattern as QBO.
+
+**Token response shape:**
+```json
+{
+  "id_token": "...",
+  "access_token": "...",
+  "expires_in": 1800,
+  "token_type": "Bearer",
+  "refresh_token": "...",
+  "scope": "openid offline_access accounting.invoices accounting.contacts ..."
+}
+```
+
+**CRITICAL: Refresh tokens rotate.** Old refresh token is invalidated when a new one is issued. Must store the new refresh token from every refresh response. If lost, user must re-authorize.
+
+### Contact (Vendor) Response Shape
+
+Endpoint: `GET /api.xro/2.0/Contacts`
+
+Required header on all requests: `xero-tenant-id: {tenantId}`
+
+Key fields:
+```
+ContactID          — UUID string (e.g., "2e465f38-66ca-413a-a8a9-dcbf4c5e6848")
+ContactStatus      — "ACTIVE"
+Name               — string, this is the display name (equivalent to QBO's DisplayName)
+Addresses          — array of { AddressType: "POBOX" | "STREET", City?, Region?, PostalCode?, Country? }
+Phones             — array of { PhoneType: "DEFAULT" | "DDI" | "FAX" | "MOBILE", PhoneNumber?, ... }
+IsSupplier         — boolean
+IsCustomer         — boolean
+EmailAddress       — string (optional)
+UpdatedDateUTC     — MS-style date string "/Date(1773631820913+0000)/"
+ContactGroups      — array
+ContactPersons     — array
+HasAttachments     — boolean
+HasValidationErrors — boolean
+```
+
+**Key finding:** ContactID is a UUID, not a numeric string like QBO's `Id`.
+**Key finding:** `Name` is the primary display field. No `CompanyName` vs `Name` ambiguity like QBO — just `Name`.
+**Key finding:** Dates use Microsoft-style `/Date(milliseconds+offset)/` format, not ISO.
+
+### Contact Creation
+
+Endpoint: `POST /api.xro/2.0/Contacts`
+
+**Minimum payload:** `{ "Name": "Vendor Name" }`
+
+**Optional fields:** `EmailAddress`, `IsSupplier` (boolean)
+
+**Status code:** 200 on success (same as QBO — not 201)
+
+**Response wrapping:** `{ Id, Status: "OK", ProviderName: "Docket", Contacts: [...] }`
+
+**Key finding:** `IsSupplier: true` in the create request may not stick immediately, but creating a bill with the contact auto-promotes it to supplier.
+
+### Account (Chart of Accounts) Response Shape
+
+Endpoint: `GET /api.xro/2.0/Accounts?where=Class=="EXPENSE"`
+
+Filter uses OData-like `where` clause with `==` syntax.
+
+Key fields:
+```
+AccountID          — UUID string
+Code               — string (e.g., "500", "600") — THIS is what line items reference
+Name               — string (e.g., "Cost of Goods Sold", "Advertising")
+Status             — "ACTIVE"
+Type               — "DIRECTCOSTS" | "EXPENSE" (both have Class "EXPENSE")
+Class              — "EXPENSE" (what we filter on)
+TaxType            — "NONE" | "TAX002" etc
+Description        — string
+ReportingCode      — "EXP"
+ShowInExpenseClaims — boolean
+```
+
+**Key finding:** Line items use `AccountCode` (string like "500"), NOT `AccountID` (UUID). This is different from QBO which uses `AccountRef.value` (the numeric ID as string).
+**Key finding:** Filter by `Class=="EXPENSE"` to get both "EXPENSE" and "DIRECTCOSTS" account types.
+**Key finding:** No sub-account hierarchy visible in the API. No equivalent to QBO's `FullyQualifiedName`. Just flat `Name`.
+**Key finding:** Demo company has 33 expense accounts.
+
+### Bill Creation
+
+Endpoint: `PUT /api.xro/2.0/Invoices` (PUT, not POST — opposite of QBO)
+
+**Minimum required payload:**
+```json
+{
+  "Type": "ACCPAY",
+  "Contact": { "ContactID": "uuid-string" },
+  "LineItems": [
+    {
+      "Description": "Line item description",
+      "Quantity": 1,
+      "UnitAmount": 150.00,
+      "AccountCode": "500"
+    }
+  ]
+}
+```
+
+**Optional but useful fields:**
+- `Date` — invoice date (string "YYYY-MM-DD")
+- `DueDate` — due date (string "YYYY-MM-DD")
+- `Reference` — invoice number or memo
+- `InvoiceNumber` — vendor's invoice number
+
+**Response enrichment — Xero adds these fields automatically:**
+- `InvoiceID` — UUID
+- `Status: "DRAFT"` — auto-set (bills start as DRAFT, not active like QBO)
+- `AmountDue`, `AmountPaid`, `SubTotal`, `TotalTax`, `Total`
+- `CurrencyCode: "USD"`, `CurrencyRate: 1`
+- `LineAmountTypes: "Exclusive"` (tax-exclusive by default)
+- Each LineItem gets: `LineItemID` (UUID), `TaxType`, `TaxAmount`, `LineAmount`, `AccountID`
+- `DateString` and `Date` (MS-style) for dates
+
+**Key finding:** Uses `AccountCode` (e.g., "500") not `AccountID` (UUID) in line items.
+**Key finding:** Contact reference uses `ContactID` (UUID), not a name string.
+**Key finding:** No equivalent to QBO's `SyncToken`. Xero has no version counter.
+**Key finding:** Status 200 on success (same as QBO — not 201).
+**Key finding:** Bills start as `DRAFT` status. QBO bills are immediately active. Handle status transitions (DRAFT → AUTHORISED → PAID) if needed.
+
+### PDF Attachment
+
+Endpoint: `POST /api.xro/2.0/Invoices/{InvoiceID}/Attachments/{FileName}`
+
+**Format:** Raw binary body with `Content-Type: application/pdf`. Much simpler than QBO's multipart.
+
+**POST behavior:** Creates new attachment (returns 200)
+**PUT behavior:** Creates/replaces attachment with same filename (returns 200)
+
+**Response format: XML, not JSON.** Different from all other endpoints.
+
+Response shape:
+```xml
+<Response>
+  <Attachments>
+    <Attachment>
+      <AttachmentID>uuid</AttachmentID>
+      <FileName>test-invoice.pdf</FileName>
+      <Url>https://api.xero.com/api.xro/2.0/Invoices/{id}/Attachments/{filename}</Url>
+      <MimeType>application/pdf</MimeType>
+      <ContentLength>302</ContentLength>
+    </Attachment>
+  </Attachments>
+</Response>
+```
+
+**Key finding:** Attachment response is XML, even when `Accept: application/json` is set. The adapter must parse XML for attachment responses.
+**Key finding:** Simpler than QBO — raw bytes only, no multipart form-data.
+**Key finding:** Both POST and PUT work for creating attachments. PUT overwrites by filename.
+
+### Error Response Shapes
+
+**Auth errors (401):**
+```json
+{
+  "Type": null,
+  "Title": "Unauthorized",
+  "Status": 401,
+  "Detail": "AuthenticationUnsuccessful",
+  "Instance": "correlation-id",
+  "Extensions": {}
+}
+```
+Header: `www-authenticate: Bearer error=invalid_token`
+
+**Validation errors (400):**
+```json
+{
+  "ErrorNumber": 10,
+  "Type": "ValidationException",
+  "Message": "A validation exception occurred",
+  "Elements": [
+    {
+      "...entity fields...",
+      "HasErrors": true,
+      "ValidationErrors": [{ "Message": "human readable error" }],
+      "Warnings": [{ "Message": "warning message" }]
+    }
+  ]
+}
+```
+
+**Error codes/messages observed:**
+
+| Condition | Type | Message |
+|-----------|------|---------|
+| Bad/expired token | 401 | `"AuthenticationUnsuccessful"` |
+| Missing contact | 400 | `"A Contact must be specified for this type of transaction"` |
+| Invalid ContactID | 400 | `"The Contact must contain at least 1 of the following elements to identify the contact: Name, ContactID, ContactNumber"` |
+| Invalid AccountCode | Warning (not error!) | `"Account code '200' has been removed as it does not match a recognised account."` |
+
+**Key finding:** Error casing is CONSISTENT (PascalCase throughout) — unlike QBO's inconsistent casing between auth and validation errors. Simpler error parsing.
+**Key finding:** Validation errors are embedded in the entity's `ValidationErrors` array; warnings are in a separate `Warnings` array.
+**Key finding:** CRITICAL — Invalid account codes produce warnings, not errors. The bill is still created without the account mapping. The adapter must validate account codes before submission or check for warnings in responses.
+
+### Duplicate Invoice Numbers
+
+**Status:** 200 (success) — Xero does NOT reject duplicate invoice numbers. A second invoice with the same number is created silently.
+
+**Key finding:** No API-level idempotency guard. Must implement our own via `sync_log` (same pattern as QBO).
+
+### Rate Limits
+
+Rate limit headers observed:
+- `x-minlimit-remaining: 59` (per-minute limit, starts at 60)
+- `x-daylimit-remaining: 999` (daily limit, starts at 1000)
+- `x-appminlimit-remaining: 9999` (app-wide per-minute, starts at 10000)
+
+Documented limits: 60 calls/minute/tenant, 1000 calls/day/tenant, 10000 calls/minute/app
+
+**Key finding:** Rate limit headers ARE returned — unlike QBO which had none. Easy to implement backoff.
+**Key finding:** For MVP volumes, these limits are more than sufficient.
+
+### Surprises / Gotchas
+
+1. **Granular scopes required for post-March-2026 apps.** `accounting.transactions` doesn't work — use `accounting.invoices` instead. This was an immediate blocker during auth.
+2. **Attachment response is XML, not JSON.** Every other endpoint returns JSON, but attachment uploads return XML. The adapter must parse XML for attachment responses.
+3. **Dates use Microsoft `/Date(milliseconds+offset)/` format**, not ISO. Need a parser (milliseconds since epoch with optional timezone offset).
+4. **Refresh tokens rotate.** Old refresh token is invalidated on use. Must store the new refresh token from every refresh response. If lost, user must re-authorize.
+5. **Invalid account codes produce warnings, not errors.** Bill is created without account mapping. Must validate account codes before submission or check response warnings.
+6. **Duplicate invoice numbers are allowed.** No API-level idempotency guard. Must implement our own (same as QBO pattern via `sync_log`).
+7. **Contact `IsSupplier` auto-promotes.** Sending `IsSupplier: true` in create may not stick immediately, but creating a bill with the contact auto-sets it to `true`.
+8. **Bill creation uses PUT, not POST.** Opposite of QBO convention. Contact creation and queries use POST/GET as expected.
+9. **Line items reference `AccountCode` (string like "500"), not `AccountID` (UUID).** Different from QBO which uses the numeric ID. The adapter must map between these.
+10. **Bills start as DRAFT status.** QBO bills are immediately active. May need to handle DRAFT → AUTHORISED status transitions.
+11. **All IDs are UUIDs**, not numeric strings like QBO.
+12. **Rate limit headers are returned** — unlike QBO. Easy to implement backoff.
+13. **Error casing is consistent (PascalCase)** — unlike QBO's inconsistent casing. Simpler error parsing.
+14. **Access token lifetime is 30 minutes**, not 1 hour like QBO. Refresh threshold should be set accordingly (refresh when <5 min remaining).
 
 ---
 
