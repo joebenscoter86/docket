@@ -33,6 +33,7 @@ const defaultProps = {
     outputType: "bill" as const,
     paymentAccountId: null,
     paymentAccountName: null,
+    batchId: null,
   },
   orgDefaults: {
     defaultOutputType: "bill" as const,

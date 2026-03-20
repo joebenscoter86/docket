@@ -1,6 +1,7 @@
 "use client";
 
 import { useReducer, useCallback, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import {
   formReducer,
   initFormState,
@@ -31,6 +32,8 @@ interface ExtractionFormProps {
     defaultPaymentAccountId: string | null;
     defaultPaymentAccountName: string | null;
   };
+  batchId?: string | null;
+  batchManifest?: { id: string; status: string }[];
 }
 
 const FIELD_CONFIG: Record<
@@ -66,7 +69,10 @@ export default function ExtractionForm({
   paymentAccountId: initialPaymentAccountId,
   paymentAccountName: initialPaymentAccountName,
   orgDefaults,
+  batchId,
+  batchManifest,
 }: ExtractionFormProps) {
+  const router = useRouter();
   const [state, dispatch] = useReducer(
     formReducer,
     extractedData as unknown as Record<string, string | number | null>,
@@ -117,7 +123,18 @@ export default function ExtractionForm({
     if (newStatus === "synced") {
       setSyncKey((k) => k + 1);
     }
-  }, []);
+    // After approve, check if this was the last unreviewed invoice in the batch
+    if (newStatus === "approved" && batchId && batchManifest) {
+      const remaining = batchManifest.filter(
+        (m) =>
+          m.id !== invoiceId &&
+          ["pending_review", "uploaded", "extracting", "error"].includes(m.status)
+      );
+      if (remaining.length === 0) {
+        router.push(`/invoices?batch_id=${batchId}&toast=all-reviewed`);
+      }
+    }
+  }, [batchId, batchManifest, invoiceId, router]);
 
   const saveField = useCallback(
     async (field: string, value: string | number | null) => {

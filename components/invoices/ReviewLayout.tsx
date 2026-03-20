@@ -28,6 +28,7 @@ interface ReviewLayoutProps {
     outputType: OutputType;
     paymentAccountId: string | null;
     paymentAccountName: string | null;
+    batchId: string | null;
   };
   signedUrl: string;
   extractedData: ExtractedDataRow | null;
@@ -36,6 +37,7 @@ interface ReviewLayoutProps {
     defaultPaymentAccountId: string | null;
     defaultPaymentAccountName: string | null;
   };
+  batchManifest?: { id: string; status: string }[];
 }
 
 type MobileTab = "document" | "details";
@@ -51,6 +53,7 @@ export default function ReviewLayout({
   signedUrl,
   extractedData,
   orgDefaults,
+  batchManifest,
 }: ReviewLayoutProps) {
   const [activeTab, setActiveTab] = useState<MobileTab>("document");
 
@@ -159,6 +162,8 @@ export default function ReviewLayout({
                 paymentAccountId={invoice.paymentAccountId}
                 paymentAccountName={invoice.paymentAccountName}
                 orgDefaults={orgDefaults}
+                batchId={invoice.batchId}
+                batchManifest={batchManifest}
               />
             ) : (
               <div className="flex items-center justify-center h-full text-sm text-muted">
