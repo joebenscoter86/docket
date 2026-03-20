@@ -52,5 +52,5 @@ export interface AccountingConnectionRow {
   token_expires_at: string;
   company_id: string;
   connected_at: string;
-  company_name?: string;
+  company_name?: string | null;
 }

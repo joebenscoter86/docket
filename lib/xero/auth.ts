@@ -351,7 +351,7 @@ export async function getValidAccessToken(
       orgId,
       newTokens,
       connection.company_id,
-      connection.company_name
+      connection.company_name ?? undefined
     );
 
     logger.info("xero.token_refreshed", { orgId });
