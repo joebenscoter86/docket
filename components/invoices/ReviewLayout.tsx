@@ -63,24 +63,26 @@ export default function ReviewLayout({
     <div className="flex flex-col h-full -m-6">
       {/* Page header */}
       <div className="flex items-center gap-3 border-b border-border bg-white px-4 py-3 md:px-6">
-        {/* Back button */}
-        <Link
-          href="/invoices"
-          className="flex items-center gap-1 text-sm text-muted hover:text-text transition-colors shrink-0"
-        >
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            fill="none"
-            viewBox="0 0 24 24"
-            strokeWidth={1.5}
-            stroke="currentColor"
-            className="h-4 w-4"
+        {/* Back button — hidden when batch nav is present (it has its own "Back to batch") */}
+        {!invoice.batchId && (
+          <Link
+            href="/invoices"
+            className="flex items-center gap-1 text-sm text-muted hover:text-text transition-colors shrink-0"
           >
-            <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5" />
-          </svg>
-          <span className="hidden md:inline">Back to Invoices</span>
-          <span className="sr-only md:hidden">Back</span>
-        </Link>
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              fill="none"
+              viewBox="0 0 24 24"
+              strokeWidth={1.5}
+              stroke="currentColor"
+              className="h-4 w-4"
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5" />
+            </svg>
+            <span className="hidden md:inline">Back to Invoices</span>
+            <span className="sr-only md:hidden">Back</span>
+          </Link>
+        )}
 
         {/* File name */}
         <span className="truncate text-sm font-medium text-text min-w-0">

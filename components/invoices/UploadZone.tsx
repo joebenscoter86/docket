@@ -345,6 +345,9 @@ export default function UploadZone({ onUploadComplete, onUploadStart }: UploadZo
             <p className="font-body text-sm text-muted">
               PDF, PNG, JPG up to 10MB
             </p>
+            <p className="font-body text-sm text-muted">
+              <span className="font-bold">Upload up to 25 files at a time</span>
+            </p>
             <Button
               variant="primary"
               type="button"
