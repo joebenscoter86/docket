@@ -23,7 +23,10 @@ dotenv.config({ path: path.resolve(__dirname, "../../.env.local") });
 const CLIENT_ID = process.env.XERO_CLIENT_ID!;
 const CLIENT_SECRET = process.env.XERO_CLIENT_SECRET!;
 const REDIRECT_URI = "http://localhost:3456/callback";
-const SCOPES = "openid profile email accounting.transactions accounting.contacts accounting.settings";
+// Xero scopes — apps created after 2 March 2026 must use new granular scopes
+// Old: accounting.transactions → New: accounting.invoices (covers bills/ACCPAY)
+// Unchanged: accounting.contacts, accounting.settings, accounting.attachments
+const SCOPES = "openid offline_access accounting.invoices accounting.contacts accounting.settings accounting.attachments";
 
 if (!CLIENT_ID || !CLIENT_SECRET) {
   console.error("❌ Missing XERO_CLIENT_ID or XERO_CLIENT_SECRET in .env.local");
@@ -95,6 +98,7 @@ function startServerAndWaitForCallback(authUrl: string, expectedState: string): 
   return new Promise((resolve, reject) => {
     const server = http.createServer((req, res) => {
       const url = new URL(req.url!, `http://localhost:3456`);
+      console.log(`   📥 Request: ${req.method} ${req.url}`);
 
       if (url.pathname === "/callback") {
         const code = url.searchParams.get("code");
@@ -141,11 +145,11 @@ function startServerAndWaitForCallback(authUrl: string, expectedState: string): 
       exec(`open "${authUrl}"`);
     });
 
-    // Timeout after 2 minutes
+    // Timeout after 5 minutes
     setTimeout(() => {
       server.close();
-      reject(new Error("Authorization timed out (2 minutes)"));
-    }, 120_000);
+      reject(new Error("Authorization timed out (5 minutes)"));
+    }, 300_000);
   });
 }
 
