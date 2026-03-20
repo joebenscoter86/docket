@@ -137,7 +137,7 @@ function getProgressBarWidth(status: FileUploadStatus): string {
 // Component
 // ---------------------------------------------------------------------------
 
-export default function UploadQueue({ files }: UploadQueueProps) {
+export default function UploadQueue({ files, onComplete }: UploadQueueProps) {
   const batchId = useRef(crypto.randomUUID());
   const cancelledRef = useRef(false);
   const limiterRef = useRef(createLimit(3));
@@ -420,14 +420,25 @@ export default function UploadQueue({ files }: UploadQueueProps) {
               <span className="text-red-600 ml-1">{failedCount} failed.</span>
             )}
           </div>
-          {successCount > 0 && (
-            <Link
-              href={`/invoices?batch_id=${batchId.current}`}
-              className="text-sm font-medium text-blue-600 hover:text-blue-700"
-            >
-              Review All &rarr;
-            </Link>
-          )}
+          <div className="flex items-center gap-3">
+            {successCount > 0 && (
+              <Link
+                href={`/invoices?batch_id=${batchId.current}`}
+                className="text-sm font-medium text-blue-600 hover:text-blue-700"
+              >
+                Review All &rarr;
+              </Link>
+            )}
+            {onComplete && (
+              <button
+                type="button"
+                onClick={onComplete}
+                className="text-sm font-medium text-text border border-border rounded-brand-md px-4 py-2 hover:bg-gray-50 transition-colors"
+              >
+                Upload More Files
+              </button>
+            )}
+          </div>
         </div>
       )}
     </div>

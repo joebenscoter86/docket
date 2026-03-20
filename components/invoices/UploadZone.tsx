@@ -167,10 +167,11 @@ export default function UploadZone({ onUploadComplete, onUploadStart }: UploadZo
       const filesToUpload = selectedFiles.filter((f) => f.valid).map((f) => f.file);
       if (filesToUpload.length === 0) return;
 
-      if (onUploadStart) {
+      if (filesToUpload.length > 1 && onUploadStart) {
+        // Multiple files: use batch upload flow
         onUploadStart(filesToUpload);
       } else {
-        // Fallback: upload first valid file using single-file path
+        // Single file: always use inline upload + onUploadComplete path
         uploadFile(filesToUpload[0]);
       }
     },

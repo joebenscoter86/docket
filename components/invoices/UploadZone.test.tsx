@@ -300,7 +300,7 @@ describe("UploadZone", () => {
       expect(button).toBeDisabled();
     });
 
-    it("calls onUploadStart with valid files when upload button is clicked", () => {
+    it("uses inline upload for single valid file instead of onUploadStart", () => {
       const onUploadStart = vi.fn();
       render(<UploadZone onUploadStart={onUploadStart} />);
       const valid = createFile("a.pdf", 1024, "application/pdf");
@@ -309,7 +309,20 @@ describe("UploadZone", () => {
 
       fireEvent.click(screen.getByText("Upload 1 File"));
 
-      expect(onUploadStart).toHaveBeenCalledWith([valid]);
+      // Single valid file should NOT call onUploadStart — uses inline upload path
+      expect(onUploadStart).not.toHaveBeenCalled();
+    });
+
+    it("calls onUploadStart with multiple valid files when upload button is clicked", () => {
+      const onUploadStart = vi.fn();
+      render(<UploadZone onUploadStart={onUploadStart} />);
+      const valid1 = createFile("a.pdf", 1024, "application/pdf");
+      const valid2 = createFile("b.pdf", 2048, "application/pdf");
+      fireEvent.drop(getZone(), createDropData([valid1, valid2]));
+
+      fireEvent.click(screen.getByText("Upload 2 Files"));
+
+      expect(onUploadStart).toHaveBeenCalledWith([valid1, valid2]);
     });
   });
 

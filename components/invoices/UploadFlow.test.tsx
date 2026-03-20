@@ -28,8 +28,13 @@ vi.mock("./ExtractionProgress", () => ({
 }));
 
 vi.mock("./UploadQueue", () => ({
-  default: ({ files }: { files: File[] }) => (
-    <div data-testid="upload-queue">Queue: {files.length} files</div>
+  default: ({ files, onComplete }: { files: File[]; onComplete?: () => void }) => (
+    <div data-testid="upload-queue">
+      Queue: {files.length} files
+      {onComplete && (
+        <button onClick={onComplete}>Upload More Files</button>
+      )}
+    </div>
   ),
 }));
 
@@ -54,5 +59,13 @@ describe("UploadFlow", () => {
     fireEvent.click(screen.getByText("Batch Upload"));
     expect(screen.getByTestId("upload-queue")).toBeInTheDocument();
     expect(screen.getByText("Queue: 2 files")).toBeInTheDocument();
+  });
+
+  it("returns to UploadZone when Upload More Files is clicked after batch", () => {
+    render(<UploadFlow />);
+    fireEvent.click(screen.getByText("Batch Upload"));
+    expect(screen.getByTestId("upload-queue")).toBeInTheDocument();
+    fireEvent.click(screen.getByText("Upload More Files"));
+    expect(screen.getByTestId("upload-zone")).toBeInTheDocument();
   });
 });

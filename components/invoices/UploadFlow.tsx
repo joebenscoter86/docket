@@ -46,7 +46,7 @@ export default function UploadFlow() {
   }, [flow]);
 
   if (flow.mode === "batch") {
-    return <UploadQueue files={flow.files} />;
+    return <UploadQueue files={flow.files} onComplete={handleUploadAnother} />;
   }
 
   if (flow.mode === "single") {
