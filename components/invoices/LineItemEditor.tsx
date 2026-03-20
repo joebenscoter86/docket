@@ -50,6 +50,7 @@ export default function LineItemEditor({
   const [adding, setAdding] = useState(false);
   const [addError, setAddError] = useState<string | null>(null);
   const [confirmRemoveId, setConfirmRemoveId] = useState<string | null>(null);
+  const [acceptingAll, setAcceptingAll] = useState(false);
   const descriptionRefs = useRef<Record<string, HTMLInputElement | null>>({});
 
   const calculateSubtotal = useCallback(
@@ -254,6 +255,21 @@ export default function LineItemEditor({
     [saveField, state.items, onMissingGlCountChange]
   );
 
+  const pendingAiItems = state.items.filter(
+    (i) => i.values.suggested_gl_account_id && !i.values.gl_account_id && i.values.gl_suggestion_source === "ai"
+  );
+
+  const handleAcceptAllAiSuggestions = useCallback(async () => {
+    setAcceptingAll(true);
+    const items = state.items.filter(
+      (i) => i.values.suggested_gl_account_id && !i.values.gl_account_id && i.values.gl_suggestion_source === "ai"
+    );
+    await Promise.all(
+      items.map((item) => handleGlAccountSelect(item.id, item.values.suggested_gl_account_id as string))
+    );
+    setAcceptingAll(false);
+  }, [state.items, handleGlAccountSelect]);
+
   const inputBase =
     "w-full border border-border rounded-md px-2 py-1.5 text-sm focus:outline-none focus-visible:ring-[3px] focus-visible:ring-[#BFDBFE] focus:border-primary";
 
@@ -283,9 +299,36 @@ export default function LineItemEditor({
 
   return (
     <div>
-      <h3 className="text-xs font-semibold uppercase tracking-wide text-muted mb-4">
-        Line Items
-      </h3>
+      <div className="flex items-center justify-between mb-4">
+        <h3 className="text-xs font-semibold uppercase tracking-wide text-muted">
+          Line Items
+        </h3>
+        {pendingAiItems.length >= 2 && (
+          <button
+            type="button"
+            onClick={handleAcceptAllAiSuggestions}
+            disabled={acceptingAll || disabled}
+            className="flex items-center gap-1 text-xs text-primary hover:text-primary-hover disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {acceptingAll ? (
+              <>
+                <svg className="h-3 w-3 animate-spin" viewBox="0 0 24 24" fill="none">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                </svg>
+                Accepting...
+              </>
+            ) : (
+              <>
+                <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+                </svg>
+                Accept all AI suggestions ({pendingAiItems.length})
+              </>
+            )}
+          </button>
+        )}
+      </div>
 
       {/* Table header */}
       <div className="grid grid-cols-[1fr_70px_100px_100px_140px_32px] gap-x-2 items-center mb-1">
