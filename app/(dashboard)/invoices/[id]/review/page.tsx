@@ -62,10 +62,10 @@ export default async function ReviewPage({
     );
   }
 
-  // Fetch extracted data, signed URL, and org defaults in parallel
+  // Fetch extracted data, signed URL, org defaults, and accounting provider in parallel
   // Admin client required for Storage — bucket RLS restricts anon access
   const admin = createAdminClient();
-  const [extractedData, signedUrlResult, orgResult] = await Promise.all([
+  const [extractedData, signedUrlResult, orgAndProviderResult] = await Promise.all([
     getExtractedData(invoice.id),
     admin.storage
       .from("invoices")
@@ -76,27 +76,22 @@ export default async function ReviewPage({
       .limit(1)
       .single()
       .then(async ({ data: membership }) => {
-        if (!membership) return null;
-        const { data: org } = await admin
-          .from("organizations")
-          .select("default_output_type, default_payment_account_id, default_payment_account_name")
-          .eq("id", membership.org_id)
-          .single();
-        return org;
+        if (!membership) return { org: null, provider: null as AccountingProviderType | null };
+        const [orgData, connection] = await Promise.all([
+          admin
+            .from("organizations")
+            .select("default_output_type, default_payment_account_id, default_payment_account_name")
+            .eq("id", membership.org_id)
+            .single()
+            .then(({ data }) => data),
+          getOrgConnection(admin, membership.org_id),
+        ]);
+        return { org: orgData, provider: connection?.provider ?? null };
       }),
   ]);
 
-  // Fetch accounting connection provider for ActionBar labels
-  let accountingProvider: AccountingProviderType | null = null;
-  const { data: membership } = await supabase
-    .from("org_memberships")
-    .select("org_id")
-    .limit(1)
-    .single();
-  if (membership) {
-    const connection = await getOrgConnection(admin, membership.org_id);
-    if (connection) accountingProvider = connection.provider;
-  }
+  const orgResult = orgAndProviderResult?.org ?? null;
+  const accountingProvider = orgAndProviderResult?.provider ?? null;
 
   // Guard: signed URL failure
   if (signedUrlResult.error || !signedUrlResult.data?.signedUrl) {
