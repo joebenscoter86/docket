@@ -33,17 +33,19 @@ afterEach(() => {
 afterEach(() => server.close());
 
 describe("XeroApiError", () => {
-  it("stores statusCode, errorCode, and detail", async () => {
+  it("stores statusCode, errorCode, detail, and element", async () => {
     const { XeroApiError } = await import("@/lib/xero/api");
     const err = new XeroApiError({
       message: "Not found",
       statusCode: 404,
       errorCode: "NOT_FOUND",
       detail: "Contact not found",
+      element: "Name",
     });
     expect(err.statusCode).toBe(404);
     expect(err.errorCode).toBe("NOT_FOUND");
     expect(err.detail).toBe("Contact not found");
+    expect(err.element).toBe("Name");
     expect(err.name).toBe("XeroApiError");
     expect(err).toBeInstanceOf(Error);
   });

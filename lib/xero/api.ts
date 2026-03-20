@@ -27,18 +27,21 @@ export class XeroApiError extends Error {
   public readonly statusCode: number;
   public readonly errorCode: string;
   public readonly detail: string;
+  public readonly element?: string;
 
   constructor(params: {
     message: string;
     statusCode: number;
     errorCode: string;
     detail: string;
+    element?: string;
   }) {
     super(params.message);
     this.name = "XeroApiError";
     this.statusCode = params.statusCode;
     this.errorCode = params.errorCode;
     this.detail = params.detail;
+    this.element = params.element;
   }
 }
 
