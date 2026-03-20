@@ -30,12 +30,22 @@ function translateAccountingError(error: AccountingApiError, outputType: OutputT
   const typeLabel = OUTPUT_TYPE_LABELS[outputType].toLowerCase();
   const detail = error.detail ?? "";
 
-  // Duplicate document number
+  // Duplicate document number (QBO code 6140, or Xero message pattern)
   if (detail.includes("Duplicate") || error.errorCode === "6140") {
     return `A ${typeLabel} with this invoice number already exists. Change the invoice number and try again.`;
   }
 
-  // Vendor/entity not found
+  // Xero: contact not found
+  if (detail.includes("ContactID") || detail.includes("Contact is not valid")) {
+    return "The selected vendor was not found in Xero. They may have been deleted. Please select a different vendor.";
+  }
+
+  // Xero: invalid account code
+  if (detail.includes("Account code") && detail.includes("is not a valid")) {
+    return "One or more GL account codes are no longer valid in Xero. Please re-map the line item accounts and try again.";
+  }
+
+  // Vendor/entity not found (QBO pattern)
   if (
     detail.includes("Invalid Reference Id") &&
     (error.element === "VendorRef" || error.element === "EntityRef")
@@ -43,7 +53,7 @@ function translateAccountingError(error: AccountingApiError, outputType: OutputT
     return "The selected vendor was not found. They may have been deleted. Please select a different vendor.";
   }
 
-  // GL account not found
+  // GL account not found (QBO pattern)
   if (
     detail.includes("Invalid Reference Id") &&
     error.element === "AccountRef"
@@ -51,17 +61,17 @@ function translateAccountingError(error: AccountingApiError, outputType: OutputT
     return "One or more GL accounts are no longer valid. Please re-map the line item accounts and try again.";
   }
 
-  // Generic invalid reference
+  // Generic invalid reference (QBO pattern)
   if (detail.includes("Invalid Reference Id")) {
     return `A reference in this ${typeLabel} is no longer valid. Please review your vendor and account selections.`;
   }
 
-  // Stale data / concurrency conflict
+  // Stale data / concurrency conflict (QBO code 5010)
   if (error.errorCode === "5010") {
     return "This record was modified since you last loaded it. Please refresh and try again.";
   }
 
-  // Business validation errors
+  // Business validation errors (QBO codes 6000, 2050)
   if (error.errorCode === "6000" || error.errorCode === "2050") {
     return `Accounting system rejected this ${typeLabel}: ${detail}`;
   }
@@ -69,6 +79,11 @@ function translateAccountingError(error: AccountingApiError, outputType: OutputT
   // Auth/token errors
   if (error.statusCode === 401) {
     return "Your accounting connection has expired. Please reconnect in Settings and try again.";
+  }
+
+  // Xero: forbidden (wrong scopes or expired token)
+  if (error.statusCode === 403) {
+    return "Your accounting connection doesn't have the required permissions. Please reconnect in Settings.";
   }
 
   // Rate limit

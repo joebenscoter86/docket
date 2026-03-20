@@ -1,8 +1,8 @@
 // lib/xero/api.test.ts
-import { describe, it, expect, vi, beforeAll, beforeEach, afterEach, afterAll } from "vitest";
+import { describe, it, expect, vi, beforeAll, afterEach, afterAll } from "vitest";
 import { http, HttpResponse } from "msw";
 import { setupServer } from "msw/node";
-import type { XeroContact, XeroAccount } from "@/lib/xero/types";
+import type { XeroContact, XeroAccount, XeroInvoicePayload } from "@/lib/xero/types";
 
 // Mock getValidAccessToken before importing api module
 vi.mock("@/lib/xero/auth", () => ({
@@ -384,5 +384,256 @@ describe("fetchAccounts", () => {
     const result = await fetchAccounts(mockSupabase, "org-1");
 
     expect(result).toEqual([]);
+  });
+});
+
+// ─── createInvoice ───
+
+describe("createInvoice", () => {
+  const billPayload: XeroInvoicePayload = {
+    Type: "ACCPAY",
+    Contact: { ContactID: "contact-uuid-1" },
+    DateString: "2026-03-20",
+    DueDateString: "2026-04-20",
+    InvoiceNumber: "INV-001",
+    Reference: "INV-001",
+    LineItems: [
+      {
+        Description: "Office Supplies",
+        Quantity: 1,
+        UnitAmount: 150.0,
+        AccountCode: "500",
+      },
+      {
+        Description: "Printing",
+        Quantity: 2,
+        UnitAmount: 75.0,
+        AccountCode: "600",
+      },
+    ],
+  };
+
+  it("creates an ACCPAY invoice via PUT", async () => {
+    let capturedMethod = "";
+    server.use(
+      http.put(`${XERO_BASE}/Invoices`, async ({ request }) => {
+        capturedMethod = request.method;
+        const body = (await request.json()) as XeroInvoicePayload;
+        expect(body.Type).toBe("ACCPAY");
+        expect(body.Contact.ContactID).toBe("contact-uuid-1");
+        expect(body.LineItems).toHaveLength(2);
+        return HttpResponse.json({
+          Invoices: [
+            {
+              InvoiceID: "inv-uuid-123",
+              InvoiceNumber: "INV-001",
+              Type: "ACCPAY",
+              Status: "DRAFT",
+              Contact: { ContactID: "contact-uuid-1", Name: "Acme Corp" },
+              DateString: "2026-03-20",
+              DueDateString: "2026-04-20",
+              Total: 300.0,
+              AmountDue: 300.0,
+              CurrencyCode: "USD",
+              LineItems: body.LineItems,
+            },
+          ],
+        });
+      })
+    );
+
+    const { createInvoice } = await import("@/lib/xero/api");
+    const mockSupabase = {} as Parameters<typeof createInvoice>[0];
+    const result = await createInvoice(mockSupabase, "org-1", billPayload);
+
+    expect(capturedMethod).toBe("PUT");
+    expect(result.Invoices[0].InvoiceID).toBe("inv-uuid-123");
+    expect(result.Invoices[0].Status).toBe("DRAFT");
+  });
+
+  it("throws XeroApiError on validation failure", async () => {
+    server.use(
+      http.put(`${XERO_BASE}/Invoices`, () => {
+        return HttpResponse.json(
+          {
+            StatusCode: 400,
+            Message: "A validation error occurred",
+            Elements: [
+              {
+                ValidationErrors: [
+                  { Message: "Account code '999' is not a valid code" },
+                ],
+              },
+            ],
+          },
+          { status: 400 }
+        );
+      })
+    );
+
+    const { createInvoice, XeroApiError } = await import("@/lib/xero/api");
+    const mockSupabase = {} as Parameters<typeof createInvoice>[0];
+
+    await expect(
+      createInvoice(mockSupabase, "org-1", billPayload)
+    ).rejects.toThrow(XeroApiError);
+  });
+
+  it("throws XeroApiError on 401 auth error", async () => {
+    server.use(
+      http.put(`${XERO_BASE}/Invoices`, () => {
+        return HttpResponse.json(
+          { Title: "Unauthorized", Status: 401, Detail: "Token expired" },
+          { status: 401 }
+        );
+      })
+    );
+
+    const { createInvoice } = await import("@/lib/xero/api");
+    const mockSupabase = {} as Parameters<typeof createInvoice>[0];
+
+    await expect(
+      createInvoice(mockSupabase, "org-1", billPayload)
+    ).rejects.toThrow("Token expired");
+  });
+
+  it("logs warnings when invoice is created with warnings", async () => {
+    const { logger } = await import("@/lib/utils/logger");
+    server.use(
+      http.put(`${XERO_BASE}/Invoices`, () => {
+        return HttpResponse.json({
+          Invoices: [
+            {
+              InvoiceID: "inv-uuid-warn",
+              InvoiceNumber: "INV-002",
+              Type: "ACCPAY",
+              Status: "DRAFT",
+              Contact: { ContactID: "contact-uuid-1", Name: "Acme Corp" },
+              DateString: "2026-03-20",
+              DueDateString: "2026-04-20",
+              Total: 150.0,
+              AmountDue: 150.0,
+              CurrencyCode: "USD",
+              LineItems: [],
+              Warnings: [{ Message: "Account code not valid for this org" }],
+            },
+          ],
+        });
+      })
+    );
+
+    const { createInvoice } = await import("@/lib/xero/api");
+    const mockSupabase = {} as Parameters<typeof createInvoice>[0];
+    const result = await createInvoice(mockSupabase, "org-1", billPayload);
+
+    expect(result.Invoices[0].Warnings).toHaveLength(1);
+    expect(logger.warn).toHaveBeenCalledWith(
+      "xero.invoice_created_with_warnings",
+      expect.objectContaining({ invoiceId: "inv-uuid-warn" })
+    );
+  });
+});
+
+// ─── attachDocumentToInvoice ───
+
+describe("attachDocumentToInvoice", () => {
+  it("uploads a PDF attachment via PUT", async () => {
+    let capturedContentType = "";
+    server.use(
+      http.put(
+        `${XERO_BASE}/Invoices/inv-uuid-123/Attachments/invoice.pdf`,
+        ({ request }) => {
+          capturedContentType = request.headers.get("content-type") ?? "";
+          return HttpResponse.json({
+            Attachments: [
+              {
+                AttachmentID: "att-uuid-1",
+                FileName: "invoice.pdf",
+                Url: "https://api.xero.com/...",
+                MimeType: "application/pdf",
+                ContentLength: 1024,
+              },
+            ],
+          });
+        }
+      )
+    );
+
+    const { attachDocumentToInvoice } = await import("@/lib/xero/api");
+    const mockSupabase = {} as Parameters<typeof attachDocumentToInvoice>[0];
+    const result = await attachDocumentToInvoice(
+      mockSupabase,
+      "org-1",
+      "inv-uuid-123",
+      Buffer.from("PDF content"),
+      "invoice.pdf"
+    );
+
+    expect(capturedContentType).toBe("application/pdf");
+    expect(result.Attachments[0].AttachmentID).toBe("att-uuid-1");
+  });
+
+  it("sets correct MIME type for PNG files", async () => {
+    let capturedContentType = "";
+    server.use(
+      http.put(
+        `${XERO_BASE}/Invoices/inv-uuid-123/Attachments/invoice.png`,
+        ({ request }) => {
+          capturedContentType = request.headers.get("content-type") ?? "";
+          return HttpResponse.json({
+            Attachments: [
+              {
+                AttachmentID: "att-uuid-2",
+                FileName: "invoice.png",
+                Url: "https://api.xero.com/...",
+                MimeType: "image/png",
+                ContentLength: 2048,
+              },
+            ],
+          });
+        }
+      )
+    );
+
+    const { attachDocumentToInvoice } = await import("@/lib/xero/api");
+    const mockSupabase = {} as Parameters<typeof attachDocumentToInvoice>[0];
+    await attachDocumentToInvoice(
+      mockSupabase,
+      "org-1",
+      "inv-uuid-123",
+      Buffer.from("PNG content"),
+      "invoice.png"
+    );
+
+    expect(capturedContentType).toBe("image/png");
+  });
+
+  it("throws XeroApiError on upload failure", async () => {
+    server.use(
+      http.put(
+        `${XERO_BASE}/Invoices/inv-uuid-123/Attachments/invoice.pdf`,
+        () => {
+          return HttpResponse.json(
+            { Title: "Not Found", Status: 404, Detail: "Invoice not found" },
+            { status: 404 }
+          );
+        }
+      )
+    );
+
+    const { attachDocumentToInvoice, XeroApiError } = await import(
+      "@/lib/xero/api"
+    );
+    const mockSupabase = {} as Parameters<typeof attachDocumentToInvoice>[0];
+
+    await expect(
+      attachDocumentToInvoice(
+        mockSupabase,
+        "org-1",
+        "inv-uuid-123",
+        Buffer.from("PDF content"),
+        "invoice.pdf"
+      )
+    ).rejects.toThrow(XeroApiError);
   });
 });

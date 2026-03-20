@@ -128,3 +128,63 @@ export interface XeroAccount {
 export interface XeroAccountsResponse {
   Accounts: XeroAccount[];
 }
+
+// ─── Xero Invoice (Bill) Types ───
+
+/** A single line item in a Xero Invoice payload. */
+export interface XeroLineItem {
+  Description: string;
+  Quantity: number;
+  UnitAmount: number;
+  AccountCode: string;
+}
+
+/**
+ * Payload for creating an ACCPAY invoice (bill) via PUT /api.xro/2.0/Invoices.
+ * Xero uses PUT for creation — POST is not supported.
+ */
+export interface XeroInvoicePayload {
+  Type: "ACCPAY";
+  Contact: { ContactID: string };
+  DateString?: string;       // YYYY-MM-DD
+  DueDateString?: string;    // YYYY-MM-DD
+  InvoiceNumber?: string;
+  Reference?: string;
+  LineItems: XeroLineItem[];
+  CurrencyCode?: string;
+  Status?: "DRAFT" | "SUBMITTED" | "AUTHORISED";
+}
+
+/** A Xero Invoice as returned by the API. */
+export interface XeroInvoice {
+  InvoiceID: string;         // UUID
+  InvoiceNumber: string;
+  Type: "ACCPAY" | "ACCREC";
+  Status: string;
+  Contact: { ContactID: string; Name: string };
+  DateString: string;
+  DueDateString: string;
+  Total: number;
+  AmountDue: number;
+  CurrencyCode: string;
+  LineItems: XeroLineItem[];
+  Warnings?: Array<{ Message: string }>;
+}
+
+/** Response shape from PUT /api.xro/2.0/Invoices. */
+export interface XeroInvoiceResponse {
+  Invoices: XeroInvoice[];
+}
+
+// ─── Xero Attachment Types ───
+
+/** Response shape from POST /api.xro/2.0/Invoices/{id}/Attachments/{filename}. */
+export interface XeroAttachmentResponse {
+  Attachments: Array<{
+    AttachmentID: string;
+    FileName: string;
+    Url: string;
+    MimeType: string;
+    ContentLength: number;
+  }>;
+}
