@@ -3,7 +3,6 @@ import {
   groupInvoicesByBatch,
   getBatchStatusSummary,
   getNextReviewableInvoice,
-  type BatchGroup,
 } from "./batch-utils";
 import type { InvoiceListItem } from "./types";
 

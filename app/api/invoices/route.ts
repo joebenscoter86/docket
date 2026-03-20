@@ -25,6 +25,8 @@ export async function GET(request: NextRequest) {
       direction: searchParams.get("direction") ?? undefined,
       cursor: searchParams.get("cursor") ?? undefined,
       limit: searchParams.has("limit") ? Number(searchParams.get("limit")) : undefined,
+      output_type: searchParams.get("output_type") ?? undefined,
+      batch_id: searchParams.get("batch_id") ?? undefined,
     });
 
     const [listResult, counts] = await Promise.all([
