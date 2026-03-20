@@ -32,6 +32,12 @@ const statusConfig: Record<InvoiceStatus, {
     bgColor: 'bg-[#EDE9FE]',
     dotAnimation: 'animate-ping',
   },
+  uploaded: {
+    label: 'Uploaded',
+    textColor: 'text-[#1E40AF]',
+    bgColor: 'bg-[#DBEAFE]',
+    dotAnimation: 'animate-pulse',
+  },
   uploading: {
     label: 'Uploading',
     textColor: 'text-[#92400E]',

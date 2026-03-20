@@ -79,11 +79,12 @@ export async function POST(
     );
   }
 
-  // 5. Set status to extracting
+  // 5. Reset status to uploaded so runExtraction's guard allows it through
+  // runExtraction will set status to 'extracting' itself (double-extraction guard)
   const admin = createAdminClient();
   await admin
     .from("invoices")
-    .update({ status: "extracting", error_message: null })
+    .update({ status: "uploaded", error_message: null })
     .eq("id", invoiceId);
 
   // 6. Run extraction

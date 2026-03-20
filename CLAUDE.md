@@ -772,6 +772,8 @@ Run these before declaring any issue done:
 | 2026-03-18 | QBO production app approved by Intuit (auto-approved via questionnaire) | Apps using only Accounting API with basic scopes get auto-approved. No manual review needed. | DOC-77 |
 | 2026-03-18 | Vercel env vars split per environment for QBO | Production env uses production QBO credentials, Preview+Dev uses sandbox. Two entries per var scoped to different environments. | DOC-77 |
 | 2026-03-18 | Production QBO smoke test passed | Full flow confirmed on dockett.app: connect real QBO account, upload invoice, extract, approve, sync → bill created in real QuickBooks. | DOC-77 |
+| 2026-03-19 | Extraction uses inline concurrency limiter (5 concurrent max) via waitUntil, Supabase Realtime for status updates (not polling) | 25 files × 4s = 100s synchronous is too slow. Inline limiter (not p-limit — webpack incompatible) caps concurrent Claude calls. Realtime already in place. | DOC-68 |
+| 2026-03-19 | Upload returns immediately with status `uploaded`, extraction runs async | Decouples upload response time from extraction latency. Same path for single and batch uploads. | DOC-68 |
 
 ---
 
