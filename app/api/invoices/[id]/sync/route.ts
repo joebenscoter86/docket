@@ -20,6 +20,64 @@ import type { OutputType, ProviderEntityType } from "@/lib/types/invoice";
 import { OUTPUT_TYPE_TO_PAYMENT_TYPE, OUTPUT_TYPE_LABELS, SYNC_SUCCESS_MESSAGES } from "@/lib/types/invoice";
 
 /**
+ * Translate QBO API errors into user-friendly messages.
+ * Maps common error codes and patterns to actionable guidance.
+ */
+function translateQBOError(error: QBOApiError, outputType: OutputType): string {
+  const typeLabel = OUTPUT_TYPE_LABELS[outputType].toLowerCase();
+  const detail = error.detail ?? "";
+
+  // Duplicate document number
+  if (detail.includes("Duplicate") || error.errorCode === "6140") {
+    return `A ${typeLabel} with this invoice number already exists in QuickBooks. Change the invoice number and try again.`;
+  }
+
+  // Vendor/entity not found
+  if (
+    detail.includes("Invalid Reference Id") &&
+    (error.element === "VendorRef" || error.element === "EntityRef")
+  ) {
+    return "The selected vendor was not found in QuickBooks. They may have been deleted. Please select a different vendor or create one in QuickBooks first.";
+  }
+
+  // GL account not found
+  if (
+    detail.includes("Invalid Reference Id") &&
+    error.element === "AccountRef"
+  ) {
+    return "One or more GL accounts are no longer valid in QuickBooks. Please re-map the line item accounts and try again.";
+  }
+
+  // Generic invalid reference
+  if (detail.includes("Invalid Reference Id")) {
+    return `A reference in this ${typeLabel} is no longer valid in QuickBooks. Please review your vendor and account selections.`;
+  }
+
+  // Stale data / concurrency conflict
+  if (error.errorCode === "5010") {
+    return "This record was modified in QuickBooks since you last loaded it. Please refresh and try again.";
+  }
+
+  // Business validation errors
+  if (error.errorCode === "6000" || error.errorCode === "2050") {
+    return `QuickBooks rejected this ${typeLabel}: ${detail}`;
+  }
+
+  // Auth/token errors
+  if (error.statusCode === 401) {
+    return "Your QuickBooks connection has expired. Please reconnect in Settings and try again.";
+  }
+
+  // Rate limit
+  if (error.statusCode === 429) {
+    return "QuickBooks rate limit reached. Please wait a moment and try again.";
+  }
+
+  // Fallback with detail if available
+  return `QuickBooks error: ${detail || error.message}`;
+}
+
+/**
  * POST /api/invoices/[id]/sync
  *
  * Syncs an approved invoice to QBO as a Bill or Purchase (Check/Cash/CreditCard).
@@ -296,12 +354,8 @@ export async function POST(
       });
 
       if (error instanceof QBOApiError) {
-        if (error.detail?.includes("Duplicate")) {
-          return validationError(
-            `A ${OUTPUT_TYPE_LABELS[outputType].toLowerCase()} with this invoice number already exists in QuickBooks. ${error.detail}`
-          );
-        }
-        return validationError(`QuickBooks error: ${error.detail}`);
+        const friendlyMessage = translateQBOError(error, outputType);
+        return validationError(friendlyMessage);
       }
       return internalError(`Failed to create ${OUTPUT_TYPE_LABELS[outputType].toLowerCase()} in QuickBooks.`);
     }

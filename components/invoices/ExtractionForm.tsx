@@ -282,6 +282,9 @@ export default function ExtractionForm({
 
   // Compute sync blockers for ActionBar
   const syncBlockers: string[] = [];
+  if (!qboOptions.connected) {
+    syncBlockers.push("Connect QuickBooks in Settings");
+  }
   if (!vendorRef) syncBlockers.push("Select a QuickBooks vendor");
   if (lineItemsMissingGl > 0) {
     syncBlockers.push(`${lineItemsMissingGl} line item(s) need a GL account`);
@@ -425,6 +428,37 @@ export default function ExtractionForm({
           setCurrentPaymentAccountName(name);
         }}
       />
+
+      {/* QBO disconnection warning */}
+      {!qboOptions.loading && !qboOptions.connected && (
+        <div className="flex items-start gap-2 bg-error/5 border border-error/20 rounded-md p-3">
+          <svg
+            className="h-5 w-5 text-error shrink-0 mt-0.5"
+            viewBox="0 0 20 20"
+            fill="currentColor"
+            aria-hidden="true"
+          >
+            <path
+              fillRule="evenodd"
+              d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z"
+              clipRule="evenodd"
+            />
+          </svg>
+          <div className="text-sm">
+            <p className="text-error font-medium">QuickBooks disconnected</p>
+            <p className="text-muted mt-0.5">
+              {qboOptions.error ?? "Reconnect in Settings to sync invoices."}
+              {" "}
+              <a
+                href="/settings"
+                className="text-primary hover:text-primary-hover underline"
+              >
+                Go to Settings
+              </a>
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* Low-confidence banner */}
       {confidenceScore === "low" && (
