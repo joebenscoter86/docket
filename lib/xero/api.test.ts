@@ -2,6 +2,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { http, HttpResponse } from "msw";
 import { setupServer } from "msw/node";
+import type { XeroContact } from "@/lib/xero/types";
 
 // Mock getValidAccessToken before importing api module
 vi.mock("@/lib/xero/auth", () => ({
@@ -91,5 +92,106 @@ describe("xeroFetch", () => {
     await expect(
       createContact(mockSupabase, "org-1", "")
     ).rejects.toThrow("Name is required");
+  });
+});
+
+const CONTACT_1: XeroContact = {
+  ContactID: "aaaa-1111",
+  Name: "Acme Corp",
+  ContactStatus: "ACTIVE",
+  IsSupplier: true,
+  IsCustomer: false,
+};
+
+const CONTACT_2: XeroContact = {
+  ContactID: "bbbb-2222",
+  Name: "Beta Inc",
+  ContactStatus: "ACTIVE",
+  IsSupplier: true,
+  IsCustomer: true,
+};
+
+describe("queryContacts", () => {
+  it("fetches active supplier contacts", async () => {
+    server.use(
+      http.get(`${XERO_BASE}/Contacts`, ({ request }) => {
+        const url = new URL(request.url);
+        expect(url.searchParams.get("where")).toContain("IsSupplier==true");
+        return HttpResponse.json({ Contacts: [CONTACT_1, CONTACT_2] });
+      })
+    );
+
+    const { queryContacts } = await import("@/lib/xero/api");
+    const mockSupabase = {} as Parameters<typeof queryContacts>[0];
+    const contacts = await queryContacts(mockSupabase, "org-1");
+
+    expect(contacts).toHaveLength(2);
+    expect(contacts[0].ContactID).toBe("aaaa-1111");
+  });
+
+  it("paginates when >100 contacts returned", async () => {
+    const page1Contacts = Array.from({ length: 100 }, (_, i) => ({
+      ...CONTACT_1,
+      ContactID: `page1-${i}`,
+      Name: `Vendor ${String(i).padStart(3, "0")}`,
+    }));
+    const page2Contacts = Array.from({ length: 50 }, (_, i) => ({
+      ...CONTACT_1,
+      ContactID: `page2-${i}`,
+      Name: `Vendor ${String(i + 100).padStart(3, "0")}`,
+    }));
+
+    let requestCount = 0;
+    server.use(
+      http.get(`${XERO_BASE}/Contacts`, ({ request }) => {
+        requestCount++;
+        const url = new URL(request.url);
+        const page = url.searchParams.get("page") ?? "1";
+        if (page === "1") {
+          return HttpResponse.json({ Contacts: page1Contacts });
+        }
+        return HttpResponse.json({ Contacts: page2Contacts });
+      })
+    );
+
+    const { queryContacts } = await import("@/lib/xero/api");
+    const mockSupabase = {} as Parameters<typeof queryContacts>[0];
+    const contacts = await queryContacts(mockSupabase, "org-1");
+
+    expect(contacts).toHaveLength(150);
+    expect(requestCount).toBe(2);
+  });
+
+  it("returns empty array when no contacts exist", async () => {
+    server.use(
+      http.get(`${XERO_BASE}/Contacts`, () => {
+        return HttpResponse.json({ Contacts: [] });
+      })
+    );
+
+    const { queryContacts } = await import("@/lib/xero/api");
+    const mockSupabase = {} as Parameters<typeof queryContacts>[0];
+    const contacts = await queryContacts(mockSupabase, "org-1");
+
+    expect(contacts).toEqual([]);
+  });
+});
+
+describe("getContactOptions", () => {
+  it("maps contacts to VendorOption shape", async () => {
+    server.use(
+      http.get(`${XERO_BASE}/Contacts`, () => {
+        return HttpResponse.json({ Contacts: [CONTACT_2, CONTACT_1] });
+      })
+    );
+
+    const { getContactOptions } = await import("@/lib/xero/api");
+    const mockSupabase = {} as Parameters<typeof getContactOptions>[0];
+    const options = await getContactOptions(mockSupabase, "org-1");
+
+    expect(options).toEqual([
+      { value: "aaaa-1111", label: "Acme Corp" },
+      { value: "bbbb-2222", label: "Beta Inc" },
+    ]);
   });
 });
