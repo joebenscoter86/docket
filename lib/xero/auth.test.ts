@@ -370,7 +370,9 @@ describe("getValidAccessToken", () => {
             }),
           }),
         }),
-        upsert: vi.fn().mockResolvedValue({ error: null }),
+        update: vi.fn().mockReturnValue({
+          eq: vi.fn().mockResolvedValue({ error: null }),
+        }),
       }),
     };
 
@@ -385,6 +387,7 @@ describe("getValidAccessToken", () => {
 
   it("coalesces concurrent token refreshes into a single Xero API call", async () => {
     const expiredConnection = {
+      id: "conn-1",
       access_token: "enc_old_access",
       refresh_token: "enc_old_refresh",
       token_expires_at: new Date(Date.now() - 60_000).toISOString(), // expired 1 min ago
@@ -403,7 +406,9 @@ describe("getValidAccessToken", () => {
             }),
           }),
         }),
-        upsert: vi.fn().mockResolvedValue({ error: null }),
+        update: vi.fn().mockReturnValue({
+          eq: vi.fn().mockResolvedValue({ error: null }),
+        }),
       }),
     };
 
@@ -619,5 +624,152 @@ describe("refreshXeroTokens", () => {
     expect(result.accessToken).toBe("new_access");
     expect(result.tenantId).toBe("tenant-1");
     expect(mockUpdate).toHaveBeenCalledTimes(3);
+  });
+});
+
+// ─── Task 6: getValidAccessToken — status checks ───
+
+describe("getValidAccessToken — status checks", () => {
+  beforeEach(() => {
+    vi.restoreAllMocks();
+    process.env.XERO_CLIENT_ID = "test_client_id";
+    process.env.XERO_CLIENT_SECRET = "test_client_secret";
+  });
+
+  it("throws ConnectionExpiredError immediately when status is 'expired'", async () => {
+    const expiredConnection = {
+      id: "conn-1",
+      status: "expired",
+      access_token: "enc_access",
+      refresh_token: "enc_refresh",
+      token_expires_at: new Date(Date.now() + 60 * 60_000).toISOString(),
+      company_id: "tenant-1",
+      company_name: "Acme",
+    };
+
+    const mockSupabase = {
+      from: vi.fn().mockReturnValue({
+        select: vi.fn().mockReturnValue({
+          eq: vi.fn().mockReturnValue({
+            eq: vi.fn().mockReturnValue({
+              limit: vi.fn().mockReturnValue({
+                single: vi.fn().mockResolvedValue({ data: expiredConnection, error: null }),
+              }),
+            }),
+          }),
+        }),
+      }),
+    };
+
+    const { getValidAccessToken } = await import("./auth");
+    const { ConnectionExpiredError } = await import("@/lib/accounting/types");
+
+    await expect(getValidAccessToken(mockSupabase as never, "org-1")).rejects.toThrow(
+      ConnectionExpiredError
+    );
+  });
+
+  it("throws ConnectionExpiredError immediately when status is 'error'", async () => {
+    const errorConnection = {
+      id: "conn-1",
+      status: "error",
+      access_token: "enc_access",
+      refresh_token: "enc_refresh",
+      token_expires_at: new Date(Date.now() + 60 * 60_000).toISOString(),
+      company_id: "tenant-1",
+      company_name: "Acme",
+    };
+
+    const mockSupabase = {
+      from: vi.fn().mockReturnValue({
+        select: vi.fn().mockReturnValue({
+          eq: vi.fn().mockReturnValue({
+            eq: vi.fn().mockReturnValue({
+              limit: vi.fn().mockReturnValue({
+                single: vi.fn().mockResolvedValue({ data: errorConnection, error: null }),
+              }),
+            }),
+          }),
+        }),
+      }),
+    };
+
+    const { getValidAccessToken } = await import("./auth");
+    const { ConnectionExpiredError } = await import("@/lib/accounting/types");
+
+    await expect(getValidAccessToken(mockSupabase as never, "org-1")).rejects.toThrow(
+      ConnectionExpiredError
+    );
+  });
+
+  it("sets status='expired' and throws ConnectionExpiredError on invalid_grant", async () => {
+    const expiredTokenConnection = {
+      id: "conn-1",
+      status: "active",
+      access_token: "enc_access",
+      refresh_token: "enc_refresh",
+      token_expires_at: new Date(Date.now() - 60_000).toISOString(),
+      company_id: "tenant-1",
+      company_name: "Acme",
+    };
+
+    const mockStatusUpdate = vi.fn().mockReturnValue({
+      eq: vi.fn().mockResolvedValue({ error: null }),
+    });
+
+    const mockSupabase = {
+      from: vi.fn().mockReturnValue({
+        select: vi.fn().mockReturnValue({
+          eq: vi.fn().mockReturnValue({
+            eq: vi.fn().mockReturnValue({
+              limit: vi.fn().mockReturnValue({
+                single: vi.fn().mockResolvedValue({ data: expiredTokenConnection, error: null }),
+              }),
+            }),
+          }),
+        }),
+        update: mockStatusUpdate,
+      }),
+    };
+
+    globalThis.fetch = vi.fn().mockResolvedValue({
+      ok: false,
+      status: 400,
+      text: async () => '{"error":"invalid_grant"}',
+    }) as typeof fetch;
+
+    const { getValidAccessToken } = await import("./auth");
+    const { ConnectionExpiredError } = await import("@/lib/accounting/types");
+
+    await expect(getValidAccessToken(mockSupabase as never, "org-1")).rejects.toThrow(
+      ConnectionExpiredError
+    );
+
+    const [updateData] = mockStatusUpdate.mock.calls[0];
+    expect(updateData.status).toBe("expired");
+  });
+});
+
+// ─── Task 6: token security ───
+
+describe("token security", () => {
+  it("never logs token values", async () => {
+    const { logger } = await import("@/lib/utils/logger");
+    const allCalls = [
+      ...(logger.info as ReturnType<typeof vi.fn>).mock.calls,
+      ...(logger.warn as ReturnType<typeof vi.fn>).mock.calls,
+      ...(logger.error as ReturnType<typeof vi.fn>).mock.calls,
+    ];
+
+    for (const call of allCalls) {
+      const serialized = JSON.stringify(call);
+      expect(serialized).not.toContain("raw_access");
+      expect(serialized).not.toContain("raw_refresh");
+      expect(serialized).not.toContain("new_access");
+      expect(serialized).not.toContain("new_refresh");
+      expect(serialized).not.toContain("old_access");
+      expect(serialized).not.toContain("old_refresh");
+      expect(serialized).not.toContain("enc_");
+    }
   });
 });

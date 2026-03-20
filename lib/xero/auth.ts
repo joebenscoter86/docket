@@ -2,6 +2,7 @@
 import { randomBytes, createHash } from "crypto";
 import { encrypt, decrypt } from "@/lib/utils/encryption";
 import { logger } from "@/lib/utils/logger";
+import { ConnectionExpiredError } from "@/lib/accounting/types";
 import type {
   XeroTokenResponse,
   XeroTokens,
@@ -388,6 +389,11 @@ export async function getValidAccessToken(
     );
   }
 
+  // Check connection status before attempting anything
+  if (connection.status === "expired" || connection.status === "error") {
+    throw new ConnectionExpiredError("xero", orgId);
+  }
+
   const expiresAt = new Date(connection.token_expires_at);
   const now = new Date();
 
@@ -412,39 +418,49 @@ export async function getValidAccessToken(
       expiresAt: expiresAt.toISOString(),
     });
 
-    const decryptedRefresh = decrypt(connection.refresh_token);
-
-    let tokenResponse: XeroTokenResponse;
     try {
-      tokenResponse = await refreshAccessToken(decryptedRefresh);
-    } catch {
-      logger.error("xero.token_refresh_failed_disconnect", { orgId });
+      return await refreshXeroTokens(
+        supabase,
+        connection.refresh_token,
+        connection.id,
+        orgId,
+        connection.company_id
+      );
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : String(err);
+
+      // invalid_grant means the refresh token is dead (expired or revoked)
+      if (errorMessage.includes("400") || errorMessage.includes("invalid_grant")) {
+        // Mark connection as expired in DB
+        await supabase
+          .from("accounting_connections")
+          .update({ status: "expired" })
+          .eq("id", connection.id);
+
+        logger.warn("xero.connection_expired", {
+          orgId,
+          connectionId: connection.id,
+        });
+
+        throw new ConnectionExpiredError("xero", orgId);
+      }
+
+      // Other errors — mark as error status
+      await supabase
+        .from("accounting_connections")
+        .update({ status: "error" })
+        .eq("id", connection.id);
+
+      logger.error("xero.token_refresh_failed", {
+        orgId,
+        connectionId: connection.id,
+        errorType: errorMessage,
+      });
+
       throw new Error(
-        "Xero connection expired. Please reconnect in Settings."
+        "Unable to connect to Xero. Please try again in a few minutes."
       );
     }
-
-    // Store rotated tokens — critical: Xero refresh tokens are single-use
-    const newTokens: XeroTokens = {
-      accessToken: tokenResponse.access_token,
-      refreshToken: tokenResponse.refresh_token,
-      expiresIn: tokenResponse.expires_in,
-    };
-
-    await storeConnection(
-      supabase,
-      orgId,
-      newTokens,
-      connection.company_id,
-      connection.company_name ?? undefined
-    );
-
-    logger.info("xero.token_refreshed", { orgId });
-
-    return {
-      accessToken: newTokens.accessToken,
-      tenantId: connection.company_id,
-    };
   })();
 
   refreshLocks.set(orgId, refreshPromise);
