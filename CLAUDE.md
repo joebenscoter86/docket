@@ -12,7 +12,7 @@ A web app where small businesses upload invoices (PDF, image, or email), AI extr
 - Side-by-side review/correction UI
 - QuickBooks Online integration (create bill + attach PDF)
 - Email/password auth (Supabase Auth)
-- Stripe subscription billing ($99/mo Growth plan)
+- Stripe subscription billing (three-tier: $29/$59/$99, usage-based trial. See `pricing-proposal.md`)
 
 **NOT in MVP:**
 - Xero integration (Phase 2)
@@ -754,6 +754,10 @@ Run these before declaring any issue done:
 
 | Date | Decision | Rationale | Issue |
 |------|----------|-----------|-------|
+| 2026-03-20 | Xero OAuth2+PKCE connect flow in `lib/xero/auth.ts` (parallel to QBO, not shared abstraction) | OAuth flows are genuinely different (PKCE vs no PKCE, tenant selection vs realmId, different token lifetimes). Auth is provider-specific; the provider abstraction (DOC-52) handles the shared API interface. | DOC-54 |
+| 2026-03-20 | DOC-54 pre-built most of DOC-55's token management scope | `lib/xero/auth.ts` already has: `refreshAccessToken`, `getValidAccessToken` (with 5-min buffer + per-org concurrency lock), `storeConnection` (encrypted), `loadConnection`, `disconnect`. DOC-55 still needs: (1) wire into provider adapter, (2) Settings page health check (7-day refresh token expiry warning), (3) explicit `ConnectionExpiredError` type. | DOC-54/DOC-55 |
+| 2026-03-20 | Single JSON cookie for Xero PKCE state (`xero_oauth_pkce`) vs QBO's two separate cookies | Verifier + state are always created/consumed/deleted together. Simpler than QBO's `qbo_oauth_state` + `qbo_oauth_return_to` pattern. | DOC-54 |
+| 2026-03-20 | Xero scopes use granular post-March-2026 format | `accounting.invoices` not `accounting.transactions`. Apps created after March 2, 2026 must use granular scopes. Confirmed in DOC-53 sandbox. | DOC-53/DOC-54 |
 | 2026-03-15 | Provider interface uses `fileBuffer + mimeType` instead of `fileUrl` | Decouples provider from Supabase Storage — future providers (Google Doc AI) won't need signed URLs. Orchestration layer handles file fetching. | DOC-14 |
 | 2026-03-15 | Added `lib/extraction/run.ts` orchestration layer | Separates DB writes and status management from both the API route and the provider. Single shared function for upload auto-trigger and manual retry. | DOC-14 |
 | 2026-03-15 | org_memberships join table instead of owner_id-only RLS | Prevents full RLS rewrite in Phase 3 (team accounts). Supports bookkeepers managing multiple businesses. 30 min extra in foundation. | Plan Review |
@@ -776,7 +780,11 @@ Run these before declaring any issue done:
 | 2026-03-17 | Full onboarding wizard, not banner nudge | 3-step flow (Welcome → Connect QBO → Upload First Invoice). Design partners get visible badge per DOC-48 mockup. | DOC-38 |
 | 2026-03-17 | Landing page at dockett.app root, app at /app/* | Single Next.js deployment. Unauth → landing page, auth → redirect to /app/invoices. No separate marketing site. | DOC-42 |
 | 2026-03-16 | Invoice list: server-side rendering with URL state (Approach A) | Simplest pattern, bookmarkable URLs, fast at MVP scale. Upgrade to hybrid (server initial + client subsequent) when filter latency >200ms or invoice volume >500/org. | DOC-25 |
-| 2026-03-15 | Single pricing tier for MVP ($99/mo Growth) | One price, one plan, zero decision paralysis for early users. Tiered pricing comes with Phase 2+. | Business |
+| 2026-03-20 | Both platforms (QBO + Xero) on all tiers | Xero ships with MVP. Platform gating creates confusing edge cases and blocks easiest conversion path (Xero users have zero native AI extraction). | DOC-86 |
+| 2026-03-20 | AI GL inference + one-click nav ungated (all tiers) | Core differentiators, not upsell levers. AI GL inference is what makes $29 Starter objectively better than $31.50 Dext. | DOC-86 |
+| 2026-03-20 | Free trial: 10 invoices usage-based, not 14-day time-based | ICP processes invoices in batches, not daily. Usage-based avoids trial expiring during slow week. No Stripe trial_period_days; count check in access layer. Pro features during trial. | DOC-86 |
+| 2026-03-19 | Three-tier pricing: $29 Starter / $59 Pro / $99 Growth | Replaces single $99/mo plan. See `pricing-proposal.md` for full competitive analysis, unit economics, and tier details. **Reference this file on any build that touches pricing, billing, Stripe checkout, or plan gating.** | Business |
+| 2026-03-15 | ~~Single pricing tier for MVP ($99/mo Growth)~~ | **SUPERSEDED** by three-tier model (2026-03-19). | Business |
 | 2026-03-18 | `UNIQUE(org_id, provider)` on `accounting_connections` | delete+insert had a race condition causing duplicate rows. Upsert with `onConflict` is atomic. | DOC-49 |
 | 2026-03-18 | Date-only strings parsed as local time, not UTC | `new Date("2026-03-01")` → UTC midnight → wrong day in US timezones. Append `T00:00:00` for local parsing. | DOC-50 |
 | 2026-03-18 | Dev server pinned to port 3000 | QBO OAuth redirect URI must match Intuit's registered URI exactly. Auto-incrementing ports break the callback. | DOC-51 |
