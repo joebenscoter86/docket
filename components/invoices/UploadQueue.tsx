@@ -137,7 +137,7 @@ function getProgressBarWidth(status: FileUploadStatus): string {
 // Component
 // ---------------------------------------------------------------------------
 
-export default function UploadQueue({ files, onComplete }: UploadQueueProps) {
+export default function UploadQueue({ files }: UploadQueueProps) {
   const batchId = useRef(crypto.randomUUID());
   const cancelledRef = useRef(false);
   const limiterRef = useRef(createLimit(3));
