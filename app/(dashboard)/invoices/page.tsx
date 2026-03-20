@@ -3,7 +3,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { validateListParams, fetchInvoiceList, fetchInvoiceCounts } from "@/lib/invoices/queries";
-import { isConnected } from "@/lib/quickbooks/auth";
+import { isOrgConnected } from "@/lib/accounting";
 import InvoiceList from "@/components/invoices/InvoiceList";
 import Button from "@/components/ui/Button";
 
@@ -41,7 +41,7 @@ export default async function InvoicesPage({ searchParams }: InvoicesPageProps) 
     .single();
 
   const isQboConnected = membership
-    ? await isConnected(createAdminClient(), membership.org_id)
+    ? await isOrgConnected(createAdminClient(), membership.org_id)
     : false;
 
   const params = validateListParams({
