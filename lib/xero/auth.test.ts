@@ -454,7 +454,7 @@ describe("disconnect", () => {
     await disconnect(mockSupabase as never, "org-123");
 
     expect(revokeUrl).toBe("https://identity.xero.com/connect/revocation");
-    expect(revokeInit.headers?.["Content-Type"]).toBe("application/x-www-form-urlencoded");
+    expect((revokeInit.headers as Record<string, string>)?.["Content-Type"]).toBe("application/x-www-form-urlencoded");
     expect(revokeInit.body?.toString()).toContain("token=refresh"); // decrypt("enc_refresh") = "refresh"
     expect(mockDelete).toHaveBeenCalled();
   });
