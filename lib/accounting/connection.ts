@@ -16,7 +16,7 @@ export async function getOrgConnection(
 ): Promise<AccountingConnectionInfo | null> {
   const { data, error } = await supabase
     .from("accounting_connections")
-    .select("id, org_id, provider, company_id, company_name, connected_at")
+    .select("id, org_id, provider, company_id, company_name, connected_at, status, refresh_token_expires_at")
     .eq("org_id", orgId)
     .order("connected_at", { ascending: false })
     .limit(1)
@@ -31,6 +31,8 @@ export async function getOrgConnection(
     companyId: data.company_id as string,
     companyName: (data.company_name as string | undefined) ?? undefined,
     connectedAt: data.connected_at as string,
+    status: (data.status as 'active' | 'expired' | 'error') ?? undefined,
+    refreshTokenExpiresAt: (data.refresh_token_expires_at as string | null) ?? null,
   };
 }
 

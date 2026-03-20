@@ -53,4 +53,6 @@ export interface AccountingConnectionRow {
   company_id: string;
   connected_at: string;
   company_name?: string | null;
+  status?: string;
+  refresh_token_expires_at?: string | null;
 }

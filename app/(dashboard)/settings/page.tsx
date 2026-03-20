@@ -2,6 +2,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getOrgConnection } from "@/lib/accounting";
 import { QBOConnectionCard } from "@/components/settings/QBOConnectionCard";
+import { ConnectionHealthBanner } from "@/components/settings/ConnectionHealthBanner";
 import { SettingsAlert } from "@/components/settings/SettingsAlert";
 import { BillingCard } from "@/components/settings/BillingCard";
 import { AccountCard } from "@/components/settings/AccountCard";
@@ -42,26 +43,39 @@ export default async function SettingsPage({
     is_design_partner: userData?.is_design_partner ?? false,
   };
 
-  // Check QBO connection status
-  let qboConnection: {
+  // Check connection status
+  let connectionData: {
     connected: boolean;
+    provider?: "quickbooks" | "xero";
     companyId?: string;
     companyName?: string;
     connectedAt?: string;
+    status?: "active" | "expired" | "error";
+    refreshTokenExpiresAt?: string | null;
   } = { connected: false };
 
   if (orgId) {
     const adminSupabase = createAdminClient();
     const connection = await getOrgConnection(adminSupabase, orgId);
     if (connection) {
-      qboConnection = {
+      connectionData = {
         connected: true,
+        provider: connection.provider,
         companyId: connection.companyId,
         companyName: connection.companyName ?? undefined,
         connectedAt: connection.connectedAt,
+        status: connection.status,
+        refreshTokenExpiresAt: connection.refreshTokenExpiresAt,
       };
     }
   }
+
+  const qboConnection = {
+    connected: connectionData.connected,
+    companyId: connectionData.companyId,
+    companyName: connectionData.companyName,
+    connectedAt: connectionData.connectedAt,
+  };
 
   // Get usage info
   let usage = { used: 0, limit: null as number | null, percentUsed: null as number | null, periodEnd: new Date().toISOString() };
@@ -106,6 +120,16 @@ export default async function SettingsPage({
         <p className="text-[13px] font-bold uppercase tracking-wider text-muted mb-3">
           Connections
         </p>
+        {connectionData.connected && connectionData.provider && (
+          <div className="mb-3">
+            <ConnectionHealthBanner
+              provider={connectionData.provider}
+              status={connectionData.status}
+              refreshTokenExpiresAt={connectionData.refreshTokenExpiresAt}
+              companyName={connectionData.companyName}
+            />
+          </div>
+        )}
         <QBOConnectionCard connection={qboConnection} />
       </div>
 

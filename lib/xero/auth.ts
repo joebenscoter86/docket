@@ -2,6 +2,7 @@
 import { randomBytes, createHash } from "crypto";
 import { encrypt, decrypt } from "@/lib/utils/encryption";
 import { logger } from "@/lib/utils/logger";
+import { ConnectionExpiredError } from "@/lib/accounting/types";
 import type {
   XeroTokenResponse,
   XeroTokens,
@@ -22,6 +23,9 @@ export const XERO_SCOPES =
 
 // Buffer before actual expiry to avoid edge-case failures (5 minutes)
 export const TOKEN_EXPIRY_BUFFER_MS = 5 * 60 * 1000;
+
+// Xero refresh tokens last ~60 days
+const XERO_REFRESH_TOKEN_LIFETIME_MS = 60 * 24 * 60 * 60 * 1000;
 
 export function getXeroConfig() {
   const clientId = process.env.XERO_CLIENT_ID;
@@ -202,6 +206,8 @@ export async function storeConnection(
       company_id: tenantId,
       company_name: tenantName ?? null,
       connected_at: new Date().toISOString(),
+      status: "active",
+      refresh_token_expires_at: new Date(Date.now() + XERO_REFRESH_TOKEN_LIFETIME_MS).toISOString(),
     },
     { onConflict: "org_id,provider" }
   );
@@ -282,6 +288,123 @@ export async function refreshAccessToken(
 }
 
 /**
+ * Refresh Xero tokens and persist the rotated tokens to DB.
+ * Retries DB writes up to 3 times with exponential backoff because
+ * Xero rotates refresh tokens — a failed DB write after successful refresh
+ * means the new tokens exist only in memory and the old DB tokens are dead.
+ *
+ * Returns { accessToken, tenantId } on success.
+ */
+export async function refreshXeroTokens(
+  supabase: ReturnType<typeof import("@/lib/supabase/admin").createAdminClient>,
+  encryptedRefreshToken: string,
+  connectionId: string,
+  orgId: string,
+  tenantId: string
+): Promise<{ accessToken: string; tenantId: string }> {
+  const startTime = Date.now();
+  const decryptedRefresh = decrypt(encryptedRefreshToken);
+
+  // Retry Xero HTTP call up to 3 times for transient errors (500s, network errors).
+  // Permanent failures (400/invalid_grant) are re-thrown immediately without retry.
+  const HTTP_MAX_RETRIES = 3;
+  const HTTP_BACKOFF_BASE_MS = 100;
+  let tokenResponse: XeroTokenResponse | undefined;
+
+  for (let attempt = 1; attempt <= HTTP_MAX_RETRIES; attempt++) {
+    try {
+      tokenResponse = await refreshAccessToken(decryptedRefresh);
+      break; // success — exit retry loop
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : String(err);
+
+      // 400/invalid_grant = permanent failure (expired/revoked token); never retry
+      if (errorMessage.includes("400") || errorMessage.includes("invalid_grant")) {
+        throw err;
+      }
+
+      if (attempt < HTTP_MAX_RETRIES) {
+        logger.error("xero.token_refresh_failed", {
+          orgId,
+          connectionId,
+          attempt: String(attempt),
+          maxAttempts: String(HTTP_MAX_RETRIES),
+          error: errorMessage,
+        });
+        await new Promise((r) =>
+          setTimeout(r, HTTP_BACKOFF_BASE_MS * Math.pow(2, attempt - 1))
+        );
+      } else {
+        throw err; // exhausted retries
+      }
+    }
+  }
+
+  // tokenResponse is always set here (loop throws on exhausted retries)
+  if (!tokenResponse) {
+    throw new Error("Token refresh failed: no response received");
+  }
+
+  // Encrypt new tokens
+  const encryptedAccess = encrypt(tokenResponse.access_token);
+  const encryptedNewRefresh = encrypt(tokenResponse.refresh_token);
+  const expiresAt = new Date(Date.now() + tokenResponse.expires_in * 1000);
+  const refreshExpiresAt = new Date(
+    Date.now() + XERO_REFRESH_TOKEN_LIFETIME_MS
+  );
+
+  // Retry DB write up to 3 times with exponential backoff
+  const MAX_RETRIES = 3;
+  const BACKOFF_BASE_MS = 100;
+  let lastError: Error | null = null;
+
+  for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+    const { error } = await supabase
+      .from("accounting_connections")
+      .update({
+        access_token: encryptedAccess,
+        refresh_token: encryptedNewRefresh,
+        token_expires_at: expiresAt.toISOString(),
+        refresh_token_expires_at: refreshExpiresAt.toISOString(),
+        status: "active",
+      })
+      .eq("id", connectionId);
+
+    if (!error) {
+      logger.info("xero.token_refresh_success", {
+        orgId,
+        connectionId,
+        durationMs: String(Date.now() - startTime),
+      });
+      return { accessToken: tokenResponse.access_token, tenantId };
+    }
+
+    lastError = new Error(error.message);
+    logger.error("xero.token_refresh_db_write_failed", {
+      orgId,
+      connectionId,
+      attempt: String(attempt),
+      maxAttempts: String(MAX_RETRIES),
+      error: error.message,
+    });
+
+    if (attempt < MAX_RETRIES) {
+      await new Promise((r) => setTimeout(r, BACKOFF_BASE_MS * Math.pow(2, attempt - 1)));
+    }
+  }
+
+  // All retries exhausted — tokens exist only in memory
+  logger.error("xero.token_refresh_exhausted", {
+    orgId,
+    connectionId,
+    error: lastError?.message ?? "unknown",
+  });
+
+  // Return in-memory tokens as fallback (process-lifetime only)
+  return { accessToken: tokenResponse.access_token, tenantId };
+}
+
+/**
  * Get a valid (non-expired) access token for an org.
  * Auto-refreshes if the current token is expired or about to expire.
  * Returns `{ accessToken, tenantId }` ready for API calls.
@@ -301,6 +424,11 @@ export async function getValidAccessToken(
     throw new Error(
       "No Xero connection found. Connect Xero in Settings first."
     );
+  }
+
+  // Check connection status before attempting anything
+  if (connection.status === "expired" || connection.status === "error") {
+    throw new ConnectionExpiredError("xero", orgId);
   }
 
   const expiresAt = new Date(connection.token_expires_at);
@@ -327,39 +455,49 @@ export async function getValidAccessToken(
       expiresAt: expiresAt.toISOString(),
     });
 
-    const decryptedRefresh = decrypt(connection.refresh_token);
-
-    let tokenResponse: XeroTokenResponse;
     try {
-      tokenResponse = await refreshAccessToken(decryptedRefresh);
-    } catch {
-      logger.error("xero.token_refresh_failed_disconnect", { orgId });
+      return await refreshXeroTokens(
+        supabase,
+        connection.refresh_token,
+        connection.id,
+        orgId,
+        connection.company_id
+      );
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : String(err);
+
+      // invalid_grant means the refresh token is dead (expired or revoked)
+      if (errorMessage.includes("400") || errorMessage.includes("invalid_grant")) {
+        // Mark connection as expired in DB
+        await supabase
+          .from("accounting_connections")
+          .update({ status: "expired" })
+          .eq("id", connection.id);
+
+        logger.warn("xero.connection_expired", {
+          orgId,
+          connectionId: connection.id,
+        });
+
+        throw new ConnectionExpiredError("xero", orgId);
+      }
+
+      // Other errors — mark as error status
+      await supabase
+        .from("accounting_connections")
+        .update({ status: "error" })
+        .eq("id", connection.id);
+
+      logger.error("xero.token_refresh_failed", {
+        orgId,
+        connectionId: connection.id,
+        errorType: errorMessage,
+      });
+
       throw new Error(
-        "Xero connection expired. Please reconnect in Settings."
+        "Unable to connect to Xero. Please try again in a few minutes."
       );
     }
-
-    // Store rotated tokens — critical: Xero refresh tokens are single-use
-    const newTokens: XeroTokens = {
-      accessToken: tokenResponse.access_token,
-      refreshToken: tokenResponse.refresh_token,
-      expiresIn: tokenResponse.expires_in,
-    };
-
-    await storeConnection(
-      supabase,
-      orgId,
-      newTokens,
-      connection.company_id,
-      connection.company_name ?? undefined
-    );
-
-    logger.info("xero.token_refreshed", { orgId });
-
-    return {
-      accessToken: newTokens.accessToken,
-      tenantId: connection.company_id,
-    };
   })();
 
   refreshLocks.set(orgId, refreshPromise);

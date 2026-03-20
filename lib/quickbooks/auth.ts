@@ -1,6 +1,7 @@
 import { randomBytes } from "crypto";
 import { encrypt, decrypt } from "@/lib/utils/encryption";
 import { logger } from "@/lib/utils/logger";
+import { ConnectionExpiredError } from "@/lib/accounting/types";
 import type { QBOTokenResponse, QBOTokens, AccountingConnectionRow } from "./types";
 
 // ─── Configuration ───
@@ -12,6 +13,9 @@ const SCOPES = "com.intuit.quickbooks.accounting";
 
 // Buffer before actual expiry to avoid edge-case failures (5 minutes)
 const TOKEN_EXPIRY_BUFFER_MS = 5 * 60 * 1000;
+
+// QBO refresh tokens expire after ~101 days
+const QBO_REFRESH_TOKEN_LIFETIME_MS = 101 * 24 * 60 * 60 * 1000;
 
 /**
  * Per-org token refresh lock. When multiple concurrent callers (e.g. batch
@@ -168,6 +172,10 @@ export async function storeConnection(
       company_id: tokens.companyId,
       company_name: companyName ?? null,
       connected_at: new Date().toISOString(),
+      status: "active",
+      refresh_token_expires_at: new Date(
+        Date.now() + QBO_REFRESH_TOKEN_LIFETIME_MS
+      ).toISOString(),
     },
     { onConflict: "org_id,provider" }
   );
@@ -249,11 +257,8 @@ export async function getValidAccessToken(
     try {
       tokenResponse = await refreshAccessToken(decryptedRefresh);
     } catch {
-      // Refresh failed — connection is effectively broken
       logger.error("qbo.token_refresh_failed_disconnect", { orgId });
-      throw new Error(
-        "QuickBooks connection expired. Please reconnect in Settings."
-      );
+      throw new ConnectionExpiredError("quickbooks", orgId);
     }
 
     // Store the new tokens
