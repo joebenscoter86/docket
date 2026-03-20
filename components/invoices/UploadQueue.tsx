@@ -329,20 +329,8 @@ export default function UploadQueue({ files, onComplete }: UploadQueueProps) {
     return () => window.removeEventListener("beforeunload", handler);
   }, [hasUploading]);
 
-  // Fire onComplete when all uploads reach terminal status
-  const allTerminal = mergedEntries.every((e) => isTerminalUploadStatus(e.status));
-  const onCompleteRef = useRef(onComplete);
-  onCompleteRef.current = onComplete;
-  const hasFiredComplete = useRef(false);
-
-  useEffect(() => {
-    if (allTerminal && mergedEntries.length > 0 && !hasFiredComplete.current) {
-      hasFiredComplete.current = true;
-      onCompleteRef.current?.();
-    }
-  }, [allTerminal, mergedEntries.length]);
-
   // Batch summary stats
+  const allTerminal = mergedEntries.every((e) => isTerminalUploadStatus(e.status));
   const successCount = mergedEntries.filter((e) => isSuccessUploadStatus(e.status)).length;
   const failedCount = mergedEntries.filter((e) => e.status === "error").length;
   const totalCount = mergedEntries.length;
