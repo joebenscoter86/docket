@@ -5,7 +5,7 @@ export default function BottomCTA() {
     <section className="bg-background py-20">
       <div className="mx-auto max-w-3xl px-6 text-center">
         <h2 className="font-headings text-3xl font-bold text-text md:text-4xl">
-          Spend your evening, your way — not on invoices.
+          Spend your evening your way. Not on invoices.
         </h2>
         <div className="mt-8">
           <Link

@@ -5,7 +5,7 @@ import Image from 'next/image'
 const steps = [
   {
     title: 'Upload',
-    description: 'Drop your PDFs — one or a whole batch. We take it from there.',
+    description: 'Drop up to 25 PDFs at once. We take it from there.',
     iconPath: '/images/icon-upload.png',
   },
   {
@@ -15,7 +15,7 @@ const steps = [
   },
   {
     title: 'Sync',
-    description: 'One click creates a bill or cuts a check in QuickBooks.',
+    description: 'Create a bill, check, or cash expense in QuickBooks with one click.',
     iconPath: '/images/icon-sync.png',
   },
 ]

@@ -10,9 +10,24 @@ export default function FeaturesSection() {
             <h2 className="font-headings text-4xl font-extrabold tracking-tight text-[#0F172A] sm:text-5xl">
               Built for how you actually work
             </h2>
-            <p className="mt-6 text-lg text-[#475569] leading-relaxed">
-              Process a whole stack of invoices at once — no more one at a time.
-            </p>
+            <ul className="mt-8 space-y-4 text-lg text-[#475569] leading-relaxed">
+              <li className="flex items-start gap-3">
+                <span className="mt-1 text-[#00A3FF] font-bold">&#10003;</span>
+                <span>Batch upload up to 25 invoices at a time</span>
+              </li>
+              <li className="flex items-start gap-3">
+                <span className="mt-1 text-[#00A3FF] font-bold">&#10003;</span>
+                <span>Choose bill, check, or cash expense on every upload</span>
+              </li>
+              <li className="flex items-start gap-3">
+                <span className="mt-1 text-[#00A3FF] font-bold">&#10003;</span>
+                <span>AI suggests GL accounts and gets smarter the more you upload</span>
+              </li>
+              <li className="flex items-start gap-3">
+                <span className="mt-1 text-[#00A3FF] font-bold">&#10003;</span>
+                <span>One click to view what you created in QuickBooks</span>
+              </li>
+            </ul>
           </div>
 
           {/* Screenshot Graphic */}
