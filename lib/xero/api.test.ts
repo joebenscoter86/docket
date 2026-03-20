@@ -2,7 +2,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { http, HttpResponse } from "msw";
 import { setupServer } from "msw/node";
-import type { XeroContact } from "@/lib/xero/types";
+import type { XeroContact, XeroAccount } from "@/lib/xero/types";
 
 // Mock getValidAccessToken before importing api module
 vi.mock("@/lib/xero/auth", () => ({
@@ -256,5 +256,131 @@ describe("createContact", () => {
     );
 
     expect(vendor.value).toBe("dddd-4444");
+  });
+});
+
+// ─── fetchAccounts ───
+
+const ACCOUNT_1: XeroAccount = {
+  AccountID: "uuid-1",
+  Code: "500",
+  Name: "Cost of Goods Sold",
+  Status: "ACTIVE",
+  Type: "DIRECTCOSTS",
+  Class: "EXPENSE",
+};
+
+const ACCOUNT_2: XeroAccount = {
+  AccountID: "uuid-2",
+  Code: "600",
+  Name: "Advertising",
+  Status: "ACTIVE",
+  Type: "EXPENSE",
+  Class: "EXPENSE",
+};
+
+const ACCOUNT_ARCHIVED: XeroAccount = {
+  AccountID: "uuid-3",
+  Code: "501",
+  Name: "Archived Account",
+  Status: "ARCHIVED",
+  Type: "EXPENSE",
+  Class: "EXPENSE",
+};
+
+describe("fetchAccounts", () => {
+  it("returns AccountOption[] sorted alphabetically by label", async () => {
+    server.use(
+      http.get(`${XERO_BASE}/Accounts`, () => {
+        return HttpResponse.json({ Accounts: [ACCOUNT_1, ACCOUNT_2] });
+      })
+    );
+
+    const { fetchAccounts } = await import("@/lib/xero/api");
+    const mockSupabase = {} as Parameters<typeof fetchAccounts>[0];
+    const result = await fetchAccounts(mockSupabase, "org-1");
+
+    // Sorted alphabetically: Advertising before Cost of Goods Sold
+    expect(result).toEqual([
+      { value: "600", label: "Advertising", accountType: "EXPENSE" },
+      { value: "500", label: "Cost of Goods Sold", accountType: "DIRECTCOSTS" },
+    ]);
+  });
+
+  it("filters out archived accounts", async () => {
+    server.use(
+      http.get(`${XERO_BASE}/Accounts`, () => {
+        return HttpResponse.json({ Accounts: [ACCOUNT_1, ACCOUNT_ARCHIVED] });
+      })
+    );
+
+    const { fetchAccounts } = await import("@/lib/xero/api");
+    const mockSupabase = {} as Parameters<typeof fetchAccounts>[0];
+    const result = await fetchAccounts(mockSupabase, "org-1");
+
+    expect(result).toHaveLength(1);
+    expect(result[0].label).toBe("Cost of Goods Sold");
+  });
+
+  it("sets xero-tenant-id header on the request", async () => {
+    let capturedHeaders: Record<string, string> = {};
+    server.use(
+      http.get(`${XERO_BASE}/Accounts`, ({ request }) => {
+        capturedHeaders = Object.fromEntries(request.headers.entries());
+        return HttpResponse.json({ Accounts: [] });
+      })
+    );
+
+    const { fetchAccounts } = await import("@/lib/xero/api");
+    const mockSupabase = {} as Parameters<typeof fetchAccounts>[0];
+    await fetchAccounts(mockSupabase, "org-1");
+
+    expect(capturedHeaders["xero-tenant-id"]).toBe("test-tenant-id");
+  });
+
+  it("uses OData where filter for expense class", async () => {
+    let capturedUrl = "";
+    server.use(
+      http.get(`${XERO_BASE}/Accounts`, ({ request }) => {
+        capturedUrl = request.url;
+        return HttpResponse.json({ Accounts: [] });
+      })
+    );
+
+    const { fetchAccounts } = await import("@/lib/xero/api");
+    const mockSupabase = {} as Parameters<typeof fetchAccounts>[0];
+    await fetchAccounts(mockSupabase, "org-1");
+
+    expect(capturedUrl).toContain('where=Class%3D%3D%22EXPENSE%22');
+  });
+
+  it("throws XeroApiError on non-ok response", async () => {
+    server.use(
+      http.get(`${XERO_BASE}/Accounts`, () => {
+        return HttpResponse.json(
+          { Title: "Unauthorized", Status: 401, Detail: "AuthenticationUnsuccessful" },
+          { status: 401 }
+        );
+      })
+    );
+
+    const { fetchAccounts, XeroApiError } = await import("@/lib/xero/api");
+    const mockSupabase = {} as Parameters<typeof fetchAccounts>[0];
+
+    await expect(fetchAccounts(mockSupabase, "org-1")).rejects.toThrow(XeroApiError);
+  });
+
+  it("returns empty array when Accounts is empty", async () => {
+    server.use(
+      http.get(`${XERO_BASE}/Accounts`, () => {
+        return HttpResponse.json({ Accounts: [] });
+      })
+    );
+
+    const { fetchAccounts } = await import("@/lib/xero/api");
+    const mockSupabase = {} as Parameters<typeof fetchAccounts>[0];
+    const result = await fetchAccounts(mockSupabase, "org-1");
+
+    expect(result).toEqual([]);
   });
 });

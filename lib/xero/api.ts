@@ -8,8 +8,10 @@ import type {
   XeroAuthError,
   XeroValidationError,
   XeroAddress,
+  XeroAccount,
+  XeroAccountsResponse,
 } from "./types";
-import type { VendorOption } from "@/lib/accounting/types";
+import type { VendorOption, AccountOption } from "@/lib/accounting/types";
 
 // ─── Configuration ───
 
@@ -284,4 +286,46 @@ export async function createContact(
     value: contact.ContactID,
     label: contact.Name,
   };
+}
+
+// ─── Account Operations ───
+
+/**
+ * Fetch expense-type accounts from Xero.
+ * Filters by Class=="EXPENSE" server-side (OData where clause).
+ * Excludes archived accounts in the response mapping.
+ * Returns AccountOption[] sorted alphabetically for dropdown display.
+ *
+ * AccountOption.value = AccountCode (e.g., "500"), NOT AccountID.
+ * Xero line items reference Code, not the UUID AccountID.
+ */
+export async function fetchAccounts(
+  supabase: SupabaseAdminClient,
+  orgId: string
+): Promise<AccountOption[]> {
+  const startTime = Date.now();
+
+  const where = encodeURIComponent('Class=="EXPENSE"');
+  const response = await xeroFetch<XeroAccountsResponse>(
+    supabase,
+    orgId,
+    `/Accounts?where=${where}`
+  );
+
+  const accounts = (response.Accounts ?? [])
+    .filter((a: XeroAccount) => a.Status !== "ARCHIVED")
+    .map((a: XeroAccount) => ({
+      value: a.Code,
+      label: a.Name,
+      accountType: a.Type,
+    }))
+    .sort((a, b) => a.label.localeCompare(b.label));
+
+  logger.info("xero.accounts_fetched", {
+    orgId,
+    count: String(accounts.length),
+    durationMs: Date.now() - startTime,
+  });
+
+  return accounts;
 }
