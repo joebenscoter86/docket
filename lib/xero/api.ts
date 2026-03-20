@@ -14,7 +14,7 @@ import type {
   XeroInvoiceResponse,
   XeroAttachmentResponse,
 } from "./types";
-import type { VendorOption, AccountOption } from "@/lib/accounting/types";
+import type { VendorOption, AccountOption, PaymentAccount } from "@/lib/accounting/types";
 
 // ─── Configuration ───
 
@@ -329,6 +329,54 @@ export async function fetchAccounts(
 
   logger.info("xero.accounts_fetched", {
     orgId,
+    count: String(accounts.length),
+    durationMs: Date.now() - startTime,
+  });
+
+  return accounts;
+}
+
+// ─── Payment Account Operations ───
+
+/**
+ * Fetch bank or credit card accounts from Xero.
+ * Xero stores both bank and credit card accounts under Type="BANK",
+ * distinguished by BankAccountType ("BANK" vs "CREDITCARD").
+ * Returns PaymentAccount[] sorted alphabetically for dropdown display.
+ */
+export async function fetchPaymentAccounts(
+  supabase: SupabaseAdminClient,
+  orgId: string,
+  accountType: "Bank" | "CreditCard"
+): Promise<PaymentAccount[]> {
+  const startTime = Date.now();
+
+  // Xero uses Type=="BANK" for both bank and credit card accounts.
+  // We fetch all bank-type accounts and filter by BankAccountType.
+  const where = encodeURIComponent('Type=="BANK"');
+  const response = await xeroFetch<XeroAccountsResponse>(
+    supabase,
+    orgId,
+    `/Accounts?where=${where}`
+  );
+
+  const xeroBankAccountType = accountType === "CreditCard" ? "CREDITCARD" : "BANK";
+
+  const accounts = (response.Accounts ?? [])
+    .filter(
+      (a: XeroAccount) =>
+        a.Status !== "ARCHIVED" && a.BankAccountType === xeroBankAccountType
+    )
+    .map((a: XeroAccount) => ({
+      id: a.AccountID,
+      name: a.Name,
+      accountType: accountType === "CreditCard" ? "Credit Card" : "Bank",
+    }))
+    .sort((a, b) => a.name.localeCompare(b.name));
+
+  logger.info("xero.payment_accounts_fetched", {
+    orgId,
+    accountType,
     count: String(accounts.length),
     durationMs: Date.now() - startTime,
   });

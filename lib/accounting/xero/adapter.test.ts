@@ -5,6 +5,7 @@ vi.mock("@/lib/xero/api", () => ({
   getContactOptions: vi.fn(),
   createContact: vi.fn(),
   fetchAccounts: vi.fn(),
+  fetchPaymentAccounts: vi.fn(),
   createInvoice: vi.fn(),
   attachDocumentToInvoice: vi.fn(),
   XeroApiError: class XeroApiError extends Error {
@@ -33,6 +34,7 @@ import {
   getContactOptions,
   createContact,
   fetchAccounts,
+  fetchPaymentAccounts,
   createInvoice,
   attachDocumentToInvoice,
   XeroApiError,
@@ -42,6 +44,7 @@ import { AccountingApiError } from "@/lib/accounting/types";
 const mockGetContactOptions = vi.mocked(getContactOptions);
 const mockCreateContact = vi.mocked(createContact);
 const mockFetchAccounts = vi.mocked(fetchAccounts);
+const mockFetchPaymentAccounts = vi.mocked(fetchPaymentAccounts);
 const mockCreateInvoice = vi.mocked(createInvoice);
 const mockAttachDocument = vi.mocked(attachDocumentToInvoice);
 
@@ -176,11 +179,34 @@ describe("XeroAccountingAdapter", () => {
   });
 
   describe("fetchPaymentAccounts", () => {
-    it("throws not implemented", async () => {
+    it("delegates to xeroFetchPaymentAccounts and returns result", async () => {
+      const mockAccounts = [
+        { id: "acc-uuid-1", name: "Business Checking", accountType: "Bank" },
+        { id: "acc-uuid-2", name: "Savings", accountType: "Bank" },
+      ];
+      mockFetchPaymentAccounts.mockResolvedValue(mockAccounts);
+
+      const adapter = await getAdapter();
+      const result = await adapter.fetchPaymentAccounts(mockSupabase, "org-1", "Bank");
+
+      expect(result).toEqual(mockAccounts);
+      expect(mockFetchPaymentAccounts).toHaveBeenCalledWith(mockSupabase, "org-1", "Bank");
+    });
+
+    it("wraps XeroApiError into AccountingApiError", async () => {
+      mockFetchPaymentAccounts.mockRejectedValue(
+        new XeroApiError({
+          message: "Unauthorized",
+          statusCode: 401,
+          errorCode: "401",
+          detail: "Token expired",
+        })
+      );
+
       const adapter = await getAdapter();
       await expect(
-        adapter.fetchPaymentAccounts(mockSupabase, "org-1", "Bank")
-      ).rejects.toThrow("not yet implemented");
+        adapter.fetchPaymentAccounts(mockSupabase, "org-1", "CreditCard")
+      ).rejects.toThrow(AccountingApiError);
     });
   });
 
