@@ -3,6 +3,11 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import ExtractionForm from "./ExtractionForm";
 import type { ExtractedDataRow } from "@/lib/types/invoice";
 
+// Mock next/navigation
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({ push: vi.fn() }),
+}));
+
 // Mock LineItemEditor and ActionBar to isolate ExtractionForm tests
 vi.mock("./LineItemEditor", () => ({
   default: () => <div data-testid="line-item-editor" />,
