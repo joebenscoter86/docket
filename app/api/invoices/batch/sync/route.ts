@@ -1,7 +1,7 @@
 import { waitUntil } from "@vercel/functions";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { isConnected } from "@/lib/quickbooks/auth";
+import { isOrgConnected, getOrgProvider } from "@/lib/accounting";
 import { checkInvoiceAccess } from "@/lib/billing/access";
 import { processBatchSync } from "@/lib/quickbooks/batch-sync";
 import type { BatchSyncInvoice } from "@/lib/quickbooks/batch-sync";
@@ -97,13 +97,15 @@ export async function POST(request: Request) {
 
   const admin = createAdminClient();
 
-  // 5. Check QBO connection
-  const connected = await isConnected(admin, orgId);
+  // 5. Check accounting connection
+  const connected = await isOrgConnected(admin, orgId);
   if (!connected) {
     return validationError(
       "Connect QuickBooks in Settings before syncing invoices."
     );
   }
+
+  const providerType = await getOrgProvider(admin, orgId);
 
   // 6. Fetch all invoices for this batch
   const { data: allInvoices, error: fetchErr } = await admin
@@ -295,7 +297,7 @@ export async function POST(request: Request) {
 
   // 11. Fire background sync for valid invoices
   if (toSync.length > 0) {
-    waitUntil(processBatchSync(admin, orgId, batchId, toSync));
+    waitUntil(processBatchSync(admin, orgId, batchId, toSync, providerType!));
   }
 
   return apiSuccess({

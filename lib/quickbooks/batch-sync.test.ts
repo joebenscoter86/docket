@@ -5,53 +5,32 @@ import type { BatchSyncInvoice } from "./batch-sync";
 
 // ─── Mocks ───
 
-vi.mock("@/lib/quickbooks/auth", () => ({
-  getValidAccessToken: vi.fn().mockResolvedValue({
-    accessToken: "fake-token",
-    companyId: "123",
-  }),
-}));
-
 const mockCreateBill = vi.fn();
 const mockCreatePurchase = vi.fn();
-const mockAttachPdfToEntity = vi.fn();
+const mockAttachDocument = vi.fn();
 
-vi.mock("@/lib/quickbooks/api", () => ({
-  createBill: (...args: unknown[]) => mockCreateBill(...args),
-  createPurchase: (...args: unknown[]) => mockCreatePurchase(...args),
-  attachPdfToEntity: (...args: unknown[]) => mockAttachPdfToEntity(...args),
-  QBOApiError: class QBOApiError extends Error {
+vi.mock("@/lib/accounting", () => ({
+  getAccountingProvider: vi.fn(() => ({
+    createBill: (...args: unknown[]) => mockCreateBill(...args),
+    createPurchase: (...args: unknown[]) => mockCreatePurchase(...args),
+    attachDocument: (...args: unknown[]) => mockAttachDocument(...args),
+  })),
+  AccountingApiError: class AccountingApiError extends Error {
     statusCode: number;
-    qboErrors: Array<{
-      Message: string;
-      Detail: string;
-      code: string;
-      element?: string;
-    }>;
-    faultType: string;
+    errorCode: string;
+    detail: string;
+    element?: string;
     constructor(
       statusCode: number,
-      errors: Array<{
-        Message: string;
-        Detail: string;
-        code: string;
-        element?: string;
-      }> = [],
-      faultType = "unknown"
+      message: string,
+      opts: { errorCode?: string; detail?: string; element?: string } = {}
     ) {
-      super(errors[0]?.Message ?? "Unknown");
+      super(message);
+      this.name = "AccountingApiError";
       this.statusCode = statusCode;
-      this.qboErrors = errors;
-      this.faultType = faultType;
-    }
-    get errorCode() {
-      return this.qboErrors[0]?.code ?? "unknown";
-    }
-    get element() {
-      return this.qboErrors[0]?.element;
-    }
-    get detail() {
-      return this.qboErrors[0]?.Detail ?? this.message;
+      this.errorCode = opts.errorCode ?? "unknown";
+      this.detail = opts.detail ?? message;
+      this.element = opts.element;
     }
   },
 }));
@@ -174,9 +153,9 @@ const billInvoice: BatchSyncInvoice = {
 describe("processBatchSync", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockCreateBill.mockResolvedValue({ Bill: { Id: "qbo-bill-123" } });
-    mockCreatePurchase.mockResolvedValue({ Purchase: { Id: "qbo-purchase-456" } });
-    mockAttachPdfToEntity.mockResolvedValue(undefined);
+    mockCreateBill.mockResolvedValue({ entityId: "qbo-bill-123", entityType: "Bill", providerResponse: {} });
+    mockCreatePurchase.mockResolvedValue({ entityId: "qbo-purchase-456", entityType: "Purchase", providerResponse: {} });
+    mockAttachDocument.mockResolvedValue({ attachmentId: null, success: true });
   });
 
   it("syncs all invoices sequentially and returns correct counts", async () => {
@@ -218,7 +197,7 @@ describe("processBatchSync", () => {
     const result = await processBatchSync(admin as unknown as ReturnType<typeof import("@/lib/supabase/admin").createAdminClient>, ORG_ID, BATCH_ID, [
       billInvoice,
       invoice2,
-    ]);
+    ], "quickbooks");
 
     expect(result.synced).toBe(2);
     expect(result.failed).toBe(0);
@@ -236,7 +215,7 @@ describe("processBatchSync", () => {
     // First call fails, second succeeds
     mockCreateBill
       .mockRejectedValueOnce(new Error("QBO error"))
-      .mockResolvedValueOnce({ Bill: { Id: "qbo-bill-999" } });
+      .mockResolvedValueOnce({ entityId: "qbo-bill-999", entityType: "Bill", providerResponse: {} });
 
     const admin = makeAdminClient();
 
@@ -244,7 +223,8 @@ describe("processBatchSync", () => {
       admin as unknown as ReturnType<typeof import("@/lib/supabase/admin").createAdminClient>,
       ORG_ID,
       BATCH_ID,
-      [billInvoice, invoice2]
+      [billInvoice, invoice2],
+      "quickbooks"
     );
 
     expect(result.synced).toBe(1);
@@ -263,7 +243,8 @@ describe("processBatchSync", () => {
       admin as unknown as ReturnType<typeof import("@/lib/supabase/admin").createAdminClient>,
       ORG_ID,
       BATCH_ID,
-      [billInvoice]
+      [billInvoice],
+      "quickbooks"
     );
 
     expect(result.synced).toBe(0);
@@ -279,7 +260,8 @@ describe("processBatchSync", () => {
       admin as unknown as ReturnType<typeof import("@/lib/supabase/admin").createAdminClient>,
       ORG_ID,
       BATCH_ID,
-      [billInvoice]
+      [billInvoice],
+      "quickbooks"
     );
 
     expect(result.totalMs).toBeGreaterThanOrEqual(0);
@@ -292,7 +274,8 @@ describe("processBatchSync", () => {
       admin as unknown as ReturnType<typeof import("@/lib/supabase/admin").createAdminClient>,
       ORG_ID,
       BATCH_ID,
-      []
+      [],
+      "quickbooks"
     );
 
     expect(result.synced).toBe(0);
@@ -302,14 +285,15 @@ describe("processBatchSync", () => {
   });
 
   it("proceeds with partial success when PDF attachment fails", async () => {
-    mockAttachPdfToEntity.mockRejectedValueOnce(new Error("S3 download failed"));
+    mockAttachDocument.mockRejectedValueOnce(new Error("S3 download failed"));
     const admin = makeAdminClient();
 
     const result = await processBatchSync(
       admin as unknown as ReturnType<typeof import("@/lib/supabase/admin").createAdminClient>,
       ORG_ID,
       BATCH_ID,
-      [billInvoice]
+      [billInvoice],
+      "quickbooks"
     );
 
     // Invoice still marked synced despite attachment failure

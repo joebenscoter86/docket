@@ -1,17 +1,15 @@
-import { getValidAccessToken } from "@/lib/quickbooks/auth";
 import {
-  createBill,
-  createPurchase,
-  attachPdfToEntity,
-  QBOApiError,
-} from "@/lib/quickbooks/api";
-import { logger } from "@/lib/utils/logger";
+  getAccountingProvider,
+  AccountingApiError,
+} from "@/lib/accounting";
 import type {
-  QBOBillPayload,
-  QBOBillLine,
-  QBOPurchasePayload,
-  QBOPurchaseLine,
-} from "@/lib/quickbooks/types";
+  AccountingProviderType,
+  CreateBillInput,
+  CreatePurchaseInput,
+  SyncLineItem,
+  TransactionResult,
+} from "@/lib/accounting";
+import { logger } from "@/lib/utils/logger";
 import type { OutputType, ProviderEntityType } from "@/lib/types/invoice";
 import { OUTPUT_TYPE_TO_PAYMENT_TYPE } from "@/lib/types/invoice";
 
@@ -59,8 +57,10 @@ export async function processBatchSync(
   adminSupabase: SupabaseAdminClient,
   orgId: string,
   batchId: string,
-  invoices: BatchSyncInvoice[]
+  invoices: BatchSyncInvoice[],
+  providerType: AccountingProviderType
 ): Promise<BatchSyncResult> {
+  const provider = getAccountingProvider(providerType);
   const startTime = Date.now();
   let synced = 0;
   let failed = 0;
@@ -81,7 +81,6 @@ export async function processBatchSync(
     const outputType = (invoice.output_type ?? "bill") as OutputType;
     const isBill = outputType === "bill";
     const transactionType = outputType;
-    const providerEntityType: ProviderEntityType = isBill ? "Bill" : "Purchase";
 
     try {
       // 1. Idempotency guard
@@ -108,10 +107,7 @@ export async function processBatchSync(
         continue;
       }
 
-      // 2. Token check (auto-refreshes if expiring within 5 min)
-      await getValidAccessToken(adminSupabase, orgId);
-
-      // 3. Load extracted data + line items
+      // 2. Load extracted data + line items
       const { data: extractedData } = await adminSupabase
         .from("extracted_data")
         .select("*")
@@ -128,95 +124,53 @@ export async function processBatchSync(
         .eq("extracted_data_id", extractedData.id)
         .order("sort_order", { ascending: true });
 
-      // 4. Create bill or purchase in QBO
-      let entityId: string;
-      let requestPayload: unknown;
-      let responsePayload: unknown;
+      // 4. Create bill or purchase via provider abstraction
+      const syncLineItems: SyncLineItem[] = (lineItems ?? []).map(
+        (li: { amount: number; gl_account_id: string; description: string | null }) => ({
+          amount: Number(li.amount),
+          glAccountId: li.gl_account_id,
+          description: li.description,
+        })
+      );
+
+      let result: TransactionResult;
+      let requestInput: unknown;
 
       if (isBill) {
-        const billLines: QBOBillLine[] = (lineItems ?? []).map(
-          (li: { amount: number; gl_account_id: string; description: string | null }) => ({
-            DetailType: "AccountBasedExpenseLineDetail" as const,
-            Amount: Number(li.amount),
-            AccountBasedExpenseLineDetail: {
-              AccountRef: { value: li.gl_account_id },
-            },
-            ...(li.description ? { Description: li.description } : {}),
-          })
-        );
-
-        const billPayload: QBOBillPayload = {
-          VendorRef: { value: extractedData.vendor_ref },
-          Line: billLines,
-          ...(extractedData.invoice_date
-            ? { TxnDate: extractedData.invoice_date }
-            : {}),
-          ...(extractedData.due_date
-            ? { DueDate: extractedData.due_date }
-            : {}),
-          ...(extractedData.invoice_number
-            ? { DocNumber: extractedData.invoice_number }
-            : {}),
+        const input: CreateBillInput = {
+          vendorRef: extractedData.vendor_ref,
+          lineItems: syncLineItems,
+          invoiceDate: extractedData.invoice_date,
+          dueDate: extractedData.due_date,
+          invoiceNumber: extractedData.invoice_number,
         };
-
-        requestPayload = billPayload;
-        const billResponse = await createBill(
-          adminSupabase,
-          orgId,
-          billPayload
-        );
-        entityId = billResponse.Bill.Id;
-        responsePayload = billResponse;
+        requestInput = input;
+        result = await provider.createBill(adminSupabase, orgId, input);
       } else {
-        const purchaseLines: QBOPurchaseLine[] = (lineItems ?? []).map(
-          (li: { amount: number; gl_account_id: string; description: string | null }) => ({
-            Amount: Number(li.amount),
-            DetailType: "AccountBasedExpenseLineDetail" as const,
-            Description: li.description ?? undefined,
-            AccountBasedExpenseLineDetail: {
-              AccountRef: { value: li.gl_account_id },
-            },
-          })
-        );
-
-        const paymentType =
-          OUTPUT_TYPE_TO_PAYMENT_TYPE[
+        const input: CreatePurchaseInput = {
+          vendorRef: extractedData.vendor_ref,
+          paymentAccountRef: invoice.payment_account_id!,
+          paymentType: OUTPUT_TYPE_TO_PAYMENT_TYPE[
             outputType as Exclude<OutputType, "bill">
-          ];
-
-        const purchasePayload: QBOPurchasePayload = {
-          PaymentType: paymentType as "Check" | "Cash" | "CreditCard",
-          AccountRef: { value: invoice.payment_account_id! },
-          EntityRef: { value: extractedData.vendor_ref, type: "Vendor" },
-          Line: purchaseLines,
-          ...(extractedData.invoice_date
-            ? { TxnDate: extractedData.invoice_date }
-            : {}),
-          ...(extractedData.invoice_number
-            ? { DocNumber: extractedData.invoice_number }
-            : {}),
+          ] as "Check" | "Cash" | "CreditCard",
+          lineItems: syncLineItems,
+          invoiceDate: extractedData.invoice_date,
+          invoiceNumber: extractedData.invoice_number,
         };
-
-        requestPayload = purchasePayload;
-        const purchaseResponse = await createPurchase(
-          adminSupabase,
-          orgId,
-          purchasePayload
-        );
-        entityId = purchaseResponse.Purchase.Id;
-        responsePayload = purchaseResponse;
+        requestInput = input;
+        result = await provider.createPurchase(adminSupabase, orgId, input);
       }
 
       // 5. Log success in sync_log
       await adminSupabase.from("sync_log").insert({
         invoice_id: invoiceId,
-        provider: "quickbooks",
-        provider_bill_id: entityId,
-        request_payload: requestPayload as Record<string, unknown>,
-        provider_response: responsePayload as Record<string, unknown>,
+        provider: providerType,
+        provider_bill_id: result.entityId,
+        request_payload: requestInput as Record<string, unknown>,
+        provider_response: result.providerResponse,
         status: "success",
         transaction_type: transactionType,
-        provider_entity_type: providerEntityType,
+        provider_entity_type: result.entityType,
       });
 
       // 6. Attach PDF (best-effort)
@@ -232,11 +186,11 @@ export async function processBatchSync(
         }
 
         const fileBuffer = Buffer.from(await fileData.arrayBuffer());
-        await attachPdfToEntity(
+        await provider.attachDocument(
           adminSupabase,
           orgId,
-          entityId,
-          providerEntityType,
+          result.entityId,
+          result.entityType,
           fileBuffer,
           invoice.file_name
         );
@@ -245,8 +199,8 @@ export async function processBatchSync(
           invoiceId,
           orgId,
           batchId,
-          entityId,
-          entityType: providerEntityType,
+          entityId: result.entityId,
+          entityType: result.entityType,
           error:
             attachError instanceof Error
               ? attachError.message
@@ -265,19 +219,19 @@ export async function processBatchSync(
         invoiceId,
         orgId,
         batchId,
-        entityId,
+        entityId: result.entityId,
+        entityType: result.entityType,
         outputType,
         transactionType,
-        providerEntityType,
       });
 
       synced++;
       rateLimitRetryCount = 0; // reset backoff counter on success
       i++;
     } catch (error) {
-      // QBO rate limit — backoff and retry the same invoice
+      // Rate limit — backoff and retry the same invoice
       if (
-        error instanceof QBOApiError &&
+        error instanceof AccountingApiError &&
         error.statusCode === 429
       ) {
         const backoffIndex = Math.min(
@@ -304,12 +258,11 @@ export async function processBatchSync(
       const errorMessage =
         error instanceof Error ? error.message : "Unknown error";
       const errorDetail =
-        error instanceof QBOApiError
+        error instanceof AccountingApiError
           ? {
               code: error.errorCode,
               element: error.element,
               detail: error.detail,
-              faultType: error.faultType,
             }
           : {};
 
@@ -325,7 +278,7 @@ export async function processBatchSync(
       // Log failure in sync_log
       await adminSupabase.from("sync_log").insert({
         invoice_id: invoiceId,
-        provider: "quickbooks",
+        provider: providerType,
         provider_response: errorDetail as Record<string, unknown>,
         status: "failed",
         transaction_type: (invoice.output_type ?? "bill") as OutputType,
