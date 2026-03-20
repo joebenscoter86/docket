@@ -142,6 +142,20 @@ describe("POST /api/invoices/batch/approve", () => {
     expect(body.code).toBe("AUTH_ERROR");
   });
 
+  it("returns 400 when request body is not valid JSON", async () => {
+    const res = await POST(
+      new Request("http://localhost/api/invoices/batch/approve", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: "not json",
+      })
+    );
+    const body = await res.json();
+
+    expect(res.status).toBe(400);
+    expect(body.code).toBe("VALIDATION_ERROR");
+  });
+
   it("returns 400 when batch_id is missing", async () => {
     const res = await POST(makeRequest({}));
     const body = await res.json();
