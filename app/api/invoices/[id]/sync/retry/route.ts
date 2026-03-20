@@ -1,7 +1,11 @@
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { isConnected } from "@/lib/quickbooks/auth";
-import { createBill, createPurchase, attachPdfToEntity, QBOApiError } from "@/lib/quickbooks/api";
+import {
+  getAccountingProvider,
+  getOrgProvider,
+  AccountingApiError,
+} from "@/lib/accounting";
+import type { CreateBillInput, CreatePurchaseInput, SyncLineItem, TransactionResult } from "@/lib/accounting";
 import { logger } from "@/lib/utils/logger";
 import {
   authError,
@@ -11,7 +15,6 @@ import {
   apiSuccess,
   internalError,
 } from "@/lib/utils/errors";
-import type { QBOBillPayload, QBOBillLine, QBOPurchasePayload, QBOPurchaseLine } from "@/lib/quickbooks/types";
 import type { OutputType, ProviderEntityType } from "@/lib/types/invoice";
 import { OUTPUT_TYPE_TO_PAYMENT_TYPE, OUTPUT_TYPE_LABELS, SYNC_SUCCESS_MESSAGES } from "@/lib/types/invoice";
 
@@ -73,7 +76,7 @@ export async function POST(
     // 4. Only approved invoices can be sync-retried
     if (invoice.status !== "approved") {
       if (invoice.status === "synced") {
-        return validationError("Invoice has already been synced to QuickBooks.");
+        return validationError("Invoice has already been synced.");
       }
       return validationError(
         `Invoice must be approved before syncing. Current status: ${invoice.status}`
@@ -86,12 +89,19 @@ export async function POST(
     const transactionType = outputType;
     const providerEntityType: ProviderEntityType = isBill ? "Bill" : "Purchase";
 
+    // 6. Verify accounting connection and get provider
+    const providerType = await getOrgProvider(adminSupabase, orgId);
+    if (!providerType) {
+      return validationError("Connect an accounting provider in Settings before syncing.");
+    }
+    const provider = getAccountingProvider(providerType);
+
     // 5. Count previous sync attempts from sync_log (append-only)
     const { count: syncAttemptCount } = await adminSupabase
       .from("sync_log")
       .select("id", { count: "exact", head: true })
       .eq("invoice_id", invoiceId)
-      .eq("provider", "quickbooks");
+      .eq("provider", providerType);
 
     if ((syncAttemptCount ?? 0) >= MAX_SYNC_RETRIES) {
       logger.warn("sync_retry_max_attempts", {
@@ -103,14 +113,8 @@ export async function POST(
         status: "error",
       });
       return unprocessableEntity(
-        `Sync failed after ${MAX_SYNC_RETRIES} attempts. Please check your QuickBooks connection and try again later.`
+        `Sync failed after ${MAX_SYNC_RETRIES} attempts. Please check your accounting connection and try again later.`
       );
-    }
-
-    // 6. Verify QBO connection exists
-    const connected = await isConnected(adminSupabase, orgId);
-    if (!connected) {
-      return validationError("Connect QuickBooks in Settings before syncing.");
     }
 
     // 6b. Validate payment_account_id for non-bill types
@@ -139,7 +143,7 @@ export async function POST(
 
     // 8. Validate required sync fields
     if (!extractedData.vendor_name || !extractedData.vendor_ref) {
-      return validationError("Vendor name and QuickBooks vendor must be set before syncing.");
+      return validationError("Vendor name and vendor must be set before syncing.");
     }
 
     if (!lineItems || lineItems.length === 0) {
@@ -155,88 +159,63 @@ export async function POST(
       );
     }
 
-    // 9. Create transaction in QBO (Bill or Purchase)
-    let entityId: string;
-    let requestPayload: unknown;
-    let responsePayload: unknown;
+    // 9. Create transaction via provider abstraction
+    const syncLineItems: SyncLineItem[] = lineItems.map(
+      (li: { amount: number; gl_account_id: string; description: string | null }) => ({
+        amount: Number(li.amount),
+        glAccountId: li.gl_account_id,
+        description: li.description,
+      })
+    );
+
+    let result: TransactionResult;
+    let requestInput: unknown;
 
     try {
       if (isBill) {
-        // ─── Bill flow ───
-        const billLines: QBOBillLine[] = lineItems.map(
-          (li: { amount: number; gl_account_id: string; description: string | null }) => ({
-            DetailType: "AccountBasedExpenseLineDetail" as const,
-            Amount: Number(li.amount),
-            AccountBasedExpenseLineDetail: {
-              AccountRef: { value: li.gl_account_id },
-            },
-            ...(li.description ? { Description: li.description } : {}),
-          })
-        );
-
-        const billPayload: QBOBillPayload = {
-          VendorRef: { value: extractedData.vendor_ref },
-          Line: billLines,
-          ...(extractedData.invoice_date ? { TxnDate: extractedData.invoice_date } : {}),
-          ...(extractedData.due_date ? { DueDate: extractedData.due_date } : {}),
-          ...(extractedData.invoice_number ? { DocNumber: extractedData.invoice_number } : {}),
+        const input: CreateBillInput = {
+          vendorRef: extractedData.vendor_ref,
+          lineItems: syncLineItems,
+          invoiceDate: extractedData.invoice_date,
+          dueDate: extractedData.due_date,
+          invoiceNumber: extractedData.invoice_number,
         };
-
-        requestPayload = billPayload;
-        const billResponse = await createBill(adminSupabase, orgId, billPayload);
-        entityId = billResponse.Bill.Id;
-        responsePayload = billResponse;
+        requestInput = input;
+        result = await provider.createBill(adminSupabase, orgId, input);
       } else {
-        // ─── Purchase flow (Check/Cash/CreditCard) ───
-        const purchaseLines: QBOPurchaseLine[] = lineItems.map(
-          (li: { amount: number; gl_account_id: string; description: string | null }) => ({
-            Amount: Number(li.amount),
-            DetailType: "AccountBasedExpenseLineDetail" as const,
-            Description: li.description ?? undefined,
-            AccountBasedExpenseLineDetail: {
-              AccountRef: { value: li.gl_account_id },
-            },
-          })
-        );
-
-        const paymentType = OUTPUT_TYPE_TO_PAYMENT_TYPE[outputType as Exclude<OutputType, "bill">];
-
-        const purchasePayload: QBOPurchasePayload = {
-          PaymentType: paymentType as "Check" | "Cash" | "CreditCard",
-          AccountRef: { value: invoice.payment_account_id! },
-          EntityRef: { value: extractedData.vendor_ref, type: "Vendor" },
-          Line: purchaseLines,
-          ...(extractedData.invoice_date ? { TxnDate: extractedData.invoice_date } : {}),
-          ...(extractedData.invoice_number ? { DocNumber: extractedData.invoice_number } : {}),
+        const input: CreatePurchaseInput = {
+          vendorRef: extractedData.vendor_ref,
+          paymentAccountRef: invoice.payment_account_id!,
+          paymentType: OUTPUT_TYPE_TO_PAYMENT_TYPE[outputType as Exclude<OutputType, "bill">] as "Check" | "Cash" | "CreditCard",
+          lineItems: syncLineItems,
+          invoiceDate: extractedData.invoice_date,
+          invoiceNumber: extractedData.invoice_number,
         };
-
-        requestPayload = purchasePayload;
-        const purchaseResponse = await createPurchase(adminSupabase, orgId, purchasePayload);
-        entityId = purchaseResponse.Purchase.Id;
-        responsePayload = purchaseResponse;
+        requestInput = input;
+        result = await provider.createPurchase(adminSupabase, orgId, input);
       }
 
       // Log success in sync_log (new row — append-only)
       await adminSupabase.from("sync_log").insert({
         invoice_id: invoiceId,
-        provider: "quickbooks",
-        provider_bill_id: entityId,
-        request_payload: requestPayload as Record<string, unknown>,
-        provider_response: responsePayload as Record<string, unknown>,
+        provider: providerType,
+        provider_bill_id: result.entityId,
+        request_payload: requestInput as Record<string, unknown>,
+        provider_response: result.providerResponse,
         status: "success",
         transaction_type: transactionType,
-        provider_entity_type: providerEntityType,
+        provider_entity_type: result.entityType,
       });
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : "Unknown error";
-      const errorDetail = error instanceof QBOApiError
-        ? { code: error.errorCode, element: error.element, detail: error.detail, faultType: error.faultType }
+      const errorDetail = error instanceof AccountingApiError
+        ? { code: error.errorCode, element: error.element, detail: error.detail }
         : {};
 
       await adminSupabase.from("sync_log").insert({
         invoice_id: invoiceId,
-        provider: "quickbooks",
-        request_payload: requestPayload as Record<string, unknown>,
+        provider: providerType,
+        request_payload: requestInput as Record<string, unknown>,
         provider_response: errorDetail as Record<string, unknown>,
         status: "failed",
         transaction_type: transactionType,
@@ -251,7 +230,7 @@ export async function POST(
         })
         .eq("id", invoiceId);
 
-      logger.error("sync_retry_creation_failed", {
+      logger.error("accounting.sync_retry_creation_failed", {
         invoiceId,
         orgId,
         userId: user.id,
@@ -262,15 +241,15 @@ export async function POST(
         durationMs: Date.now() - startTime,
       });
 
-      if (error instanceof QBOApiError) {
+      if (error instanceof AccountingApiError) {
         if (error.detail?.includes("Duplicate")) {
           return validationError(
-            `A ${OUTPUT_TYPE_LABELS[outputType].toLowerCase()} with this invoice number already exists in QuickBooks. ${error.detail}`
+            `A ${OUTPUT_TYPE_LABELS[outputType].toLowerCase()} with this invoice number already exists. ${error.detail}`
           );
         }
-        return validationError(`QuickBooks error: ${error.detail}`);
+        return validationError(`Accounting error: ${error.detail}`);
       }
-      return internalError(`Failed to create ${OUTPUT_TYPE_LABELS[outputType].toLowerCase()} in QuickBooks.`);
+      return internalError(`Failed to create ${OUTPUT_TYPE_LABELS[outputType].toLowerCase()}.`);
     }
 
     // 10. Attach PDF (partial success if this fails)
@@ -285,14 +264,16 @@ export async function POST(
       }
 
       const fileBuffer = Buffer.from(await fileData.arrayBuffer());
-      await attachPdfToEntity(adminSupabase, orgId, entityId, providerEntityType, fileBuffer, invoice.file_name);
+      await provider.attachDocument(
+        adminSupabase, orgId, result.entityId, result.entityType, fileBuffer, invoice.file_name
+      );
     } catch (error) {
       attachmentStatus = "failed";
-      logger.warn("sync_retry_attachment_failed", {
+      logger.warn("accounting.sync_retry_attachment_failed", {
         invoiceId,
         orgId,
-        entityId,
-        entityType: providerEntityType,
+        entityId: result.entityId,
+        entityType: result.entityType,
         error: error instanceof Error ? error.message : "Unknown error",
       });
     }
@@ -303,31 +284,31 @@ export async function POST(
       .update({ status: "synced", error_message: null })
       .eq("id", invoiceId);
 
-    logger.info("sync_retry_complete", {
+    logger.info("accounting.sync_retry_complete", {
       invoiceId,
       orgId,
       userId: user.id,
-      entityId,
+      entityId: result.entityId,
       outputType,
       transactionType,
-      providerEntityType,
+      providerEntityType: result.entityType,
       attachmentStatus,
       durationMs: Date.now() - startTime,
     });
 
     return apiSuccess({
-      billId: entityId,
+      billId: result.entityId,
       attachmentStatus,
       message: SYNC_SUCCESS_MESSAGES[outputType],
       ...(attachmentStatus === "failed"
         ? {
             warning:
-              `${OUTPUT_TYPE_LABELS[outputType]} created but PDF attachment failed. You can attach it manually in QuickBooks.`,
+              `${OUTPUT_TYPE_LABELS[outputType]} created but PDF attachment failed. You can attach it manually.`,
           }
         : {}),
     });
   } catch (error) {
-    logger.error("sync_retry_unexpected_error", {
+    logger.error("accounting.sync_retry_unexpected_error", {
       invoiceId,
       error: error instanceof Error ? error.message : "Unknown error",
       durationMs: Date.now() - startTime,

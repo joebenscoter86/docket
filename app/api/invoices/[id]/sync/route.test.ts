@@ -96,31 +96,35 @@ vi.mock("@/lib/supabase/admin", () => ({
   createAdminClient: () => mockAdminClient,
 }));
 
-const mockIsConnected = vi.fn();
-vi.mock("@/lib/quickbooks/auth", () => ({
-  isConnected: (...args: unknown[]) => mockIsConnected(...args),
-}));
-
 const mockCreateBill = vi.fn();
 const mockCreatePurchase = vi.fn();
-const mockAttachPdfToEntity = vi.fn();
-vi.mock("@/lib/quickbooks/api", () => ({
-  createBill: (...args: unknown[]) => mockCreateBill(...args),
-  createPurchase: (...args: unknown[]) => mockCreatePurchase(...args),
-  attachPdfToEntity: (...args: unknown[]) => mockAttachPdfToEntity(...args),
-  QBOApiError: class QBOApiError extends Error {
+const mockAttachDocument = vi.fn();
+const mockGetOrgProvider = vi.fn();
+
+vi.mock("@/lib/accounting", () => ({
+  getOrgProvider: (...args: unknown[]) => mockGetOrgProvider(...args),
+  getAccountingProvider: () => ({
+    createBill: (...args: unknown[]) => mockCreateBill(...args),
+    createPurchase: (...args: unknown[]) => mockCreatePurchase(...args),
+    attachDocument: (...args: unknown[]) => mockAttachDocument(...args),
+  }),
+  AccountingApiError: class AccountingApiError extends Error {
     statusCode: number;
-    qboErrors: Array<{ Message: string; Detail: string; code: string; element?: string }>;
-    faultType: string;
-    constructor(statusCode: number, errors: Array<{ Message: string; Detail: string; code: string; element?: string }>, faultType: string) {
-      super(errors[0]?.Message ?? "Unknown");
+    errorCode: string;
+    detail: string;
+    element?: string;
+    constructor(
+      statusCode: number,
+      message: string,
+      opts: { errorCode?: string; detail?: string; element?: string } = {}
+    ) {
+      super(message);
+      this.name = "AccountingApiError";
       this.statusCode = statusCode;
-      this.qboErrors = errors;
-      this.faultType = faultType;
+      this.errorCode = opts.errorCode ?? "unknown";
+      this.detail = opts.detail ?? message;
+      this.element = opts.element;
     }
-    get errorCode() { return this.qboErrors[0]?.code ?? "unknown"; }
-    get element() { return this.qboErrors[0]?.element; }
-    get detail() { return this.qboErrors[0]?.Detail ?? this.message; }
   },
 }));
 
@@ -187,13 +191,13 @@ function setupSuccessMocks(invoiceOverrides: Partial<typeof fakeInvoice> = {}) {
   mockCheckInvoiceAccess.mockResolvedValue({ allowed: true });
   mockInvoiceSelect.mockResolvedValue({ data: { ...fakeInvoice, ...invoiceOverrides }, error: null });
   mockSyncLogSelect.mockResolvedValue({ data: null, error: { code: "PGRST116" } });
-  mockIsConnected.mockResolvedValue(true);
+  mockGetOrgProvider.mockResolvedValue("quickbooks");
   mockExtractedDataSelect.mockResolvedValue({ data: fakeExtractedData, error: null });
   mockLineItemsSelect.mockResolvedValue({ data: fakeLineItems, error: null });
   mockSyncLogInsert.mockResolvedValue({ error: null });
   mockInvoiceUpdate.mockResolvedValue({ error: null });
   mockStorageDownload.mockResolvedValue({ data: fakeFileBlob, error: null });
-  mockAttachPdfToEntity.mockResolvedValue({});
+  mockAttachDocument.mockResolvedValue({ attachmentId: "att-1", success: true });
 }
 
 // ─── Tests ───
@@ -207,7 +211,7 @@ describe("POST /api/invoices/[id]/sync", () => {
 
   it("creates a Bill when output_type is 'bill' (default)", async () => {
     setupSuccessMocks();
-    mockCreateBill.mockResolvedValue({ Bill: { Id: "bill-99", TotalAmt: 150 } });
+    mockCreateBill.mockResolvedValue({ entityId: "bill-99", entityType: "Bill", providerResponse: { Bill: { Id: "bill-99", TotalAmt: 150 } } });
 
     const { request, params } = makeRequest();
     const res = await POST(request, { params });
@@ -222,12 +226,12 @@ describe("POST /api/invoices/[id]/sync", () => {
 
   it("attaches PDF with entity type 'Bill' for bill sync", async () => {
     setupSuccessMocks();
-    mockCreateBill.mockResolvedValue({ Bill: { Id: "bill-99", TotalAmt: 150 } });
+    mockCreateBill.mockResolvedValue({ entityId: "bill-99", entityType: "Bill", providerResponse: { Bill: { Id: "bill-99", TotalAmt: 150 } } });
 
     const { request, params } = makeRequest();
     await POST(request, { params });
 
-    expect(mockAttachPdfToEntity).toHaveBeenCalledWith(
+    expect(mockAttachDocument).toHaveBeenCalledWith(
       expect.anything(),
       "org-1",
       "bill-99",
@@ -239,7 +243,7 @@ describe("POST /api/invoices/[id]/sync", () => {
 
   it("includes transaction_type and provider_entity_type in sync_log for bills", async () => {
     setupSuccessMocks();
-    mockCreateBill.mockResolvedValue({ Bill: { Id: "bill-99", TotalAmt: 150 } });
+    mockCreateBill.mockResolvedValue({ entityId: "bill-99", entityType: "Bill", providerResponse: { Bill: { Id: "bill-99", TotalAmt: 150 } } });
 
     const { request, params } = makeRequest();
     await POST(request, { params });
@@ -257,7 +261,7 @@ describe("POST /api/invoices/[id]/sync", () => {
 
   it("creates a Purchase with PaymentType='Check' when output_type is 'check'", async () => {
     setupSuccessMocks({ output_type: "check", payment_account_id: "bank-1", payment_account_name: "Business Checking" });
-    mockCreatePurchase.mockResolvedValue({ Purchase: { Id: "purchase-1", PaymentType: "Check", TotalAmt: 150 } });
+    mockCreatePurchase.mockResolvedValue({ entityId: "purchase-1", entityType: "Purchase", providerResponse: { Purchase: { Id: "purchase-1", PaymentType: "Check", TotalAmt: 150 } } });
 
     const { request, params } = makeRequest();
     const res = await POST(request, { params });
@@ -269,18 +273,18 @@ describe("POST /api/invoices/[id]/sync", () => {
     expect(mockCreatePurchase).toHaveBeenCalledOnce();
     expect(mockCreateBill).not.toHaveBeenCalled();
 
-    // Verify the Purchase payload
-    const purchasePayload = mockCreatePurchase.mock.calls[0][2];
-    expect(purchasePayload.PaymentType).toBe("Check");
-    expect(purchasePayload.AccountRef).toEqual({ value: "bank-1" });
-    expect(purchasePayload.EntityRef).toEqual({ value: "vendor-42", type: "Vendor" });
+    // Verify the CreatePurchaseInput shape passed to provider
+    const purchaseInput = mockCreatePurchase.mock.calls[0][2];
+    expect(purchaseInput.paymentType).toBe("Check");
+    expect(purchaseInput.paymentAccountRef).toBe("bank-1");
+    expect(purchaseInput.vendorRef).toBe("vendor-42");
   });
 
   // ── Cash happy path ──
 
   it("creates a Purchase with PaymentType='Cash' when output_type is 'cash'", async () => {
     setupSuccessMocks({ output_type: "cash", payment_account_id: "bank-2" });
-    mockCreatePurchase.mockResolvedValue({ Purchase: { Id: "purchase-2", PaymentType: "Cash", TotalAmt: 150 } });
+    mockCreatePurchase.mockResolvedValue({ entityId: "purchase-2", entityType: "Purchase", providerResponse: { Purchase: { Id: "purchase-2", PaymentType: "Cash", TotalAmt: 150 } } });
 
     const { request, params } = makeRequest();
     const res = await POST(request, { params });
@@ -288,15 +292,15 @@ describe("POST /api/invoices/[id]/sync", () => {
 
     expect(res.status).toBe(200);
     expect(body.data.message).toContain("Expense recorded");
-    const purchasePayload = mockCreatePurchase.mock.calls[0][2];
-    expect(purchasePayload.PaymentType).toBe("Cash");
+    const purchaseInput = mockCreatePurchase.mock.calls[0][2];
+    expect(purchaseInput.paymentType).toBe("Cash");
   });
 
   // ── CreditCard happy path ──
 
   it("creates a Purchase with PaymentType='CreditCard' when output_type is 'credit_card'", async () => {
     setupSuccessMocks({ output_type: "credit_card", payment_account_id: "cc-1" });
-    mockCreatePurchase.mockResolvedValue({ Purchase: { Id: "purchase-3", PaymentType: "CreditCard", TotalAmt: 150 } });
+    mockCreatePurchase.mockResolvedValue({ entityId: "purchase-3", entityType: "Purchase", providerResponse: { Purchase: { Id: "purchase-3", PaymentType: "CreditCard", TotalAmt: 150 } } });
 
     const { request, params } = makeRequest();
     const res = await POST(request, { params });
@@ -304,18 +308,18 @@ describe("POST /api/invoices/[id]/sync", () => {
 
     expect(res.status).toBe(200);
     expect(body.data.message).toContain("Credit card");
-    const purchasePayload = mockCreatePurchase.mock.calls[0][2];
-    expect(purchasePayload.PaymentType).toBe("CreditCard");
+    const purchaseInput = mockCreatePurchase.mock.calls[0][2];
+    expect(purchaseInput.paymentType).toBe("CreditCard");
   });
 
   it("attaches PDF with entity type 'Purchase' for non-bill sync", async () => {
     setupSuccessMocks({ output_type: "check", payment_account_id: "bank-1" });
-    mockCreatePurchase.mockResolvedValue({ Purchase: { Id: "purchase-1", PaymentType: "Check", TotalAmt: 150 } });
+    mockCreatePurchase.mockResolvedValue({ entityId: "purchase-1", entityType: "Purchase", providerResponse: { Purchase: { Id: "purchase-1", PaymentType: "Check", TotalAmt: 150 } } });
 
     const { request, params } = makeRequest();
     await POST(request, { params });
 
-    expect(mockAttachPdfToEntity).toHaveBeenCalledWith(
+    expect(mockAttachDocument).toHaveBeenCalledWith(
       expect.anything(),
       "org-1",
       "purchase-1",
@@ -327,7 +331,7 @@ describe("POST /api/invoices/[id]/sync", () => {
 
   it("includes transaction_type and provider_entity_type in sync_log for purchases", async () => {
     setupSuccessMocks({ output_type: "check", payment_account_id: "bank-1" });
-    mockCreatePurchase.mockResolvedValue({ Purchase: { Id: "purchase-1", PaymentType: "Check", TotalAmt: 150 } });
+    mockCreatePurchase.mockResolvedValue({ entityId: "purchase-1", entityType: "Purchase", providerResponse: { Purchase: { Id: "purchase-1", PaymentType: "Check", TotalAmt: 150 } } });
 
     const { request, params } = makeRequest();
     await POST(request, { params });
@@ -357,7 +361,7 @@ describe("POST /api/invoices/[id]/sync", () => {
 
   it("does not require payment_account_id for bill type", async () => {
     setupSuccessMocks({ output_type: "bill", payment_account_id: null });
-    mockCreateBill.mockResolvedValue({ Bill: { Id: "bill-99", TotalAmt: 150 } });
+    mockCreateBill.mockResolvedValue({ entityId: "bill-99", entityType: "Bill", providerResponse: { Bill: { Id: "bill-99", TotalAmt: 150 } } });
 
     const { request, params } = makeRequest();
     const res = await POST(request, { params });
@@ -379,6 +383,21 @@ describe("POST /api/invoices/[id]/sync", () => {
     expect(body.data.attachmentStatus).toBe("already_synced");
     expect(body.data.billId).toBe("purchase-existing");
     expect(mockCreatePurchase).not.toHaveBeenCalled();
+  });
+
+  // ── No accounting connection ──
+
+  it("returns validation error when no accounting provider is connected", async () => {
+    setupSuccessMocks();
+    mockGetOrgProvider.mockResolvedValue(null);
+
+    const { request, params } = makeRequest();
+    const res = await POST(request, { params });
+    const body = await res.json();
+
+    expect(res.status).toBe(400);
+    expect(body.code).toBe("VALIDATION_ERROR");
+    expect(body.error).toContain("Connect an accounting provider");
   });
 
   // ── Sync log failure includes transaction_type ──
