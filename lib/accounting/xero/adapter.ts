@@ -2,8 +2,11 @@ import {
   getContactOptions,
   createContact,
   fetchAccounts as xeroFetchAccounts,
+  createInvoice,
+  attachDocumentToInvoice,
   XeroApiError,
 } from "@/lib/xero/api";
+import type { XeroInvoicePayload, XeroLineItem } from "@/lib/xero/types";
 import type { AccountingProvider } from "../provider";
 import {
   AccountingApiError,
@@ -64,8 +67,6 @@ export class XeroAccountingAdapter implements AccountingProvider {
     }
   }
 
-  /* eslint-disable @typescript-eslint/no-unused-vars */
-
   async fetchAccounts(
     supabase: SupabaseAdminClient,
     orgId: string
@@ -77,6 +78,8 @@ export class XeroAccountingAdapter implements AccountingProvider {
     }
   }
 
+  /* eslint-disable @typescript-eslint/no-unused-vars */
+
   async fetchPaymentAccounts(
     _supabase: SupabaseAdminClient,
     _orgId: string,
@@ -87,38 +90,104 @@ export class XeroAccountingAdapter implements AccountingProvider {
     );
   }
 
+  /* eslint-enable @typescript-eslint/no-unused-vars */
+
   async createBill(
-    _supabase: SupabaseAdminClient,
-    _orgId: string,
-    _input: CreateBillInput
+    supabase: SupabaseAdminClient,
+    orgId: string,
+    input: CreateBillInput
   ): Promise<TransactionResult> {
-    throw new Error(
-      "Xero createBill not yet implemented. See DOC-58."
-    );
+    const lineItems: XeroLineItem[] = input.lineItems.map((item) => ({
+      Description: item.description ?? "",
+      Quantity: 1,
+      UnitAmount: item.amount,
+      AccountCode: item.glAccountId,
+    }));
+
+    const payload: XeroInvoicePayload = {
+      Type: "ACCPAY",
+      Contact: { ContactID: input.vendorRef },
+      LineItems: lineItems,
+      ...(input.invoiceDate ? { DateString: input.invoiceDate } : {}),
+      ...(input.dueDate ? { DueDateString: input.dueDate } : {}),
+      ...(input.invoiceNumber
+        ? { InvoiceNumber: input.invoiceNumber, Reference: input.invoiceNumber }
+        : {}),
+    };
+
+    try {
+      const response = await createInvoice(supabase, orgId, payload);
+      const invoice = response.Invoices[0];
+      return {
+        entityId: invoice.InvoiceID,
+        entityType: "Bill",
+        providerResponse: response as unknown as Record<string, unknown>,
+      };
+    } catch (err) {
+      wrapXeroError(err);
+    }
   }
 
   async createPurchase(
-    _supabase: SupabaseAdminClient,
-    _orgId: string,
-    _input: CreatePurchaseInput
+    supabase: SupabaseAdminClient,
+    orgId: string,
+    input: CreatePurchaseInput
   ): Promise<TransactionResult> {
-    throw new Error(
-      "Xero createPurchase not yet implemented. See DOC-58."
-    );
+    // Xero doesn't have a direct "Purchase" entity like QBO.
+    // Non-bill transactions (Check/Cash/CreditCard) map to Bank Transactions in Xero.
+    // For now, create as ACCPAY invoice (bill) since Xero handles payments differently.
+    // TODO: Implement Xero Bank Transactions for non-bill output types when DOC-57 lands.
+    const lineItems: XeroLineItem[] = input.lineItems.map((item) => ({
+      Description: item.description ?? "",
+      Quantity: 1,
+      UnitAmount: item.amount,
+      AccountCode: item.glAccountId,
+    }));
+
+    const payload: XeroInvoicePayload = {
+      Type: "ACCPAY",
+      Contact: { ContactID: input.vendorRef },
+      LineItems: lineItems,
+      ...(input.invoiceDate ? { DateString: input.invoiceDate } : {}),
+      ...(input.invoiceNumber
+        ? { InvoiceNumber: input.invoiceNumber, Reference: input.invoiceNumber }
+        : {}),
+    };
+
+    try {
+      const response = await createInvoice(supabase, orgId, payload);
+      const invoice = response.Invoices[0];
+      return {
+        entityId: invoice.InvoiceID,
+        entityType: "Bill",
+        providerResponse: response as unknown as Record<string, unknown>,
+      };
+    } catch (err) {
+      wrapXeroError(err);
+    }
   }
 
   async attachDocument(
-    _supabase: SupabaseAdminClient,
-    _orgId: string,
-    _entityId: string,
+    supabase: SupabaseAdminClient,
+    orgId: string,
+    entityId: string,
     _entityType: "Bill" | "Purchase",
-    _fileBuffer: Buffer,
-    _fileName: string
+    fileBuffer: Buffer,
+    fileName: string
   ): Promise<AttachmentResult> {
-    throw new Error(
-      "Xero attachDocument not yet implemented. See DOC-58."
-    );
+    try {
+      const response = await attachDocumentToInvoice(
+        supabase,
+        orgId,
+        entityId,
+        fileBuffer,
+        fileName
+      );
+      const attachmentId = response.Attachments?.[0]?.AttachmentID ?? null;
+      return { attachmentId, success: true };
+    } catch {
+      // Attachment failure must not bubble up — caller decides how to handle partial success
+      return { attachmentId: null, success: false };
+    }
   }
-
-  /* eslint-enable @typescript-eslint/no-unused-vars */
 }

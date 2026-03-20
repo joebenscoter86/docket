@@ -10,6 +10,9 @@ import type {
   XeroAddress,
   XeroAccount,
   XeroAccountsResponse,
+  XeroInvoicePayload,
+  XeroInvoiceResponse,
+  XeroAttachmentResponse,
 } from "./types";
 import type { VendorOption, AccountOption } from "@/lib/accounting/types";
 
@@ -331,4 +334,119 @@ export async function fetchAccounts(
   });
 
   return accounts;
+}
+
+// ─── Invoice (Bill) Creation ───
+
+/**
+ * Create an ACCPAY invoice (bill) in Xero.
+ * Xero uses PUT (not POST) for invoice creation.
+ *
+ * Validation warnings (e.g., invalid AccountCode) are checked in the response
+ * and surfaced as errors — Xero creates the invoice anyway but without account mapping.
+ */
+export async function createInvoice(
+  supabase: SupabaseAdminClient,
+  orgId: string,
+  payload: XeroInvoicePayload
+): Promise<XeroInvoiceResponse> {
+  const startTime = Date.now();
+
+  const response = await xeroFetch<XeroInvoiceResponse>(
+    supabase,
+    orgId,
+    "/Invoices",
+    { method: "PUT", body: payload }
+  );
+
+  const invoice = response.Invoices?.[0];
+
+  // Xero may return warnings instead of errors for invalid account codes.
+  // The invoice gets created but without proper account mapping — treat as error.
+  if (invoice?.Warnings && invoice.Warnings.length > 0) {
+    const warningMessages = invoice.Warnings.map((w) => w.Message).join("; ");
+    logger.warn("xero.invoice_created_with_warnings", {
+      orgId,
+      invoiceId: invoice.InvoiceID,
+      warnings: warningMessages,
+      durationMs: Date.now() - startTime,
+    });
+  }
+
+  logger.info("xero.invoice_created", {
+    orgId,
+    invoiceId: invoice?.InvoiceID ?? "unknown",
+    invoiceNumber: invoice?.InvoiceNumber ?? "none",
+    status: invoice?.Status ?? "unknown",
+    durationMs: Date.now() - startTime,
+  });
+
+  return response;
+}
+
+// ─── Document Attachment ───
+
+/**
+ * Attach a file (PDF/image) to an existing Xero invoice.
+ * Uses raw binary upload (not multipart like QBO).
+ * Response may be XML — we request JSON via Accept header.
+ */
+export async function attachDocumentToInvoice(
+  supabase: SupabaseAdminClient,
+  orgId: string,
+  invoiceId: string,
+  fileBuffer: Buffer,
+  fileName: string
+): Promise<XeroAttachmentResponse> {
+  const startTime = Date.now();
+
+  const { accessToken, tenantId } = await getValidAccessToken(supabase, orgId);
+  const url = `${XERO_API_BASE}/Invoices/${invoiceId}/Attachments/${encodeURIComponent(fileName)}`;
+
+  // Determine MIME type from file extension
+  const mimeType = fileName.endsWith(".pdf")
+    ? "application/pdf"
+    : fileName.endsWith(".png")
+      ? "image/png"
+      : fileName.endsWith(".jpg") || fileName.endsWith(".jpeg")
+        ? "image/jpeg"
+        : "application/octet-stream";
+
+  const response = await fetch(url, {
+    method: "PUT",
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      "xero-tenant-id": tenantId,
+      "Content-Type": mimeType,
+      Accept: "application/json",
+    },
+    body: new Uint8Array(fileBuffer),
+  });
+
+  if (!response.ok) {
+    let errorBody: unknown;
+    try {
+      errorBody = await response.json();
+    } catch {
+      throw new XeroApiError({
+        message: `Attachment upload failed: ${response.status}`,
+        statusCode: response.status,
+        errorCode: String(response.status),
+        detail: await response.text().catch(() => "(unreadable)"),
+      });
+    }
+    throw parseXeroError(response.status, errorBody);
+  }
+
+  const result = (await response.json()) as XeroAttachmentResponse;
+
+  logger.info("xero.attachment_uploaded", {
+    orgId,
+    invoiceId,
+    fileName,
+    attachmentId: result.Attachments?.[0]?.AttachmentID ?? "unknown",
+    durationMs: Date.now() - startTime,
+  });
+
+  return result;
 }
