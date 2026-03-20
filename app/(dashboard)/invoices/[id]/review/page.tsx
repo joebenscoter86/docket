@@ -106,16 +106,8 @@ export default async function ReviewPage({
   }
 
   return (
-    <>
-      {invoice.batch_id && batchManifest.length > 1 && (
-        <BatchNavigation
-          currentInvoiceId={invoice.id}
-          batchId={invoice.batch_id}
-          initialManifest={batchManifest}
-        />
-      )}
-      <ReviewLayout
-        invoice={{
+    <ReviewLayout
+      invoice={{
           id: invoice.id,
           fileName: invoice.file_name,
           fileType: invoice.file_type,
@@ -137,6 +129,5 @@ export default async function ReviewPage({
         }}
         batchManifest={batchManifest}
       />
-    </>
   );
 }

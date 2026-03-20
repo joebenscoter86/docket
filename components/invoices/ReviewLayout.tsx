@@ -16,7 +16,9 @@ const PdfViewer = dynamic(() => import("./PdfViewer"), {
   ),
 });
 import ExtractionForm from "./ExtractionForm";
+import { BatchNavigation } from "./BatchNavigation";
 import type { InvoiceStatus, ExtractedDataRow, OutputType } from "@/lib/types/invoice";
+import type { BatchManifestItem } from "@/lib/invoices/queries";
 
 interface ReviewLayoutProps {
   invoice: {
@@ -61,6 +63,14 @@ export default function ReviewLayout({
 
   return (
     <div className="flex flex-col h-full -m-6">
+      {/* Batch navigation bar */}
+      {invoice.batchId && batchManifest && batchManifest.length > 1 && (
+        <BatchNavigation
+          currentInvoiceId={invoice.id}
+          batchId={invoice.batchId}
+          initialManifest={batchManifest as BatchManifestItem[]}
+        />
+      )}
       {/* Page header */}
       <div className="flex items-center gap-3 border-b border-border bg-white px-4 py-3 md:px-6">
         {/* Back button — hidden when batch nav is present (it has its own "Back to batch") */}

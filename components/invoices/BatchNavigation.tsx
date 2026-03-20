@@ -86,7 +86,7 @@ export function BatchNavigation({
     "px-2.5 py-1.5 rounded-md text-sm text-gray-700 border border-gray-200 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed min-h-[44px] flex items-center gap-1";
 
   return (
-    <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between bg-white border-b border-gray-200 px-4 py-2.5 gap-2 sm:gap-0">
+    <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between bg-white px-4 py-2.5 gap-2 sm:gap-0">
       {/* Back to batch */}
       <button
         onClick={handleBack}
