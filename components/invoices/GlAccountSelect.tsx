@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useCallback } from "react";
-import type { AccountOption } from "@/lib/types/qbo";
+import type { AccountOption } from "@/lib/accounting";
 
 interface GlAccountSelectProps {
   accounts: AccountOption[];

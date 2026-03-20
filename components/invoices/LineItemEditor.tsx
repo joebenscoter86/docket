@@ -9,7 +9,7 @@ import {
 } from "./line-items-reducer";
 import { formatCurrency, parseCurrencyInput } from "@/lib/utils/currency";
 import type { ExtractedLineItemRow } from "@/lib/types/invoice";
-import type { AccountOption } from "@/lib/types/qbo";
+import type { AccountOption } from "@/lib/accounting";
 import GlAccountSelect from "./GlAccountSelect";
 
 interface LineItemEditorProps {

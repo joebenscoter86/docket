@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import type { VendorOption, AccountOption } from "@/lib/types/qbo";
+import type { VendorOption, AccountOption } from "@/lib/accounting";
 
 interface QboOptionsState {
   vendors: VendorOption[];
@@ -26,8 +26,8 @@ export function useQboOptions(): QboOptionsState & { addVendor: (vendor: VendorO
     async function fetchOptions() {
       try {
         const [vendorRes, accountRes] = await Promise.all([
-          fetch("/api/quickbooks/vendors"),
-          fetch("/api/quickbooks/accounts"),
+          fetch("/api/accounting/vendors"),
+          fetch("/api/accounting/accounts"),
         ]);
 
         if (cancelled) return;
