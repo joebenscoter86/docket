@@ -126,19 +126,9 @@ export default function UploadZone({ onUploadComplete, onUploadStart }: UploadZo
       if (fileArray.length === 0) return;
 
       setError(null);
+      setCapWarning(null);
 
-      // Calculate remaining capacity
-      const remaining = MAX_FILES - selectedFiles.length;
-      const accepted = fileArray.slice(0, remaining);
-      const rejected = fileArray.length - accepted.length;
-
-      if (rejected > 0) {
-        setCapWarning(`Maximum ${MAX_FILES} files allowed. ${rejected} file${rejected > 1 ? "s were" : " was"} not added.`);
-      } else {
-        setCapWarning(null);
-      }
-
-      const newEntries: SelectedFile[] = accepted.map((file) => {
+      const newEntries: SelectedFile[] = fileArray.map((file) => {
         const validationError = validateFile(file);
         return {
           file,
@@ -148,10 +138,19 @@ export default function UploadZone({ onUploadComplete, onUploadStart }: UploadZo
         };
       });
 
-      setSelectedFiles((prev) => [...prev, ...newEntries]);
+      setSelectedFiles((prev) => {
+        const remaining = MAX_FILES - prev.length;
+        if (remaining <= 0) return prev;
+        const accepted = newEntries.slice(0, remaining);
+        if (newEntries.length > remaining) {
+          const rejected = newEntries.length - remaining;
+          setCapWarning(`Maximum ${MAX_FILES} files allowed. ${rejected} file${rejected > 1 ? "s were" : " was"} not added.`);
+        }
+        return [...prev, ...accepted];
+      });
       setState("idle");
     },
-    [state, selectedFiles.length]
+    [state]
   );
 
   const handleRemoveFile = useCallback((id: string) => {
@@ -165,18 +164,17 @@ export default function UploadZone({ onUploadComplete, onUploadStart }: UploadZo
   const handleUploadClick = useCallback(
     (e: React.MouseEvent) => {
       e.stopPropagation();
-      if (validCount === 0) return;
+      const filesToUpload = selectedFiles.filter((f) => f.valid).map((f) => f.file);
+      if (filesToUpload.length === 0) return;
 
-      const filesToUpload = validFiles.map((f) => f.file);
-
-      if (onUploadStart && validCount > 0) {
+      if (onUploadStart) {
         onUploadStart(filesToUpload);
-      } else if (validCount === 1) {
-        // Single file without onUploadStart: use inline upload for backward compat
+      } else {
+        // Fallback: upload first valid file using single-file path
         uploadFile(filesToUpload[0]);
       }
     },
-    [validFiles, validCount, onUploadStart, uploadFile]
+    [selectedFiles, onUploadStart, uploadFile]
   );
 
   const handleInputChange = useCallback(
