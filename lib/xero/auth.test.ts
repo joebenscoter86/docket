@@ -209,6 +209,31 @@ describe("storeConnection", () => {
     process.env.XERO_REDIRECT_URI = "http://localhost:3000/api/auth/callback/xero";
   });
 
+  it("writes status='active' and refresh_token_expires_at ~60 days out", async () => {
+    const mockUpsert = vi.fn().mockResolvedValue({ error: null });
+    const mockSupabase = {
+      from: vi.fn().mockReturnValue({ upsert: mockUpsert }),
+    };
+
+    const { storeConnection } = await import("./auth");
+    const beforeCall = Date.now();
+    await storeConnection(
+      mockSupabase as never,
+      "org-123",
+      { accessToken: "raw_access", refreshToken: "raw_refresh", expiresIn: 1800 },
+      "tenant-uuid-1",
+      "Acme Ltd"
+    );
+
+    const [upsertData] = mockUpsert.mock.calls[0];
+    expect(upsertData.status).toBe("active");
+
+    const refreshExpiry = new Date(upsertData.refresh_token_expires_at).getTime();
+    const sixtyDaysMs = 60 * 24 * 60 * 60 * 1000;
+    expect(refreshExpiry).toBeGreaterThanOrEqual(beforeCall + sixtyDaysMs - 5000);
+    expect(refreshExpiry).toBeLessThanOrEqual(beforeCall + sixtyDaysMs + 5000);
+  });
+
   it("encrypts tokens and upserts with provider 'xero' and correct onConflict", async () => {
     const mockUpsert = vi.fn().mockResolvedValue({ error: null });
     const mockSupabase = {

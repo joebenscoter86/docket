@@ -23,6 +23,9 @@ export const XERO_SCOPES =
 // Buffer before actual expiry to avoid edge-case failures (5 minutes)
 export const TOKEN_EXPIRY_BUFFER_MS = 5 * 60 * 1000;
 
+// Xero refresh tokens last ~60 days
+const XERO_REFRESH_TOKEN_LIFETIME_MS = 60 * 24 * 60 * 60 * 1000;
+
 export function getXeroConfig() {
   const clientId = process.env.XERO_CLIENT_ID;
   const clientSecret = process.env.XERO_CLIENT_SECRET;
@@ -202,6 +205,8 @@ export async function storeConnection(
       company_id: tenantId,
       company_name: tenantName ?? null,
       connected_at: new Date().toISOString(),
+      status: "active",
+      refresh_token_expires_at: new Date(Date.now() + XERO_REFRESH_TOKEN_LIFETIME_MS).toISOString(),
     },
     { onConflict: "org_id,provider" }
   );
