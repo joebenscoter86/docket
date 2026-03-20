@@ -1,5 +1,7 @@
 // lib/xero/auth.ts
 import { randomBytes, createHash } from "crypto";
+import { logger } from "@/lib/utils/logger";
+import type { XeroTokenResponse, XeroTokens, XeroTenant } from "./types";
 
 // ─── Configuration ───
 
@@ -55,4 +57,103 @@ export function generatePKCE(): {
  */
 export function generateState(): string {
   return randomBytes(32).toString("hex");
+}
+
+/**
+ * Build the Xero authorization URL that the user's browser is redirected to.
+ * Includes PKCE code_challenge for added security.
+ */
+export function getAuthorizationUrl(
+  state: string,
+  codeChallenge: string
+): string {
+  const { clientId, redirectUri } = getXeroConfig();
+
+  const params = new URLSearchParams({
+    client_id: clientId,
+    redirect_uri: redirectUri,
+    response_type: "code",
+    scope: XERO_SCOPES,
+    state,
+    code_challenge: codeChallenge,
+    code_challenge_method: "S256",
+  });
+
+  return `${XERO_AUTH_URL}?${params.toString()}`;
+}
+
+/**
+ * Exchange an authorization code + PKCE verifier for access + refresh tokens.
+ */
+export async function exchangeCodeForTokens(
+  code: string,
+  codeVerifier: string
+): Promise<XeroTokens> {
+  const { clientId, clientSecret, redirectUri } = getXeroConfig();
+
+  const response = await fetch(XERO_TOKEN_URL, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/x-www-form-urlencoded",
+      Accept: "application/json",
+      Authorization: `Basic ${Buffer.from(`${clientId}:${clientSecret}`).toString("base64")}`,
+    },
+    body: new URLSearchParams({
+      grant_type: "authorization_code",
+      code,
+      redirect_uri: redirectUri,
+      code_verifier: codeVerifier,
+    }),
+  });
+
+  if (!response.ok) {
+    const errorBody = await response.text();
+    logger.error("xero.exchange_code_failed", {
+      status: String(response.status),
+      error: errorBody,
+    });
+    throw new Error(`Token exchange failed: ${response.status}`);
+  }
+
+  const data = (await response.json()) as XeroTokenResponse;
+
+  return {
+    accessToken: data.access_token,
+    refreshToken: data.refresh_token,
+    expiresIn: data.expires_in,
+  };
+}
+
+/**
+ * Fetch the list of authorized Xero tenants and return the first one.
+ * After OAuth, the user may have multiple orgs — we take the first tenant.
+ * Throws if the user has no authorized tenants.
+ */
+export async function getXeroTenantId(
+  accessToken: string
+): Promise<{ tenantId: string; tenantName: string }> {
+  const response = await fetch(XERO_CONNECTIONS_URL, {
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      Accept: "application/json",
+    },
+  });
+
+  if (!response.ok) {
+    const errorBody = await response.text();
+    logger.error("xero.get_tenants_failed", {
+      status: String(response.status),
+      error: errorBody,
+    });
+    throw new Error(`Failed to fetch Xero tenants: ${response.status}`);
+  }
+
+  const tenants = (await response.json()) as XeroTenant[];
+
+  if (tenants.length === 0) {
+    throw new Error("No Xero tenants found. Please ensure your Xero organization is connected.");
+  }
+
+  const first = tenants[0];
+  return { tenantId: first.tenantId, tenantName: first.tenantName };
 }
