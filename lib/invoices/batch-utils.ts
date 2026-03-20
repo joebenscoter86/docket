@@ -41,14 +41,15 @@ export function groupInvoicesByBatch(invoices: InvoiceListItem[]): InvoiceRow[] 
 
   const rows: InvoiceRow[] = [];
 
-  for (const [batchId, batchInvoices] of batchMap) {
+  for (const [batchId, batchInvoices] of Array.from(batchMap)) {
     if (batchInvoices.length === 1) {
       individuals.push(batchInvoices[0]);
       continue;
     }
 
     batchInvoices.sort(
-      (a, b) => new Date(a.uploaded_at).getTime() - new Date(b.uploaded_at).getTime()
+      (a: InvoiceListItem, b: InvoiceListItem) =>
+        new Date(a.uploaded_at).getTime() - new Date(b.uploaded_at).getTime()
     );
 
     rows.push({

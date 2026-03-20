@@ -6,6 +6,7 @@ export interface InvoiceListItem {
   status: InvoiceStatus;
   uploaded_at: string;
   output_type: OutputType | null;
+  batch_id: string | null;
   extracted_data: {
     vendor_name: string | null;
     invoice_number: string | null;

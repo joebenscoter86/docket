@@ -1,4 +1,5 @@
 import { SupabaseClient } from "@supabase/supabase-js";
+import { InvoiceStatus } from "@/lib/types/invoice";
 import {
   InvoiceListItem,
   InvoiceListCounts,
@@ -93,6 +94,15 @@ export function validateListParams(params: InvoiceListParams) {
   let limit = typeof params.limit === "number" ? params.limit : DEFAULT_LIMIT;
   limit = Math.max(1, Math.min(limit, MAX_LIMIT));
 
+  // Validate batch_id — must be a valid UUID format if present
+  const batch_id =
+    params.batch_id &&
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+      params.batch_id
+    )
+      ? params.batch_id
+      : undefined;
+
   return {
     status,
     sort,
@@ -100,7 +110,7 @@ export function validateListParams(params: InvoiceListParams) {
     cursor: params.cursor,
     limit,
     output_type,
-    batch_id: params.batch_id,
+    batch_id,
   };
 }
 
@@ -172,6 +182,7 @@ export async function fetchInvoiceList(
       status,
       uploaded_at,
       output_type,
+      batch_id,
       extracted_data (
         vendor_name,
         invoice_number,
@@ -229,8 +240,10 @@ export async function fetchInvoiceList(
   // Always add id as final tiebreaker for stable ordering
   query = query.order("id", { ascending: direction === "asc" });
 
-  // Fetch limit + 1 to detect next page
-  query = query.limit(limit + 1);
+  // Fetch limit + 1 to detect next page (skip when filtering by batch)
+  if (!batch_id) {
+    query = query.limit(limit + 1);
+  }
 
   const { data, error } = await query;
 
@@ -238,7 +251,7 @@ export async function fetchInvoiceList(
     return { invoices: [], nextCursor: null };
   }
 
-  const hasNextPage = data.length > limit;
+  const hasNextPage = !batch_id && data.length > limit;
   const rows = hasNextPage ? data.slice(0, limit) : data;
 
   const invoices: InvoiceListItem[] = rows.map(
@@ -253,6 +266,7 @@ export async function fetchInvoiceList(
         status: row.status as InvoiceListItem["status"],
         uploaded_at: row.uploaded_at as string,
         output_type: (row.output_type as InvoiceListItem["output_type"]) ?? null,
+        batch_id: (row.batch_id as string) ?? null,
         extracted_data: extracted
           ? {
               vendor_name: (extracted as Record<string, unknown>).vendor_name as string | null,
@@ -275,4 +289,31 @@ export async function fetchInvoiceList(
   }
 
   return { invoices, nextCursor };
+}
+
+// --- Batch manifest ---
+
+export interface BatchManifestItem {
+  id: string;
+  status: InvoiceStatus;
+  uploaded_at: string;
+}
+
+export async function fetchBatchManifest(
+  supabase: SupabaseClient,
+  batchId: string
+): Promise<BatchManifestItem[]> {
+  const { data, error } = await supabase
+    .from("invoices")
+    .select("id, status, uploaded_at")
+    .eq("batch_id", batchId)
+    .order("uploaded_at", { ascending: true });
+
+  if (error || !data) return [];
+
+  return data.map((row) => ({
+    id: row.id as string,
+    status: row.status as InvoiceStatus,
+    uploaded_at: row.uploaded_at as string,
+  }));
 }
