@@ -10,6 +10,7 @@ import {
   apiSuccess,
 } from "@/lib/utils/errors";
 import { logger } from "@/lib/utils/logger";
+import { trackServerEvent, AnalyticsEvents } from "@/lib/analytics/events";
 
 export async function POST(
   _request: Request,
@@ -114,6 +115,8 @@ export async function POST(
     durationMs: Date.now() - start,
     status: "success",
   });
+
+  trackServerEvent(user.id, AnalyticsEvents.INVOICE_APPROVED, { invoiceId });
 
   return apiSuccess({ status: "approved" });
 }

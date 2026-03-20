@@ -5,6 +5,7 @@ import { isConnected } from "@/lib/quickbooks/auth";
 import { checkInvoiceAccess } from "@/lib/billing/access";
 import { createBill, createPurchase, attachPdfToEntity, QBOApiError } from "@/lib/quickbooks/api";
 import { logger } from "@/lib/utils/logger";
+import { trackServerEvent, AnalyticsEvents } from "@/lib/analytics/events";
 import {
   authError,
   notFound,
@@ -354,6 +355,8 @@ export async function POST(
       attachmentStatus,
       durationMs: Date.now() - startTime,
     });
+
+    trackServerEvent(user.id, AnalyticsEvents.INVOICE_SYNCED, { invoiceId });
 
     return apiSuccess({
       billId: entityId,

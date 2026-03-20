@@ -5,6 +5,7 @@ import { logger } from "@/lib/utils/logger";
 import { queryAccounts } from "@/lib/quickbooks/api";
 import { lookupGlMappings } from "./gl-mappings";
 import { normalizeForMatching } from "@/lib/utils/normalize";
+import { trackServerEvent, AnalyticsEvents } from "@/lib/analytics/events";
 import type { ExtractionResult, ExtractionContext } from "./types";
 
 export async function runExtraction(params: {
@@ -241,6 +242,12 @@ export async function runExtraction(params: {
       confidenceScore: result.data.confidenceScore,
       lineItemCount: result.data.lineItems.length,
       status: "success",
+    });
+
+    trackServerEvent(userId, AnalyticsEvents.INVOICE_EXTRACTED, {
+      invoiceId,
+      confidenceScore: result.data.confidenceScore,
+      durationMs: result.durationMs,
     });
 
     return result;
