@@ -36,6 +36,10 @@ Reconnecting via OAuth does an upsert that flips status back to `active`.
 - Updated on every token refresh and on initial OAuth connect
 - Nullable so existing QBO rows aren't broken by the migration
 
+**Migration notes:**
+- Existing QBO rows get `status = 'active'` automatically (Postgres backfills the DEFAULT on `NOT NULL ADD COLUMN`).
+- Existing QBO rows get `refresh_token_expires_at = NULL`. The health check logic treats NULL as "no warning" (see Section 3). QBO's `storeConnection` and `refreshAccessToken` will be updated in this issue to also write `refresh_token_expires_at = now() + 101 days`, so new QBO connections and refreshes get the column populated going forward.
+
 No new tables.
 
 ---
@@ -82,16 +86,53 @@ Same `Map<string, Promise<{ accessToken: string; tenantId: string }>>` pattern a
 
 Critical for Xero: the rotating refresh token means a second concurrent refresh call would send an already-dead refresh token, causing `invalid_grant` and marking the connection expired erroneously.
 
+**Multi-instance limitation:** On Vercel's serverless platform, each cold-start function instance gets its own `Map`. Two concurrent requests hitting different instances will both attempt a refresh, and the second will fail with `invalid_grant` because Xero already rotated the token on the first call. The in-process lock provides **best-effort** protection, not a guarantee. The `invalid_grant` handler in step 6 of `getValidXeroTokens` serves as the safety net — it marks the connection `expired` and forces reconnection. This is safe but disruptive. At MVP scale with <10 users, the probability of two requests for the same org hitting different cold-start instances within the same ~200ms refresh window is negligible. If this becomes a real issue at scale, the fix is a distributed lock (e.g., Supabase advisory lock or Redis).
+
+### `ConnectionExpiredError`
+
+Defined in `lib/accounting/types.ts` as a shared error class for both QBO and Xero:
+
+```typescript
+export class ConnectionExpiredError extends Error {
+  public readonly provider: 'quickbooks' | 'xero';
+  public readonly orgId: string;
+
+  constructor(provider: 'quickbooks' | 'xero', orgId: string, message?: string) {
+    super(message ?? `${provider} connection expired for org ${orgId}`);
+    this.name = 'ConnectionExpiredError';
+    this.provider = provider;
+    this.orgId = orgId;
+  }
+}
+```
+
+API routes and UI components catch this error to show the appropriate reconnect prompt. QBO's `getValidAccessToken` will be updated to throw `ConnectionExpiredError` instead of a generic `Error` for consistency.
+
 ---
 
 ## 3. Connection Health Check
 
 ### Server-side (Settings page load)
 
+**Updated `AccountingConnectionInfo` type** (in `lib/accounting/connection.ts`):
+
+```typescript
+export interface AccountingConnectionInfo {
+  id: string;
+  provider: 'quickbooks' | 'xero';
+  companyId: string;
+  companyName: string | null;
+  connectedAt: string;
+  status?: 'active' | 'expired' | 'error';            // optional for backward compat
+  refreshTokenExpiresAt?: string | null;                // ISO timestamp, nullable
+}
+```
+
 When the Settings page fetches the Xero connection via `getOrgConnection()`, the `refresh_token_expires_at` column drives the health display:
 
 | Condition | Behavior |
 |-----------|----------|
+| `refresh_token_expires_at` is NULL | No warning (legacy QBO rows before this migration) |
 | `refresh_token_expires_at` is > 7 days away | Healthy — show connected status |
 | `refresh_token_expires_at` is within 7 days | Show warning banner (see below) |
 | `refresh_token_expires_at` is in the past | Set `status = 'expired'`, show reconnect prompt |
@@ -164,6 +205,7 @@ All `logger.error()` calls auto-capture to Sentry with context tags (existing be
 | Connection status `expired` → immediate throw | No refresh attempted, `ConnectionExpiredError` thrown |
 | Connection status `error` → immediate throw | Same behavior |
 | Tokens never logged | Mock logger, verify no token values in any log call args |
+| `invalid_grant` on non-expired connection (multi-instance race) | Verifies that `invalid_grant` from a connection whose `refresh_token_expires_at` is still in the future correctly sets `status = 'expired'` and throws `ConnectionExpiredError` — validates the safety net for the multi-instance scenario |
 
 ### Mocking
 
@@ -185,7 +227,9 @@ E2E tests deferred to DOC-61 (end-to-end Xero flow).
 | `lib/xero/auth.ts` | Modified (extend from DOC-54) | `refreshXeroTokens()`, `getValidXeroTokens()`, concurrency lock |
 | `lib/xero/auth.test.ts` | New | Unit tests for all token management scenarios |
 | `app/(dashboard)/settings/page.tsx` | Modified | Health check logic, warning banner, reconnect prompt |
-| `lib/accounting/connection.ts` | Modified | Include `status` and `refresh_token_expires_at` in `AccountingConnectionInfo` |
+| `lib/accounting/connection.ts` | Modified | Add `status` and `refreshTokenExpiresAt` (both optional) to `AccountingConnectionInfo`, update `.select()` query |
+| `lib/accounting/types.ts` | Modified | Add `ConnectionExpiredError` class |
+| `lib/quickbooks/auth.ts` | Modified | Update `storeConnection` and `refreshAccessToken` to write `refresh_token_expires_at`; update error throws to use `ConnectionExpiredError` |
 
 ---
 
