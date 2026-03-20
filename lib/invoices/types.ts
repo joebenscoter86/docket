@@ -29,6 +29,7 @@ export interface InvoiceListParams {
   cursor?: string;
   limit?: number;
   output_type?: string;
+  batch_id?: string;
 }
 
 export interface InvoiceListResult {

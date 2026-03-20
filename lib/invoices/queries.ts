@@ -100,6 +100,7 @@ export function validateListParams(params: InvoiceListParams) {
     cursor: params.cursor,
     limit,
     output_type,
+    batch_id: params.batch_id,
   };
 }
 
@@ -155,13 +156,14 @@ interface ValidatedParams {
   cursor?: string;
   limit: number;
   output_type: string;
+  batch_id?: string;
 }
 
 export async function fetchInvoiceList(
   supabase: SupabaseClient,
   params: ValidatedParams
 ): Promise<{ invoices: InvoiceListItem[]; nextCursor: string | null }> {
-  const { status, sort, direction, cursor, limit, output_type } = params;
+  const { status, sort, direction, cursor, limit, output_type, batch_id } = params;
   const sortConfig = SORT_COLUMN_MAP[sort] ?? SORT_COLUMN_MAP.uploaded_at;
 
   let query = supabase.from("invoices").select(`
@@ -186,6 +188,11 @@ export async function fetchInvoiceList(
   // Output type filter
   if (output_type !== "all") {
     query = query.eq("output_type", output_type);
+  }
+
+  // Batch filter
+  if (batch_id) {
+    query = query.eq("batch_id", batch_id);
   }
 
   // Cursor pagination — always keyed on (uploaded_at, id) regardless of display sort.

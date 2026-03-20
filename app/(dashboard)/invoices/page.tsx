@@ -13,6 +13,7 @@ interface InvoicesPageProps {
     cursor?: string;
     limit?: string;
     output_type?: string;
+    batch_id?: string;
   }>;
 }
 
@@ -32,6 +33,7 @@ export default async function InvoicesPage({ searchParams }: InvoicesPageProps) 
     cursor: resolvedParams.cursor,
     limit: resolvedParams.limit ? Number(resolvedParams.limit) : undefined,
     output_type: resolvedParams.output_type,
+    batch_id: resolvedParams.batch_id,
   });
 
   const [listResult, counts] = await Promise.all([
@@ -61,6 +63,14 @@ export default async function InvoicesPage({ searchParams }: InvoicesPageProps) 
           </Button>
         </Link>
       </div>
+      {resolvedParams.batch_id && (
+        <div className="mb-4 flex items-center gap-2 text-sm text-muted">
+          <span>Showing batch upload results</span>
+          <Link href="/invoices" className="text-blue-600 hover:underline">
+            View all invoices
+          </Link>
+        </div>
+      )}
       <InvoiceList
         invoices={listResult.invoices}
         counts={counts}
