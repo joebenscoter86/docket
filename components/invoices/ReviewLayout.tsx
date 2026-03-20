@@ -19,6 +19,7 @@ import ExtractionForm from "./ExtractionForm";
 import { BatchNavigation } from "./BatchNavigation";
 import type { InvoiceStatus, ExtractedDataRow, OutputType } from "@/lib/types/invoice";
 import type { BatchManifestItem } from "@/lib/invoices/queries";
+import type { AccountingProviderType } from "@/lib/accounting/types";
 
 interface ReviewLayoutProps {
   invoice: {
@@ -40,6 +41,7 @@ interface ReviewLayoutProps {
     defaultPaymentAccountName: string | null;
   };
   batchManifest?: { id: string; status: string }[];
+  accountingProvider?: AccountingProviderType | null;
 }
 
 type MobileTab = "document" | "details";
@@ -56,6 +58,7 @@ export default function ReviewLayout({
   extractedData,
   orgDefaults,
   batchManifest,
+  accountingProvider,
 }: ReviewLayoutProps) {
   const [activeTab, setActiveTab] = useState<MobileTab>("document");
 
@@ -176,6 +179,7 @@ export default function ReviewLayout({
                 orgDefaults={orgDefaults}
                 batchId={invoice.batchId}
                 batchManifest={batchManifest}
+                accountingProvider={accountingProvider ?? null}
               />
             ) : (
               <div className="flex items-center justify-center h-full text-sm text-muted">

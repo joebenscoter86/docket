@@ -2,12 +2,14 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getExtractedData } from "@/lib/extraction/data";
+import { getOrgConnection } from "@/lib/accounting";
 import { logger } from "@/lib/utils/logger";
 import ReviewLayout from "@/components/invoices/ReviewLayout";
 import ReviewProcessingState from "@/components/invoices/ReviewProcessingState";
 import { BatchNavigation } from "@/components/invoices/BatchNavigation";
 import Link from "next/link";
 import type { InvoiceStatus, ExtractedDataRow, OutputType } from "@/lib/types/invoice";
+import type { AccountingProviderType } from "@/lib/accounting/types";
 import { fetchBatchManifest, type BatchManifestItem } from "@/lib/invoices/queries";
 
 const PROCESSING_STATUSES: InvoiceStatus[] = ["uploading", "extracting", "error"];
@@ -84,6 +86,18 @@ export default async function ReviewPage({
       }),
   ]);
 
+  // Fetch accounting connection provider for ActionBar labels
+  let accountingProvider: AccountingProviderType | null = null;
+  const { data: membership } = await supabase
+    .from("org_memberships")
+    .select("org_id")
+    .limit(1)
+    .single();
+  if (membership) {
+    const connection = await getOrgConnection(admin, membership.org_id);
+    if (connection) accountingProvider = connection.provider;
+  }
+
   // Guard: signed URL failure
   if (signedUrlResult.error || !signedUrlResult.data?.signedUrl) {
     logger.error("review_page_signed_url_failed", {
@@ -128,6 +142,7 @@ export default async function ReviewPage({
           defaultPaymentAccountName: orgResult?.default_payment_account_name ?? null,
         }}
         batchManifest={batchManifest}
+        accountingProvider={accountingProvider}
       />
   );
 }
