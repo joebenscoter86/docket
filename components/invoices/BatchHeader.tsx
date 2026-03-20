@@ -77,7 +77,7 @@ export default function BatchHeader({
   const handleReviewNext = (e: React.MouseEvent) => {
     e.stopPropagation();
     if (!nextReviewableId) return;
-    router.push(`/app/invoices/${nextReviewableId}/review`);
+    router.push(`/invoices/${nextReviewableId}/review`);
   };
 
   const handleViewAll = (e: React.MouseEvent) => {
