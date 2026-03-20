@@ -13,6 +13,15 @@ const SCOPES = "com.intuit.quickbooks.accounting";
 // Buffer before actual expiry to avoid edge-case failures (5 minutes)
 const TOKEN_EXPIRY_BUFFER_MS = 5 * 60 * 1000;
 
+/**
+ * Per-org token refresh lock. When multiple concurrent callers (e.g. batch
+ * extractions) need to refresh the same expired token, only the first caller
+ * actually calls Intuit. The rest await the same promise. This prevents the
+ * race condition where Intuit rotates the refresh token on first use and
+ * subsequent concurrent refreshes fail with an invalidated token.
+ */
+const refreshLocks = new Map<string, Promise<{ accessToken: string; companyId: string }>>();
+
 function getConfig() {
   const clientId = process.env.QBO_CLIENT_ID;
   const clientSecret = process.env.QBO_CLIENT_SECRET;
@@ -198,6 +207,10 @@ export async function loadConnection(
  * Auto-refreshes if the current token is expired or about to expire.
  * Returns the access token string ready for Authorization header.
  * Throws if no connection exists or refresh fails.
+ *
+ * Concurrent callers for the same org coalesce into a single refresh call
+ * to prevent race conditions where Intuit rotates the refresh token on
+ * first use and subsequent concurrent refreshes fail.
  */
 export async function getValidAccessToken(
   supabase: ReturnType<typeof import("@/lib/supabase/admin").createAdminClient>,
@@ -220,38 +233,54 @@ export async function getValidAccessToken(
     };
   }
 
-  // Token expired or about to expire — refresh it
-  logger.info("qbo.token_refresh_needed", { orgId, expiresAt: expiresAt.toISOString() });
-
-  const decryptedRefresh = decrypt(connection.refresh_token);
-
-  let tokenResponse: QBOTokenResponse;
-  try {
-    tokenResponse = await refreshAccessToken(decryptedRefresh);
-  } catch {
-    // Refresh failed — connection is effectively broken
-    logger.error("qbo.token_refresh_failed_disconnect", { orgId });
-    throw new Error(
-      "QuickBooks connection expired. Please reconnect in Settings."
-    );
+  // Token expired or about to expire — coalesce concurrent refresh calls
+  const existing = refreshLocks.get(orgId);
+  if (existing) {
+    logger.info("qbo.token_refresh_coalesced", { orgId });
+    return existing;
   }
 
-  // Store the new tokens
-  const newTokens: QBOTokens = {
-    accessToken: tokenResponse.access_token,
-    refreshToken: tokenResponse.refresh_token,
-    expiresAt: new Date(Date.now() + tokenResponse.expires_in * 1000),
-    companyId: connection.company_id,
-  };
+  const refreshPromise = (async () => {
+    logger.info("qbo.token_refresh_needed", { orgId, expiresAt: expiresAt.toISOString() });
 
-  await storeConnection(supabase, orgId, newTokens, connection.company_name);
+    const decryptedRefresh = decrypt(connection.refresh_token);
 
-  logger.info("qbo.token_refreshed", { orgId });
+    let tokenResponse: QBOTokenResponse;
+    try {
+      tokenResponse = await refreshAccessToken(decryptedRefresh);
+    } catch {
+      // Refresh failed — connection is effectively broken
+      logger.error("qbo.token_refresh_failed_disconnect", { orgId });
+      throw new Error(
+        "QuickBooks connection expired. Please reconnect in Settings."
+      );
+    }
 
-  return {
-    accessToken: newTokens.accessToken,
-    companyId: newTokens.companyId,
-  };
+    // Store the new tokens
+    const newTokens: QBOTokens = {
+      accessToken: tokenResponse.access_token,
+      refreshToken: tokenResponse.refresh_token,
+      expiresAt: new Date(Date.now() + tokenResponse.expires_in * 1000),
+      companyId: connection.company_id,
+    };
+
+    await storeConnection(supabase, orgId, newTokens, connection.company_name);
+
+    logger.info("qbo.token_refreshed", { orgId });
+
+    return {
+      accessToken: newTokens.accessToken,
+      companyId: newTokens.companyId,
+    };
+  })();
+
+  refreshLocks.set(orgId, refreshPromise);
+
+  try {
+    return await refreshPromise;
+  } finally {
+    refreshLocks.delete(orgId);
+  }
 }
 
 /**

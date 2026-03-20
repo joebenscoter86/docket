@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import type { OutputType } from "@/lib/types/invoice";
 import { OUTPUT_TYPE_TO_ACCOUNT_TYPE } from "@/lib/types/invoice";
-import type { QBOPaymentAccount } from "@/lib/quickbooks/types";
+import type { PaymentAccount } from "@/lib/accounting";
 
 interface PaymentAccountSelectProps {
   outputType: OutputType;
@@ -20,7 +20,7 @@ export default function PaymentAccountSelect({
   onSelect,
   disabled,
 }: PaymentAccountSelectProps) {
-  const [accounts, setAccounts] = useState<QBOPaymentAccount[]>([]);
+  const [accounts, setAccounts] = useState<PaymentAccount[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -34,7 +34,7 @@ export default function PaymentAccountSelect({
     setLoading(true);
     setError(null);
 
-    fetch(`/api/quickbooks/payment-accounts?type=${accountType}`)
+    fetch(`/api/accounting/payment-accounts?type=${accountType}`)
       .then(async (res) => {
         if (cancelled) return;
         if (!res.ok) throw new Error("Failed to fetch accounts");
