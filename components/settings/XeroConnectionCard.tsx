@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Button from "@/components/ui/Button";
 
-interface QBOConnectionCardProps {
+interface XeroConnectionCardProps {
   connection: {
     connected: boolean;
     companyId?: string;
@@ -14,25 +14,25 @@ interface QBOConnectionCardProps {
   disabledReason?: string;
 }
 
-export function QBOConnectionCard({ connection, disabled, disabledReason }: QBOConnectionCardProps) {
+export function XeroConnectionCard({ connection, disabled, disabledReason }: XeroConnectionCardProps) {
   const [disconnecting, setDisconnecting] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
 
   async function handleDisconnect() {
     setDisconnecting(true);
     try {
-      const response = await fetch("/api/quickbooks/disconnect", {
+      const response = await fetch("/api/xero/disconnect", {
         method: "POST",
       });
 
       if (response.ok) {
-        window.location.href = "/settings?qbo_success=" + encodeURIComponent("QuickBooks disconnected.");
+        window.location.href = "/settings?xero_success=" + encodeURIComponent("Xero disconnected.");
       } else {
-        window.location.href = "/settings?qbo_error=" + encodeURIComponent("Failed to disconnect QuickBooks.");
+        window.location.href = "/settings?xero_error=" + encodeURIComponent("Failed to disconnect Xero.");
       }
     } catch {
       setDisconnecting(false);
-      window.location.href = "/settings?qbo_error=" + encodeURIComponent("Failed to disconnect QuickBooks.");
+      window.location.href = "/settings?xero_error=" + encodeURIComponent("Failed to disconnect Xero.");
     }
   }
 
@@ -46,20 +46,22 @@ export function QBOConnectionCard({ connection, disabled, disabledReason }: QBOC
 
   return (
     <div className="bg-surface rounded-brand-lg shadow-soft px-6 py-5 flex items-center gap-5 transition-all duration-150 ease-in-out hover:-translate-y-0.5 hover:shadow-float">
-      {/* QB Logo */}
-      <div className="flex h-11 w-11 items-center justify-center rounded-brand-md bg-[#2CA01C] text-white font-bold text-sm flex-shrink-0">
-        QB
+      {/* Xero Logo */}
+      <div className="flex h-11 w-11 items-center justify-center rounded-brand-md bg-[#13B5EA] flex-shrink-0">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M4.5 5.5L12 13M12 13L19.5 5.5M12 13L4.5 20.5M12 13L19.5 20.5" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
+        </svg>
       </div>
 
       {/* Info */}
       <div className="flex-1 min-w-0">
         <p className="font-body font-bold text-[15px] text-text">
-          QuickBooks Online
+          Xero
         </p>
         <p className="font-body text-[13px] text-muted">
           {connection.connected && connection.companyName
             ? `${connection.companyName}${connectedDate ? ` · Connected ${connectedDate}` : ""}`
-            : "Connect your QuickBooks account to sync invoices as bills."}
+            : "Connect your Xero account to sync invoices as bills."}
         </p>
       </div>
 
@@ -121,7 +123,7 @@ export function QBOConnectionCard({ connection, disabled, disabledReason }: QBOC
                 )}
               </span>
             ) : (
-              <a href="/api/quickbooks/connect">
+              <a href="/api/xero/connect">
                 <Button variant="outline" className="h-9 px-3 text-[13px]">
                   Connect
                 </Button>

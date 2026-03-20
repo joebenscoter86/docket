@@ -2,6 +2,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getOrgConnection } from "@/lib/accounting";
 import { QBOConnectionCard } from "@/components/settings/QBOConnectionCard";
+import { XeroConnectionCard } from "@/components/settings/XeroConnectionCard";
 import { ConnectionHealthBanner } from "@/components/settings/ConnectionHealthBanner";
 import { SettingsAlert } from "@/components/settings/SettingsAlert";
 import { BillingCard } from "@/components/settings/BillingCard";
@@ -11,7 +12,7 @@ import { getUsageThisPeriod } from "@/lib/billing/usage";
 export default async function SettingsPage({
   searchParams,
 }: {
-  searchParams: { qbo_success?: string; qbo_error?: string; subscribed?: string };
+  searchParams: { qbo_success?: string; qbo_error?: string; xero_success?: string; xero_error?: string; subscribed?: string };
 }) {
   const supabase = createClient();
   const { data: { user } } = await supabase.auth.getUser();
@@ -70,11 +71,20 @@ export default async function SettingsPage({
     }
   }
 
+  const connectedProvider = connectionData.connected ? connectionData.provider : null;
+
   const qboConnection = {
-    connected: connectionData.connected,
-    companyId: connectionData.companyId,
-    companyName: connectionData.companyName,
-    connectedAt: connectionData.connectedAt,
+    connected: connectedProvider === "quickbooks",
+    companyId: connectedProvider === "quickbooks" ? connectionData.companyId : undefined,
+    companyName: connectedProvider === "quickbooks" ? connectionData.companyName : undefined,
+    connectedAt: connectedProvider === "quickbooks" ? connectionData.connectedAt : undefined,
+  };
+
+  const xeroConnection = {
+    connected: connectedProvider === "xero",
+    companyId: connectedProvider === "xero" ? connectionData.companyId : undefined,
+    companyName: connectedProvider === "xero" ? connectionData.companyName : undefined,
+    connectedAt: connectedProvider === "xero" ? connectionData.connectedAt : undefined,
   };
 
   // Get usage info
@@ -111,6 +121,12 @@ export default async function SettingsPage({
       {searchParams.qbo_error && (
         <SettingsAlert type="error" message={searchParams.qbo_error} />
       )}
+      {searchParams.xero_success && (
+        <SettingsAlert type="success" message={searchParams.xero_success} />
+      )}
+      {searchParams.xero_error && (
+        <SettingsAlert type="error" message={searchParams.xero_error} />
+      )}
       {searchParams.subscribed === "true" && (
         <SettingsAlert type="success" message="Subscription activated! You're on the Growth plan." />
       )}
@@ -130,7 +146,18 @@ export default async function SettingsPage({
             />
           </div>
         )}
-        <QBOConnectionCard connection={qboConnection} />
+        <div className="space-y-3">
+          <QBOConnectionCard
+            connection={qboConnection}
+            disabled={connectedProvider === "xero"}
+            disabledReason="Disconnect Xero before connecting QuickBooks"
+          />
+          <XeroConnectionCard
+            connection={xeroConnection}
+            disabled={connectedProvider === "quickbooks"}
+            disabledReason="Disconnect QuickBooks before connecting Xero"
+          />
+        </div>
       </div>
 
       {/* Account Section */}

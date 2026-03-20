@@ -18,6 +18,8 @@ import SyncStatusPanel from "./SyncStatusPanel";
 import OutputTypeSelector from "./OutputTypeSelector";
 import { useQboOptions } from "./hooks/useQboOptions";
 import VendorSelect from "./VendorSelect";
+import type { AccountingProviderType } from "@/lib/accounting/types";
+import { getProviderLabel } from "@/lib/accounting/links";
 
 interface ExtractionFormProps {
   extractedData: ExtractedDataRow;
@@ -34,6 +36,7 @@ interface ExtractionFormProps {
   };
   batchId?: string | null;
   batchManifest?: { id: string; status: string }[];
+  accountingProvider: AccountingProviderType | null;
 }
 
 const FIELD_CONFIG: Record<
@@ -71,6 +74,7 @@ export default function ExtractionForm({
   orgDefaults,
   batchId,
   batchManifest,
+  accountingProvider,
 }: ExtractionFormProps) {
   const router = useRouter();
   const [state, dispatch] = useReducer(
@@ -281,11 +285,12 @@ export default function ExtractionForm({
   const currency = (state.values.currency as string) ?? "USD";
 
   // Compute sync blockers for ActionBar
+  const providerLabel = accountingProvider ? getProviderLabel(accountingProvider) : "your accounting software";
   const syncBlockers: string[] = [];
   if (!qboOptions.connected) {
-    syncBlockers.push("Connect QuickBooks in Settings");
+    syncBlockers.push(`Connect ${providerLabel} in Settings`);
   }
-  if (!vendorRef) syncBlockers.push("Select a QuickBooks vendor");
+  if (!vendorRef) syncBlockers.push(`Select a ${providerLabel} vendor`);
   if (lineItemsMissingGl > 0) {
     syncBlockers.push(`${lineItemsMissingGl} line item(s) need a GL account`);
   }
@@ -429,7 +434,7 @@ export default function ExtractionForm({
         }}
       />
 
-      {/* QBO disconnection warning */}
+      {/* Accounting disconnection warning */}
       {!qboOptions.loading && !qboOptions.connected && (
         <div className="flex items-start gap-2 bg-error/5 border border-error/20 rounded-md p-3">
           <svg
@@ -445,7 +450,11 @@ export default function ExtractionForm({
             />
           </svg>
           <div className="text-sm">
-            <p className="text-error font-medium">QuickBooks disconnected</p>
+            <p className="text-error font-medium">
+              {accountingProvider
+                ? `${getProviderLabel(accountingProvider)} disconnected`
+                : "No accounting provider connected"}
+            </p>
             <p className="text-muted mt-0.5">
               {qboOptions.error ?? "Reconnect in Settings to sync invoices."}
               {" "}
@@ -557,6 +566,7 @@ export default function ExtractionForm({
             syncBlockers={syncBlockers}
             isRetry={!!initialErrorMessage?.startsWith("Sync failed")}
             outputType={currentOutputType}
+            provider={accountingProvider}
             onStatusChange={handleStatusChange}
           />
         </>

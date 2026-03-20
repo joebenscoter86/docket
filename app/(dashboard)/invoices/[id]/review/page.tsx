@@ -2,12 +2,14 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getExtractedData } from "@/lib/extraction/data";
+import { getOrgConnection } from "@/lib/accounting";
 import { logger } from "@/lib/utils/logger";
 import ReviewLayout from "@/components/invoices/ReviewLayout";
 import ReviewProcessingState from "@/components/invoices/ReviewProcessingState";
 import { BatchNavigation } from "@/components/invoices/BatchNavigation";
 import Link from "next/link";
 import type { InvoiceStatus, ExtractedDataRow, OutputType } from "@/lib/types/invoice";
+import type { AccountingProviderType } from "@/lib/accounting/types";
 import { fetchBatchManifest, type BatchManifestItem } from "@/lib/invoices/queries";
 
 const PROCESSING_STATUSES: InvoiceStatus[] = ["uploading", "extracting", "error"];
@@ -60,10 +62,10 @@ export default async function ReviewPage({
     );
   }
 
-  // Fetch extracted data, signed URL, and org defaults in parallel
+  // Fetch extracted data, signed URL, org defaults, and accounting provider in parallel
   // Admin client required for Storage — bucket RLS restricts anon access
   const admin = createAdminClient();
-  const [extractedData, signedUrlResult, orgResult] = await Promise.all([
+  const [extractedData, signedUrlResult, orgAndProviderResult] = await Promise.all([
     getExtractedData(invoice.id),
     admin.storage
       .from("invoices")
@@ -74,15 +76,22 @@ export default async function ReviewPage({
       .limit(1)
       .single()
       .then(async ({ data: membership }) => {
-        if (!membership) return null;
-        const { data: org } = await admin
-          .from("organizations")
-          .select("default_output_type, default_payment_account_id, default_payment_account_name")
-          .eq("id", membership.org_id)
-          .single();
-        return org;
+        if (!membership) return { org: null, provider: null as AccountingProviderType | null };
+        const [orgData, connection] = await Promise.all([
+          admin
+            .from("organizations")
+            .select("default_output_type, default_payment_account_id, default_payment_account_name")
+            .eq("id", membership.org_id)
+            .single()
+            .then(({ data }) => data),
+          getOrgConnection(admin, membership.org_id),
+        ]);
+        return { org: orgData, provider: connection?.provider ?? null };
       }),
   ]);
+
+  const orgResult = orgAndProviderResult?.org ?? null;
+  const accountingProvider = orgAndProviderResult?.provider ?? null;
 
   // Guard: signed URL failure
   if (signedUrlResult.error || !signedUrlResult.data?.signedUrl) {
@@ -128,6 +137,7 @@ export default async function ReviewPage({
           defaultPaymentAccountName: orgResult?.default_payment_account_name ?? null,
         }}
         batchManifest={batchManifest}
+        accountingProvider={accountingProvider}
       />
   );
 }

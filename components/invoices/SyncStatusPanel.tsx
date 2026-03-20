@@ -1,8 +1,9 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { TransactionType, SYNC_SUCCESS_MESSAGES, TRANSACTION_TYPE_SHORT_LABELS } from "@/lib/types/invoice";
-import { getQuickBooksTransactionUrl } from "@/lib/quickbooks/links";
+import { TransactionType, TRANSACTION_TYPE_SHORT_LABELS } from "@/lib/types/invoice";
+import { getTransactionUrl, getProviderLabel } from "@/lib/accounting/links";
+import type { AccountingProviderType } from "@/lib/accounting/types";
 
 interface SyncLogEntry {
   id: string;
@@ -40,10 +41,18 @@ function getErrorMessage(entry: SyncLogEntry): string {
 }
 
 function getSuccessMessage(entry: SyncLogEntry): string {
+  const providerLabel = getProviderLabel((entry.provider as AccountingProviderType) || "quickbooks");
   if (entry.transaction_type) {
-    return SYNC_SUCCESS_MESSAGES[entry.transaction_type];
+    const typeLabels: Record<string, string> = {
+      bill: "Bill created",
+      check: "Check created",
+      cash: "Expense recorded",
+      credit_card: "Credit card expense recorded",
+    };
+    const label = typeLabels[entry.transaction_type] ?? "Synced";
+    return `${label} in ${providerLabel}`;
   }
-  return "Synced to QuickBooks";
+  return `Synced to ${providerLabel}`;
 }
 
 function getFailureMessage(entry: SyncLogEntry): string {
@@ -158,12 +167,16 @@ export default function SyncStatusPanel({
                 </p>
                 {latestLog.transaction_type && (
                   <a
-                    href={getQuickBooksTransactionUrl(latestLog.transaction_type, latestLog.provider_bill_id)}
+                    href={getTransactionUrl(
+                      (latestLog.provider as AccountingProviderType) || "quickbooks",
+                      latestLog.transaction_type,
+                      latestLog.provider_bill_id
+                    )}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="text-sm text-accent hover:text-green-700 font-medium flex items-center gap-1"
                   >
-                    View in QuickBooks
+                    View in {getProviderLabel((latestLog.provider as AccountingProviderType) || "quickbooks")}
                     <svg className="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor">
                       <path d="M11 3a1 1 0 100 2h2.586l-6.293 6.293a1 1 0 101.414 1.414L15 6.414V9a1 1 0 102 0V4a1 1 0 00-1-1h-5z" />
                       <path d="M5 5a2 2 0 00-2 2v8a2 2 0 002 2h8a2 2 0 002-2v-3a1 1 0 10-2 0v3H5V7h3a1 1 0 000-2H5z" />

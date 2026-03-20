@@ -25,6 +25,7 @@ describe("ActionBar — approve phase (pending_review)", () => {
     totalAmount: 110,
     syncBlockers: [],
     outputType: "bill" as const,
+    provider: "quickbooks" as const,
     onStatusChange: vi.fn(),
   };
 
@@ -108,6 +109,7 @@ describe("ActionBar — sync phase (approved)", () => {
     totalAmount: 110,
     syncBlockers: [],
     outputType: "bill" as const,
+    provider: "quickbooks" as const,
     onStatusChange: vi.fn(),
   };
 
@@ -245,6 +247,7 @@ describe("ActionBar — approve-to-sync transition", () => {
         totalAmount={110}
         syncBlockers={[]}
         outputType="bill"
+        provider="quickbooks"
         onStatusChange={vi.fn()}
       />
     );
@@ -261,6 +264,7 @@ describe("ActionBar — approve-to-sync transition", () => {
         totalAmount={110}
         syncBlockers={[]}
         outputType="bill"
+        provider="quickbooks"
         onStatusChange={vi.fn()}
       />
     );
@@ -280,6 +284,7 @@ describe("ActionBar — synced phase", () => {
         totalAmount={110}
         syncBlockers={[]}
         outputType="bill"
+        provider="quickbooks"
         onStatusChange={vi.fn()}
       />
     );

@@ -23,6 +23,7 @@ const defaultOutputProps = {
   outputType: "bill" as const,
   paymentAccountId: null,
   paymentAccountName: null,
+  accountingProvider: "quickbooks" as const,
   orgDefaults: {
     defaultOutputType: "bill" as const,
     defaultPaymentAccountId: null,

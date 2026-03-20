@@ -109,6 +109,7 @@ export class XeroAccountingAdapter implements AccountingProvider {
 
     const payload: XeroInvoicePayload = {
       Type: "ACCPAY",
+      Status: "AUTHORISED",
       Contact: { ContactID: input.vendorRef },
       LineItems: lineItems,
       ...(input.invoiceDate ? { DateString: input.invoiceDate } : {}),
