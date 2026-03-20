@@ -4,10 +4,8 @@ import { getQuickBooksTransactionUrl } from "@/lib/quickbooks/links";
 
 const XERO_BASE_URL = "https://go.xero.com";
 
-function getXeroTransactionUrl(): string {
-  // Xero doesn't support deep links to individual bills.
-  // Link to the bills awaiting payment list instead.
-  return `${XERO_BASE_URL}/AccountsPayable/`;
+function getXeroTransactionUrl(entityId: string): string {
+  return `${XERO_BASE_URL}/AccountsPayable/View.aspx?InvoiceID=${encodeURIComponent(entityId)}`;
 }
 
 /**
@@ -22,7 +20,7 @@ export function getTransactionUrl(
   if (provider === "quickbooks") {
     return getQuickBooksTransactionUrl(transactionType, entityId);
   }
-  return getXeroTransactionUrl();
+  return getXeroTransactionUrl(entityId);
 }
 
 /**

@@ -54,6 +54,7 @@ export default function ActionBar({
   }, []);
 
   // Reset internal state when parent status changes (e.g., after approve transitions to sync phase)
+  // Preserve syncedEntityId so the synced read-only banner can show the "View in" link
   useEffect(() => {
     setBarState("idle");
     setErrorMessage(null);
@@ -239,6 +240,17 @@ export default function ActionBar({
           <span className="text-sm text-accent">
             This invoice has been synced to {provider ? getProviderLabel(provider) : "your accounting software"}.
           </span>
+          {syncedEntityId && provider && (
+            <a
+              href={getTransactionUrl(provider, outputType, syncedEntityId)}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-sm text-accent hover:text-green-700 font-medium flex items-center gap-1 ml-1"
+            >
+              View in {getProviderLabel(provider)}
+              <ExternalLinkIcon />
+            </a>
+          )}
         </div>
         {warning && <WarningBanner message={warning} />}
       </div>
