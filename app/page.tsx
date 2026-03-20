@@ -42,15 +42,37 @@ export default async function Home() {
   }
 
   return (
-    <div className="flex min-h-screen flex-col bg-surface">
-      <LandingNav />
-      <main>
-        <HeroSection />
-        <HowItWorksSection />
-        <FeaturesSection />
-        <BottomCTA />
-      </main>
-      <Footer />
+    <div className="flex min-h-screen flex-col bg-[#1A1C20] relative selection:bg-[#00C6FF]/30">
+      {/* Stitch Dotted Canvas Background */}
+      <div 
+        className="fixed inset-0 z-0 pointer-events-none opacity-50"
+        style={{ backgroundImage: 'radial-gradient(#ffffff 1.5px, transparent 1px)', backgroundSize: '32px 32px' }}
+      />
+      
+      <div className="relative z-10 w-full max-w-[1400px] mx-auto p-4 sm:p-8 space-y-8 lg:space-y-12 pb-24">
+        
+        {/* Navigation Floating Header */}
+        <div className="rounded-[40px] bg-white shadow-xl overflow-hidden">
+          <LandingNav />
+        </div>
+
+        {/* Exact Stitch Card 1: Hero V1 */}
+        <div className="rounded-[40px] shadow-2xl overflow-hidden ring-1 ring-white/20">
+          <HeroSection />
+        </div>
+
+        {/* Exact Stitch Card 2: Features V2 Flow */}
+        <div className="rounded-[40px] shadow-2xl overflow-hidden bg-white ring-1 ring-white/20">
+          <HowItWorksSection />
+          <FeaturesSection />
+          <BottomCTA />
+        </div>
+
+      </div>
+      
+      <div className="relative z-10 rounded-t-[40px] bg-white overflow-hidden mt-12 max-w-[1400px] mx-auto w-full">
+        <Footer />
+      </div>
     </div>
   )
 }
