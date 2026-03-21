@@ -25,14 +25,14 @@ export default function FeaturesSection() {
               </li>
               <li className="flex items-start gap-3">
                 <span className="mt-1 text-[#00A3FF] font-bold">&#10003;</span>
-                <span>One click to view what you created in QuickBooks</span>
+                <span>One click to view what you created in QuickBooks or Xero</span>
               </li>
             </ul>
           </div>
 
           {/* Screenshot Graphic */}
           <div className="flex-1 relative">
-            <div className="relative rounded-2xl bg-[#F8FAFC] p-4 shadow-[0_32px_80px_rgba(15,23,42,0.1)] ring-1 ring-[#E2E8F0]">
+            <div className="relative rounded-2xl bg-[#F8FAFC] p-4 shadow-[0_32px_80px_rgba(15,23,42,0.25),0_8px_24px_rgba(15,23,42,0.12)] ring-1 ring-[#E2E8F0]">
               <Image
                 src="/images/review-ui-screenshot.png"
                 alt="Docket Dashboard"

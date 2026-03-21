@@ -19,15 +19,14 @@ export default function LandingNav() {
   }, [menuOpen])
 
   return (
-    <nav className="sticky top-0 z-50 border-b border-border bg-surface">
-      <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
+    <nav className="flex items-center justify-between px-6 py-3">
         <Link href="/">
           <Image
             src="/dockett_logo.png"
             alt="Docket"
-            width={180}
-            height={48}
-            style={{ width: 'auto', height: '48px' }}
+            width={270}
+            height={72}
+            style={{ width: 'auto', height: '72px' }}
             priority
           />
         </Link>
@@ -67,13 +66,12 @@ export default function LandingNav() {
             )}
           </svg>
         </button>
-      </div>
 
       {/* Mobile menu */}
       {menuOpen && (
         <div
           data-testid="mobile-menu"
-          className="border-t border-border bg-surface px-6 py-4 shadow-soft md:hidden"
+          className="border-t border-border/20 px-6 py-4 md:hidden"
         >
           <div className="flex flex-col gap-3">
             <Link
