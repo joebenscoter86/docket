@@ -79,11 +79,11 @@ export default function BatchSyncDialog({
 
         if (bankRes.ok) {
           const bankBody = await bankRes.json();
-          setBankAccounts(bankBody.data ?? []);
+          setBankAccounts(bankBody.data?.accounts ?? []);
         }
         if (ccRes.ok) {
           const ccBody = await ccRes.json();
-          setCcAccounts(ccBody.data ?? []);
+          setCcAccounts(ccBody.data?.accounts ?? []);
         }
       } catch {
         // Non-critical -- user can still sync as bill
