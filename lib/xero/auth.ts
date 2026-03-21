@@ -19,7 +19,7 @@ export const XERO_CONNECTIONS_URL = "https://api.xero.com/connections";
 export const XERO_REVOKE_URL =
   "https://identity.xero.com/connect/revocation";
 export const XERO_SCOPES =
-  "openid offline_access accounting.invoices accounting.contacts accounting.settings accounting.attachments";
+  "openid offline_access accounting.invoices accounting.contacts accounting.settings accounting.attachments accounting.banktransactions";
 
 // Buffer before actual expiry to avoid edge-case failures (5 minutes)
 export const TOKEN_EXPIRY_BUFFER_MS = 5 * 60 * 1000;

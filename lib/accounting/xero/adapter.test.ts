@@ -7,7 +7,9 @@ vi.mock("@/lib/xero/api", () => ({
   fetchAccounts: vi.fn(),
   fetchPaymentAccounts: vi.fn(),
   createInvoice: vi.fn(),
+  createBankTransaction: vi.fn(),
   attachDocumentToInvoice: vi.fn(),
+  attachDocumentToBankTransaction: vi.fn(),
   XeroApiError: class XeroApiError extends Error {
     statusCode: number;
     errorCode: string;
@@ -36,7 +38,9 @@ import {
   fetchAccounts,
   fetchPaymentAccounts,
   createInvoice,
+  createBankTransaction,
   attachDocumentToInvoice,
+  attachDocumentToBankTransaction,
   XeroApiError,
 } from "@/lib/xero/api";
 import { AccountingApiError } from "@/lib/accounting/types";
@@ -46,7 +50,9 @@ const mockCreateContact = vi.mocked(createContact);
 const mockFetchAccounts = vi.mocked(fetchAccounts);
 const mockFetchPaymentAccounts = vi.mocked(fetchPaymentAccounts);
 const mockCreateInvoice = vi.mocked(createInvoice);
+const mockCreateBankTransaction = vi.mocked(createBankTransaction);
 const mockAttachDocument = vi.mocked(attachDocumentToInvoice);
+const mockAttachBankTransaction = vi.mocked(attachDocumentToBankTransaction);
 
 async function getAdapter() {
   const { XeroAccountingAdapter } = await import(
@@ -338,20 +344,18 @@ describe("XeroAccountingAdapter", () => {
   });
 
   describe("createPurchase", () => {
-    it("creates an ACCPAY invoice for non-bill transactions", async () => {
-      mockCreateInvoice.mockResolvedValue({
-        Invoices: [
+    it("creates a SPEND bank transaction for Check payment type", async () => {
+      mockCreateBankTransaction.mockResolvedValue({
+        BankTransactions: [
           {
-            InvoiceID: "xero-purchase-uuid",
-            InvoiceNumber: "CHK-001",
-            Type: "ACCPAY",
-            Status: "DRAFT",
+            BankTransactionID: "xero-bt-uuid",
+            Type: "SPEND",
             Contact: { ContactID: "contact-1", Name: "Acme" },
+            BankAccount: { AccountID: "bank-1", Name: "Business Checking", Code: "090" },
             DateString: "2026-03-20",
-            DueDateString: "",
+            Reference: "CHK-001",
             Total: 200,
-            AmountDue: 200,
-            CurrencyCode: "USD",
+            Status: "AUTHORISED",
             LineItems: [],
           },
         ],
@@ -367,15 +371,92 @@ describe("XeroAccountingAdapter", () => {
         invoiceNumber: "CHK-001",
       });
 
-      expect(result.entityId).toBe("xero-purchase-uuid");
-      expect(result.entityType).toBe("Bill");
+      expect(result.entityId).toBe("xero-bt-uuid");
+      expect(result.entityType).toBe("Purchase");
 
-      const payload = mockCreateInvoice.mock.calls[0][2];
-      expect(payload.Type).toBe("ACCPAY");
+      const payload = mockCreateBankTransaction.mock.calls[0][2];
+      expect(payload.Type).toBe("SPEND");
+      expect(payload.Status).toBe("AUTHORISED");
+      expect(payload.BankAccount.AccountID).toBe("bank-1");
+      expect(payload.Contact.ContactID).toBe("contact-1");
+      expect(payload.Date).toBe("2026-03-20");
+      expect(payload.Reference).toBe("CHK-001");
+      expect(payload.LineItems).toHaveLength(1);
+      expect(payload.LineItems[0]).toEqual({
+        Description: "Check payment",
+        Quantity: 1,
+        UnitAmount: 200,
+        AccountCode: "500",
+      });
+    });
+
+    it("creates a SPEND bank transaction for CreditCard payment type", async () => {
+      mockCreateBankTransaction.mockResolvedValue({
+        BankTransactions: [
+          {
+            BankTransactionID: "xero-cc-uuid",
+            Type: "SPEND",
+            Contact: { ContactID: "contact-1", Name: "Acme" },
+            BankAccount: { AccountID: "cc-1", Name: "Visa Card", Code: "091" },
+            DateString: "2026-03-20",
+            Total: 50,
+            Status: "AUTHORISED",
+            LineItems: [],
+          },
+        ],
+      });
+
+      const adapter = await getAdapter();
+      const result = await adapter.createPurchase(mockSupabase, "org-1", {
+        vendorRef: "contact-1",
+        paymentAccountRef: "cc-1",
+        paymentType: "CreditCard",
+        lineItems: [{ amount: 50, glAccountId: "600", description: null }],
+        invoiceDate: "2026-03-20",
+        invoiceNumber: null,
+      });
+
+      expect(result.entityId).toBe("xero-cc-uuid");
+      expect(result.entityType).toBe("Purchase");
+
+      const payload = mockCreateBankTransaction.mock.calls[0][2];
+      expect(payload.BankAccount.AccountID).toBe("cc-1");
+      expect(payload.LineItems[0].Description).toBe("");
+    });
+
+    it("omits optional fields when null", async () => {
+      mockCreateBankTransaction.mockResolvedValue({
+        BankTransactions: [
+          {
+            BankTransactionID: "xero-bt-uuid-2",
+            Type: "SPEND",
+            Contact: { ContactID: "contact-1", Name: "Acme" },
+            BankAccount: { AccountID: "bank-1", Name: "Checking", Code: "090" },
+            DateString: "",
+            Total: 100,
+            Status: "AUTHORISED",
+            LineItems: [],
+          },
+        ],
+      });
+
+      const adapter = await getAdapter();
+      await adapter.createPurchase(mockSupabase, "org-1", {
+        vendorRef: "contact-1",
+        paymentAccountRef: "bank-1",
+        paymentType: "Cash",
+        lineItems: [{ amount: 100, glAccountId: "500", description: null }],
+        invoiceDate: null,
+        invoiceNumber: null,
+      });
+
+      const payload = mockCreateBankTransaction.mock.calls[0][2];
+      expect(payload.Date).toBeUndefined();
+      expect(payload.Reference).toBeUndefined();
     });
 
     it("wraps XeroApiError into AccountingApiError", async () => {
-      mockCreateInvoice.mockRejectedValue(
+      mockCreateBankTransaction.mockRejectedValue(
         new XeroApiError({
           message: "Contact is not valid",
           statusCode: 400,
@@ -520,6 +601,41 @@ describe("XeroAccountingAdapter", () => {
 
       expect(result.success).toBe(false);
       expect(result.attachmentId).toBeNull();
+    });
+
+    it("routes Purchase attachments to attachDocumentToBankTransaction", async () => {
+      mockAttachBankTransaction.mockResolvedValue({
+        Attachments: [
+          {
+            AttachmentID: "att-bt-uuid",
+            FileName: "receipt.pdf",
+            Url: "https://api.xero.com/...",
+            MimeType: "application/pdf",
+            ContentLength: 2048,
+          },
+        ],
+      });
+
+      const adapter = await getAdapter();
+      const result = await adapter.attachDocument(
+        mockSupabase,
+        "org-1",
+        "bt-uuid",
+        "Purchase",
+        Buffer.from("PDF content"),
+        "receipt.pdf"
+      );
+
+      expect(result.success).toBe(true);
+      expect(result.attachmentId).toBe("att-bt-uuid");
+      expect(mockAttachBankTransaction).toHaveBeenCalledWith(
+        mockSupabase,
+        "org-1",
+        "bt-uuid",
+        Buffer.from("PDF content"),
+        "receipt.pdf"
+      );
+      expect(mockAttachDocument).not.toHaveBeenCalled();
     });
   });
 });

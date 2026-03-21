@@ -96,6 +96,7 @@ describe("getAuthorizationUrl", () => {
 
     expect(scope).toContain("accounting.invoices");
     expect(scope).toContain("accounting.contacts");
+    expect(scope).toContain("accounting.banktransactions");
     expect(scope).toContain("offline_access");
     expect(scope).not.toContain("accounting.transactions");
   });
