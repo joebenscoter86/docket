@@ -280,6 +280,9 @@ export async function POST(request: Request) {
       glInvoiceCount++;
     }
 
+    // Check if this invoice has remaining issues that can't be auto-fixed
+    const manualReasons: string[] = [];
+
     // Check for content-based duplicates
     if (ed.vendor_name) {
       try {
@@ -295,12 +298,7 @@ export async function POST(request: Request) {
         if (duplicates.length > 0) {
           const dup = duplicates[0];
           const statusLabel = dup.status === "synced" ? "already synced" : dup.status;
-          // Soft warning only -- don't block approval. Sync gate catches synced duplicates later.
-          needsManualReview.push({
-            id: inv.id,
-            fileName: inv.file_name,
-            reasons: [`Possible duplicate of ${dup.vendorName}${dup.invoiceNumber ? ` - ${dup.invoiceNumber}` : ""} (${statusLabel})`],
-          });
+          manualReasons.push(`Possible duplicate of ${dup.vendorName}${dup.invoiceNumber ? ` - ${dup.invoiceNumber}` : ""} (${statusLabel})`);
         }
       } catch (err) {
         logger.warn("prepare_preview.duplicate_check_failed", {
@@ -309,9 +307,6 @@ export async function POST(request: Request) {
         });
       }
     }
-
-    // Check if this invoice has remaining issues that can't be auto-fixed
-    const manualReasons: string[] = [];
 
     if (!hasVendorRef && !willAutoMatchVendor && providerType) {
       manualReasons.push("No vendor match found");
