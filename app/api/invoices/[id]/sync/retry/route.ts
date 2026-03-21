@@ -101,7 +101,8 @@ export async function POST(
       .from("sync_log")
       .select("id", { count: "exact", head: true })
       .eq("invoice_id", invoiceId)
-      .eq("provider", providerType);
+      .eq("provider", providerType)
+      .eq("transaction_type", transactionType);
 
     if ((syncAttemptCount ?? 0) >= MAX_SYNC_RETRIES) {
       logger.warn("sync_retry_max_attempts", {

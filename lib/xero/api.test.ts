@@ -2,7 +2,7 @@
 import { describe, it, expect, vi, beforeAll, afterEach, afterAll } from "vitest";
 import { http, HttpResponse } from "msw";
 import { setupServer } from "msw/node";
-import type { XeroContact, XeroAccount, XeroInvoicePayload } from "@/lib/xero/types";
+import type { XeroContact, XeroAccount, XeroInvoicePayload, XeroBankTransactionPayload } from "@/lib/xero/types";
 
 // Mock getValidAccessToken before importing api module
 vi.mock("@/lib/xero/auth", () => ({
@@ -636,6 +636,250 @@ describe("attachDocumentToInvoice", () => {
         "inv-uuid-123",
         Buffer.from("PDF content"),
         "invoice.pdf"
+      )
+    ).rejects.toThrow(XeroApiError);
+  });
+});
+
+// ─── createBankTransaction ───
+
+describe("createBankTransaction", () => {
+  const spendPayload: XeroBankTransactionPayload = {
+    Type: "SPEND",
+    Contact: { ContactID: "contact-uuid-1" },
+    BankAccount: { AccountID: "bank-uuid-1" },
+    LineItems: [
+      {
+        Description: "Check payment",
+        Quantity: 1,
+        UnitAmount: 200.0,
+        AccountCode: "500",
+      },
+    ],
+    Date: "2026-03-20",
+    Reference: "CHK-001",
+    Status: "AUTHORISED",
+  };
+
+  it("creates a SPEND bank transaction via PUT", async () => {
+    let capturedMethod = "";
+    server.use(
+      http.put(`${XERO_BASE}/BankTransactions`, async ({ request }) => {
+        capturedMethod = request.method;
+        const body = (await request.json()) as XeroBankTransactionPayload;
+        expect(body.Type).toBe("SPEND");
+        expect(body.Contact.ContactID).toBe("contact-uuid-1");
+        expect(body.BankAccount.AccountID).toBe("bank-uuid-1");
+        expect(body.LineItems).toHaveLength(1);
+        return HttpResponse.json({
+          BankTransactions: [
+            {
+              BankTransactionID: "bt-uuid-123",
+              Type: "SPEND",
+              Status: "AUTHORISED",
+              Contact: { ContactID: "contact-uuid-1", Name: "Acme Corp" },
+              BankAccount: { AccountID: "bank-uuid-1", Name: "Checking", Code: "090" },
+              DateString: "2026-03-20",
+              Reference: "CHK-001",
+              Total: 200.0,
+              LineItems: body.LineItems,
+            },
+          ],
+        });
+      })
+    );
+
+    const { createBankTransaction } = await import("@/lib/xero/api");
+    const mockSupabase = {} as Parameters<typeof createBankTransaction>[0];
+    const result = await createBankTransaction(mockSupabase, "org-1", spendPayload);
+
+    expect(capturedMethod).toBe("PUT");
+    expect(result.BankTransactions[0].BankTransactionID).toBe("bt-uuid-123");
+    expect(result.BankTransactions[0].Status).toBe("AUTHORISED");
+  });
+
+  it("throws XeroApiError on validation failure", async () => {
+    server.use(
+      http.put(`${XERO_BASE}/BankTransactions`, () => {
+        return HttpResponse.json(
+          {
+            StatusCode: 400,
+            Message: "A validation error occurred",
+            Elements: [
+              {
+                ValidationErrors: [
+                  { Message: "Account code '999' is not a valid code" },
+                ],
+              },
+            ],
+          },
+          { status: 400 }
+        );
+      })
+    );
+
+    const { createBankTransaction, XeroApiError } = await import("@/lib/xero/api");
+    const mockSupabase = {} as Parameters<typeof createBankTransaction>[0];
+
+    await expect(
+      createBankTransaction(mockSupabase, "org-1", spendPayload)
+    ).rejects.toThrow(XeroApiError);
+  });
+
+  it("throws XeroApiError on 401 auth error", async () => {
+    server.use(
+      http.put(`${XERO_BASE}/BankTransactions`, () => {
+        return HttpResponse.json(
+          { Title: "Unauthorized", Status: 401, Detail: "Token expired" },
+          { status: 401 }
+        );
+      })
+    );
+
+    const { createBankTransaction } = await import("@/lib/xero/api");
+    const mockSupabase = {} as Parameters<typeof createBankTransaction>[0];
+
+    await expect(
+      createBankTransaction(mockSupabase, "org-1", spendPayload)
+    ).rejects.toThrow("Token expired");
+  });
+
+  it("logs warnings when bank transaction is created with warnings", async () => {
+    const { logger } = await import("@/lib/utils/logger");
+    server.use(
+      http.put(`${XERO_BASE}/BankTransactions`, () => {
+        return HttpResponse.json({
+          BankTransactions: [
+            {
+              BankTransactionID: "bt-uuid-warn",
+              Type: "SPEND",
+              Status: "AUTHORISED",
+              Contact: { ContactID: "contact-uuid-1", Name: "Acme Corp" },
+              BankAccount: { AccountID: "bank-uuid-1", Name: "Checking", Code: "090" },
+              DateString: "2026-03-20",
+              Total: 200.0,
+              LineItems: [],
+              Warnings: [{ Message: "Account code not valid for this org" }],
+            },
+          ],
+        });
+      })
+    );
+
+    const { createBankTransaction } = await import("@/lib/xero/api");
+    const mockSupabase = {} as Parameters<typeof createBankTransaction>[0];
+    const result = await createBankTransaction(mockSupabase, "org-1", spendPayload);
+
+    expect(result.BankTransactions[0].Warnings).toHaveLength(1);
+    expect(logger.warn).toHaveBeenCalledWith(
+      "xero.bank_transaction_created_with_warnings",
+      expect.objectContaining({ bankTransactionId: "bt-uuid-warn" })
+    );
+  });
+});
+
+// ─── attachDocumentToBankTransaction ───
+
+describe("attachDocumentToBankTransaction", () => {
+  it("uploads a PDF attachment via PUT with IncludeOnline=true", async () => {
+    let capturedContentType = "";
+    let capturedUrl = "";
+    server.use(
+      http.put(
+        `${XERO_BASE}/BankTransactions/bt-uuid-123/Attachments/receipt.pdf`,
+        ({ request }) => {
+          capturedContentType = request.headers.get("content-type") ?? "";
+          capturedUrl = request.url;
+          return HttpResponse.json({
+            Attachments: [
+              {
+                AttachmentID: "att-bt-uuid-1",
+                FileName: "receipt.pdf",
+                Url: "https://api.xero.com/...",
+                MimeType: "application/pdf",
+                ContentLength: 1024,
+              },
+            ],
+          });
+        }
+      )
+    );
+
+    const { attachDocumentToBankTransaction } = await import("@/lib/xero/api");
+    const mockSupabase = {} as Parameters<typeof attachDocumentToBankTransaction>[0];
+    const result = await attachDocumentToBankTransaction(
+      mockSupabase,
+      "org-1",
+      "bt-uuid-123",
+      Buffer.from("PDF content"),
+      "receipt.pdf"
+    );
+
+    expect(capturedContentType).toBe("application/pdf");
+    expect(result.Attachments[0].AttachmentID).toBe("att-bt-uuid-1");
+    expect(capturedUrl).toContain("IncludeOnline=true");
+  });
+
+  it("sets correct MIME type for PNG files", async () => {
+    let capturedContentType = "";
+    server.use(
+      http.put(
+        `${XERO_BASE}/BankTransactions/bt-uuid-123/Attachments/receipt.png`,
+        ({ request }) => {
+          capturedContentType = request.headers.get("content-type") ?? "";
+          return HttpResponse.json({
+            Attachments: [
+              {
+                AttachmentID: "att-bt-uuid-2",
+                FileName: "receipt.png",
+                Url: "https://api.xero.com/...",
+                MimeType: "image/png",
+                ContentLength: 2048,
+              },
+            ],
+          });
+        }
+      )
+    );
+
+    const { attachDocumentToBankTransaction } = await import("@/lib/xero/api");
+    const mockSupabase = {} as Parameters<typeof attachDocumentToBankTransaction>[0];
+    await attachDocumentToBankTransaction(
+      mockSupabase,
+      "org-1",
+      "bt-uuid-123",
+      Buffer.from("PNG content"),
+      "receipt.png"
+    );
+
+    expect(capturedContentType).toBe("image/png");
+  });
+
+  it("throws XeroApiError on upload failure", async () => {
+    server.use(
+      http.put(
+        `${XERO_BASE}/BankTransactions/bt-uuid-123/Attachments/receipt.pdf`,
+        () => {
+          return HttpResponse.json(
+            { Title: "Not Found", Status: 404, Detail: "Bank transaction not found" },
+            { status: 404 }
+          );
+        }
+      )
+    );
+
+    const { attachDocumentToBankTransaction, XeroApiError } = await import(
+      "@/lib/xero/api"
+    );
+    const mockSupabase = {} as Parameters<typeof attachDocumentToBankTransaction>[0];
+
+    await expect(
+      attachDocumentToBankTransaction(
+        mockSupabase,
+        "org-1",
+        "bt-uuid-123",
+        Buffer.from("PDF content"),
+        "receipt.pdf"
       )
     ).rejects.toThrow(XeroApiError);
   });

@@ -647,6 +647,7 @@ All four checks must pass before a PR can be merged. No exceptions.
 - **Access token lifetime is 30 minutes** (not 1 hour like QBO). Set refresh threshold to <5 min remaining.
 - **Refresh tokens rotate.** Old refresh token is invalidated on every use. Must store the new token from every refresh response — if lost, user must re-authorize.
 - **Bill creation uses PUT, not POST** to `/api.xro/2.0/Invoices` with `Type: "ACCPAY"`. Contact creation uses POST as expected.
+- **Non-bill purchases (Check/Cash/CreditCard) use Bank Transactions**, not Invoices. `PUT /api.xro/2.0/BankTransactions` with `Type: "SPEND"`, `Status: "AUTHORISED"`, and `BankAccount: { AccountID }`. Attachments use `PUT /api.xro/2.0/BankTransactions/{id}/Attachments/{filename}`. Requires `accounting.banktransactions` scope.
 - **Line items reference `AccountCode` (string like "500"), not `AccountID` (UUID).** Filter accounts by `Class=="EXPENSE"` (OData-style where clause). No hierarchy — flat `Name` only, no `FullyQualifiedName`.
 - **ContactID is a UUID** (e.g., `"2e465f38-..."`), not a numeric string like QBO's `Id`. Primary display field is `Name` — no `CompanyName` vs `Name` ambiguity.
 - **No SyncToken.** Xero has no version counter for updates — unlike QBO which requires SyncToken for PUT.
@@ -754,6 +755,7 @@ Run these before declaring any issue done:
 
 | Date | Decision | Rationale | Issue |
 |------|----------|-----------|-------|
+| 2026-03-20 | Xero non-bill purchases use Bank Transactions (`Type: "SPEND"`), not ACCPAY Invoices | Xero's ACCPAY invoices don't support BankAccount references. Bank Transactions are the correct entity for Check/Cash/CreditCard expenses -- matches how Xero models direct payments. Attachments route to `/BankTransactions/{id}/Attachments/`. | DOC-90 |
 | 2026-03-20 | Xero OAuth2+PKCE connect flow in `lib/xero/auth.ts` (parallel to QBO, not shared abstraction) | OAuth flows are genuinely different (PKCE vs no PKCE, tenant selection vs realmId, different token lifetimes). Auth is provider-specific; the provider abstraction (DOC-52) handles the shared API interface. | DOC-54 |
 | 2026-03-20 | DOC-54 pre-built most of DOC-55's token management scope | `lib/xero/auth.ts` already has: `refreshAccessToken`, `getValidAccessToken` (with 5-min buffer + per-org concurrency lock), `storeConnection` (encrypted), `loadConnection`, `disconnect`. DOC-55 still needs: (1) wire into provider adapter, (2) Settings page health check (7-day refresh token expiry warning), (3) explicit `ConnectionExpiredError` type. | DOC-54/DOC-55 |
 | 2026-03-20 | Single JSON cookie for Xero PKCE state (`xero_oauth_pkce`) vs QBO's two separate cookies | Verifier + state are always created/consumed/deleted together. Simpler than QBO's `qbo_oauth_state` + `qbo_oauth_return_to` pattern. | DOC-54 |
