@@ -1,3 +1,4 @@
+import { createHash } from "crypto";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { validateFileMagicBytes, validateFileSize } from "@/lib/upload/validate";
@@ -16,6 +17,7 @@ import { logger } from "@/lib/utils/logger";
 import { enqueueExtraction } from "@/lib/extraction/queue";
 import { trackServerEvent, AnalyticsEvents } from "@/lib/analytics/events";
 import { waitUntil } from "@vercel/functions";
+import type { DuplicateWarning } from "@/lib/types/invoice";
 
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const BATCH_SIZE_CAP = 25;
@@ -131,7 +133,10 @@ export async function POST(request: Request) {
       );
     }
 
-    // 4b. Batch size cap enforcement
+    // 4b. Compute file hash for duplicate detection
+    const fileHash = createHash("sha256").update(buffer).digest("hex");
+
+    // 4c. Batch size cap enforcement
     const admin = createAdminClient();
     if (batchId) {
       const { count, error: countError } = await admin
@@ -161,6 +166,38 @@ export async function POST(request: Request) {
           `Batch limit reached. Maximum ${BATCH_SIZE_CAP} invoices per batch.`
         );
       }
+    }
+
+    // 4d. Check for file hash duplicates (advisory only, never blocks upload)
+    let duplicateWarning: DuplicateWarning | null = null;
+    try {
+      const { data: hashMatches } = await admin
+        .from("invoices")
+        .select("id, file_name, status, uploaded_at")
+        .eq("org_id", orgId)
+        .eq("file_hash", fileHash)
+        .neq("status", "error")
+        .limit(5);
+
+      if (hashMatches && hashMatches.length > 0) {
+        duplicateWarning = {
+          type: "file_hash",
+          message: "This file has been uploaded before.",
+          matches: hashMatches.map((m) => ({
+            invoiceId: m.id,
+            fileName: m.file_name,
+            status: m.status,
+            uploadedAt: m.uploaded_at,
+          })),
+        };
+        logger.info("invoice_upload_hash_duplicate_found", {
+          userId, orgId, fileHash, matchCount: hashMatches.length,
+        });
+      }
+    } catch (err) {
+      logger.warn("invoice_upload_hash_check_failed", {
+        userId, orgId, error: err instanceof Error ? err.message : String(err),
+      });
     }
 
     // 5. Upload to Supabase Storage
@@ -193,6 +230,7 @@ export async function POST(request: Request) {
       file_name: fileName,
       file_type: fileType,
       file_size_bytes: fileSize,
+      file_hash: fileHash,
     };
     if (batchId) {
       insertData.batch_id = batchId;
@@ -299,6 +337,7 @@ export async function POST(request: Request) {
       invoiceId,
       fileName,
       signedUrl: signedUrlData?.signedUrl || null,
+      duplicateWarning,
     });
   } catch (error) {
     const durationMs = Date.now() - startTime;
