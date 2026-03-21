@@ -11,6 +11,7 @@ import {
   subscriptionRequired,
   apiSuccess,
 } from "@/lib/utils/errors";
+import { checkContentDuplicates } from "@/lib/invoices/duplicate-check";
 
 const UUID_REGEX =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -124,7 +125,7 @@ export async function POST(request: Request) {
 
   const { data: extractedRows, error: edErr } = await admin
     .from("extracted_data")
-    .select("id, invoice_id, vendor_name, vendor_ref, total_amount")
+    .select("id, invoice_id, vendor_name, vendor_ref, total_amount, invoice_number, invoice_date")
     .in("invoice_id", candidateIds);
 
   if (edErr) {
@@ -277,6 +278,38 @@ export async function POST(request: Request) {
     if (pendingGlCount > 0) {
       glSuggestionsToAccept += pendingGlCount;
       glInvoiceCount++;
+    }
+
+    // Check for content-based duplicates
+    if (ed.vendor_name) {
+      try {
+        const duplicates = await checkContentDuplicates({
+          admin,
+          invoiceId: inv.id,
+          orgId,
+          vendorName: ed.vendor_name,
+          invoiceNumber: ed.invoice_number ?? null,
+          totalAmount: ed.total_amount != null ? Number(ed.total_amount) : null,
+          invoiceDate: ed.invoice_date ?? null,
+        });
+        const syncedDuplicates = duplicates.filter((d) => d.matchType === "exact" && d.status === "synced");
+        if (syncedDuplicates.length > 0) {
+          const dup = syncedDuplicates[0];
+          needsManualReview.push({
+            id: inv.id,
+            fileName: inv.file_name,
+            reasons: [`Possible duplicate of ${dup.vendorName}${dup.invoiceNumber ? ` - ${dup.invoiceNumber}` : ""} (already synced)`],
+          });
+          willApprove--;
+          willSkip++;
+          continue;
+        }
+      } catch (err) {
+        logger.warn("prepare_preview.duplicate_check_failed", {
+          invoiceId: inv.id, orgId,
+          error: err instanceof Error ? err.message : String(err),
+        });
+      }
     }
 
     // Check if this invoice has remaining issues that can't be auto-fixed
