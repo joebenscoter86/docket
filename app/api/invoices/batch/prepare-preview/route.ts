@@ -295,14 +295,12 @@ export async function POST(request: Request) {
         if (duplicates.length > 0) {
           const dup = duplicates[0];
           const statusLabel = dup.status === "synced" ? "already synced" : dup.status;
+          // Soft warning only -- don't block approval. Sync gate catches synced duplicates later.
           needsManualReview.push({
             id: inv.id,
             fileName: inv.file_name,
             reasons: [`Possible duplicate of ${dup.vendorName}${dup.invoiceNumber ? ` - ${dup.invoiceNumber}` : ""} (${statusLabel})`],
           });
-          willApprove--;
-          willSkip++;
-          continue;
         }
       } catch (err) {
         logger.warn("prepare_preview.duplicate_check_failed", {
