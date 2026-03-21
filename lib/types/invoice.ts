@@ -115,5 +115,5 @@ export interface ExtractedDataRow {
   extraction_duration_ms: number | null;
   extracted_at: string;
   extracted_line_items: ExtractedLineItemRow[];
-  duplicate_matches: DuplicateMatch[] | null;
+  duplicate_matches?: DuplicateMatch[] | null;
 }
