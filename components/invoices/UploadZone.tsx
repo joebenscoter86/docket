@@ -2,6 +2,7 @@
 
 import { useState, useRef, useCallback, useEffect } from "react";
 import Button from "@/components/ui/Button";
+import type { DuplicateWarning } from "@/lib/types/invoice";
 
 type UploadState = "idle" | "dragging" | "uploading" | "success";
 
@@ -45,6 +46,7 @@ export default function UploadZone({ onUploadComplete, onUploadStart }: UploadZo
   const [statusAnnouncement, setStatusAnnouncement] = useState("");
   const [selectedFiles, setSelectedFiles] = useState<SelectedFile[]>([]);
   const [capWarning, setCapWarning] = useState<string | null>(null);
+  const [duplicateWarning, setDuplicateWarning] = useState<DuplicateWarning | null>(null);
 
   const inputRef = useRef<HTMLInputElement>(null);
   const dragCounterRef = useRef(0);
@@ -80,6 +82,7 @@ export default function UploadZone({ onUploadComplete, onUploadStart }: UploadZo
       setState("uploading");
       setError(null);
       setCapWarning(null);
+      setDuplicateWarning(null);
       setProgress(0);
       setFileName(file.name);
       setSelectedFiles([]);
@@ -106,6 +109,9 @@ export default function UploadZone({ onUploadComplete, onUploadStart }: UploadZo
         setProgress(100);
         setState("success");
         setStatusAnnouncement("Upload complete");
+        if (body.data?.duplicateWarning) {
+          setDuplicateWarning(body.data.duplicateWarning);
+        }
         if (onUploadComplete && body.data?.invoiceId) {
           onUploadComplete(body.data.invoiceId);
         }
@@ -264,6 +270,7 @@ export default function UploadZone({ onUploadComplete, onUploadStart }: UploadZo
       setState("idle");
       setError(null);
       setCapWarning(null);
+      setDuplicateWarning(null);
       setProgress(0);
       setFileName(null);
       setStatusAnnouncement("");
@@ -429,6 +436,28 @@ export default function UploadZone({ onUploadComplete, onUploadStart }: UploadZo
               </span>
               <p className="text-xs text-muted">Processing...</p>
             </div>
+            {duplicateWarning && (
+              <div
+                className="flex items-start gap-2 rounded-brand-md bg-amber-50 border border-amber-200 px-3 py-2 max-w-sm"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <svg className="h-4 w-4 flex-shrink-0 text-amber-600 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
+                </svg>
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs text-amber-800">{duplicateWarning.message}</p>
+                  {duplicateWarning.matches.slice(0, 2).map((m) => (
+                    <a
+                      key={m.invoiceId}
+                      href={`/invoices/${m.invoiceId}/review`}
+                      className="text-xs text-amber-700 underline hover:text-amber-900 block truncate"
+                    >
+                      {m.fileName} ({m.status})
+                    </a>
+                  ))}
+                </div>
+              </div>
+            )}
             <Button
               variant="outline"
               type="button"
