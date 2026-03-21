@@ -42,8 +42,8 @@ export function notFound(message = "Resource not found") {
   return apiError({ error: message, code: "NOT_FOUND", status: 404 });
 }
 
-export function conflict(message: string) {
-  return apiError({ error: message, code: "CONFLICT", status: 409 });
+export function conflict(message: string, details?: Record<string, unknown>) {
+  return apiError({ error: message, code: "CONFLICT", status: 409, details });
 }
 
 export function rateLimited(message = "Too many requests") {
