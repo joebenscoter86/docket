@@ -1,12 +1,14 @@
 "use client";
 
-import { useState, useEffect, useMemo, useCallback } from "react";
+import { useState, useEffect, useMemo, useCallback, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { getBatchStatusSummary, getNextReviewableInvoice } from "@/lib/invoices/batch-utils";
 import type { InvoiceListItem } from "@/lib/invoices/types";
 import { formatRelativeTime } from "@/lib/utils/date";
 import { useInvoiceStatuses } from "@/lib/hooks/useInvoiceStatuses";
 import PrepareApproveDialog, { type PreparePreview } from "./PrepareApproveDialog";
+import BatchSyncDialog, { type SyncInvoiceItem } from "./BatchSyncDialog";
+import type { OutputType } from "@/lib/types/invoice";
 
 interface BatchHeaderProps {
   batchId: string;
@@ -58,6 +60,7 @@ export default function BatchHeader({
   isAccountingConnected,
 }: BatchHeaderProps) {
   const router = useRouter();
+  const [, startTransition] = useTransition();
 
   // --- Retry state ---
   const [isRetrying, setIsRetrying] = useState(false);
@@ -78,6 +81,7 @@ export default function BatchHeader({
   const [showSkippedDetails, setShowSkippedDetails] = useState(false);
 
   // --- Sync All state ---
+  const [showSyncDialog, setShowSyncDialog] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
   const [syncingInvoiceIds, setSyncingInvoiceIds] = useState<string[]>([]);
   const [syncComplete, setSyncComplete] = useState(false);
@@ -180,9 +184,9 @@ export default function BatchHeader({
 
     setIsExecuting(false);
     setPreparePreview(null);
-    // Delay refresh so the result banner renders before server re-render
-    setTimeout(() => router.refresh(), 100);
-  }, [batchId, isExecuting, router]);
+    // Use transition so the refresh doesn't interrupt the banner render
+    startTransition(() => router.refresh());
+  }, [batchId, isExecuting, router, startTransition]);
 
   const handleCancelPrepareApprove = useCallback(() => {
     if (!isExecuting) {
@@ -191,30 +195,71 @@ export default function BatchHeader({
   }, [isExecuting]);
 
   // --- Sync All handler ---
-  const handleSyncAll = async (e: React.MouseEvent) => {
+  const handleSyncAllClick = (e: React.MouseEvent) => {
     e.stopPropagation();
     if (isSyncing) return;
+    setShowSyncDialog(true);
+  };
 
-    setIsSyncing(true);
-    setSyncComplete(false);
-    setSyncResult(null);
+  const handleSyncConfirm = useCallback(
+    async (
+      invoiceConfigs: Array<{
+        id: string;
+        outputType: OutputType;
+        paymentAccountId: string | null;
+        paymentAccountName: string | null;
+      }>
+    ) => {
+      if (isSyncing) return;
 
-    try {
-      const res = await fetch("/api/invoices/batch/sync", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ batch_id: batchId }),
-      });
-      const body = await res.json();
-      if (res.ok && body.data.invoiceIds.length > 0) {
-        setSyncingInvoiceIds(body.data.invoiceIds);
-      } else {
+      setIsSyncing(true);
+      setSyncComplete(false);
+      setSyncResult(null);
+
+      // Update each invoice's output type + payment account before syncing
+      const updatePromises = invoiceConfigs.map((cfg) =>
+        fetch(`/api/invoices/${cfg.id}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            output_type: cfg.outputType,
+            payment_account_id: cfg.paymentAccountId,
+            payment_account_name: cfg.paymentAccountName,
+          }),
+        })
+      );
+
+      try {
+        await Promise.all(updatePromises);
+      } catch {
+        // Best effort -- sync will catch validation errors
+      }
+
+      setShowSyncDialog(false);
+
+      // Fire batch sync
+      try {
+        const res = await fetch("/api/invoices/batch/sync", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ batch_id: batchId }),
+        });
+        const body = await res.json();
+        if (res.ok && body.data.invoiceIds.length > 0) {
+          setSyncingInvoiceIds(body.data.invoiceIds);
+        } else {
+          setIsSyncing(false);
+        }
+      } catch {
         setIsSyncing(false);
       }
-    } catch {
-      setIsSyncing(false);
-    }
-  };
+    },
+    [batchId, isSyncing]
+  );
+
+  const handleSyncCancel = useCallback(() => {
+    if (!isSyncing) setShowSyncDialog(false);
+  }, [isSyncing]);
 
   // --- Realtime sync progress tracking ---
   const { statuses: realtimeStatuses } = useInvoiceStatuses(syncingInvoiceIds);
@@ -540,7 +585,7 @@ export default function BatchHeader({
           {summary.approved > 0 && isAccountingConnected && (
             <button
               type="button"
-              onClick={handleSyncAll}
+              onClick={handleSyncAllClick}
               disabled={isSyncing}
               className="inline-flex w-full items-center justify-center gap-1.5 rounded-md border border-green-600 px-3 py-1.5 text-sm font-medium text-green-700 transition-colors hover:bg-green-50 disabled:cursor-not-allowed disabled:opacity-60 md:w-auto"
             >
@@ -568,6 +613,26 @@ export default function BatchHeader({
           isExecuting={isExecuting}
           onConfirm={handleConfirmPrepareApprove}
           onCancel={handleCancelPrepareApprove}
+        />
+      )}
+
+      {/* Batch sync dialog with output type selection */}
+      {showSyncDialog && (
+        <BatchSyncDialog
+          invoices={invoices
+            .filter((inv) => inv.status === "approved")
+            .map((inv): SyncInvoiceItem => ({
+              id: inv.id,
+              fileName: inv.file_name,
+              vendorName: inv.extracted_data?.vendor_name ?? null,
+              totalAmount: inv.extracted_data?.total_amount ?? null,
+              outputType: (inv.output_type ?? "bill") as OutputType,
+              paymentAccountId: null,
+              paymentAccountName: null,
+            }))}
+          isSyncing={isSyncing}
+          onConfirm={handleSyncConfirm}
+          onCancel={handleSyncCancel}
         />
       )}
     </div>
