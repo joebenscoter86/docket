@@ -15,7 +15,7 @@ const steps = [
   },
   {
     title: 'Sync',
-    description: 'Create a bill, check, or cash expense in QuickBooks with one click.',
+    description: 'Create a bill, check, or cash expense in QuickBooks or Xero with one click.',
     iconPath: '/images/icon-sync.png',
   },
 ]
