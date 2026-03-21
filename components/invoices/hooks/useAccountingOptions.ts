@@ -32,7 +32,7 @@ export function useAccountingOptions(): AccountingOptionsState & { addVendor: (v
 
         if (cancelled) return;
 
-        // 401 means token expired — treat as disconnected
+        // 401 means token expired, 422 means no provider connected — treat as disconnected
         if (vendorRes.status === 401 || accountRes.status === 401) {
           setState({
             vendors: [],
@@ -40,6 +40,17 @@ export function useAccountingOptions(): AccountingOptionsState & { addVendor: (v
             loading: false,
             connected: false,
             error: "Accounting connection expired. Reconnect in Settings.",
+          });
+          return;
+        }
+
+        if (vendorRes.status === 422 || accountRes.status === 422) {
+          setState({
+            vendors: [],
+            accounts: [],
+            loading: false,
+            connected: false,
+            error: null,
           });
           return;
         }

@@ -6,7 +6,7 @@ import {
   AccountingApiError,
 } from "@/lib/accounting";
 import { logger } from "@/lib/utils/logger";
-import { authError, apiSuccess, internalError } from "@/lib/utils/errors";
+import { authError, apiSuccess, internalError, unprocessableEntity } from "@/lib/utils/errors";
 
 /**
  * GET /api/accounting/accounts
@@ -47,7 +47,9 @@ export async function GET() {
     // Check for a connected accounting provider
     const providerType = await getOrgProvider(adminSupabase, orgId);
     if (!providerType) {
-      return apiSuccess([]);
+      return unprocessableEntity(
+        "No accounting connection found. Connect a provider in Settings."
+      );
     }
 
     const provider = getAccountingProvider(providerType);

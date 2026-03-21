@@ -261,14 +261,27 @@ export default function LineItemEditor({
 
   const handleAcceptAllAiSuggestions = useCallback(async () => {
     setAcceptingAll(true);
-    const items = state.items.filter(
+    const pending = state.items.filter(
       (i) => i.values.suggested_gl_account_id && !i.values.gl_account_id && i.values.gl_suggestion_source === "ai"
     );
-    await Promise.all(
-      items.map((item) => handleGlAccountSelect(item.id, item.values.suggested_gl_account_id as string))
+    const results = await Promise.all(
+      pending.map((item) => handleGlAccountSelect(item.id, item.values.suggested_gl_account_id as string))
     );
+    // Fix stale-closure race: each concurrent handleGlAccountSelect computed
+    // the missing count using the same pre-batch state.items snapshot, so only
+    // its own item was subtracted. Recompute the true count after all saves.
+    if (onMissingGlCountChange && pending.length > 0) {
+      const acceptedIds = new Set(
+        pending.filter((_, i) => results[i]).map((item) => item.id)
+      );
+      const correctedCount = state.items.filter((item) => {
+        if (acceptedIds.has(item.id)) return false;
+        return !item.values.gl_account_id;
+      }).length;
+      onMissingGlCountChange(correctedCount);
+    }
     setAcceptingAll(false);
-  }, [state.items, handleGlAccountSelect]);
+  }, [state.items, handleGlAccountSelect, onMissingGlCountChange]);
 
   const inputBase =
     "w-full border border-border rounded-md px-2 py-1.5 text-sm focus:outline-none focus-visible:ring-[3px] focus-visible:ring-[#BFDBFE] focus:border-primary";
