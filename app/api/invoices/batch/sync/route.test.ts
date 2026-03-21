@@ -227,7 +227,7 @@ describe("POST /api/invoices/batch/sync", () => {
     expect(body.code).toBe("SUBSCRIPTION_REQUIRED");
   });
 
-  it("returns 400 when no QBO connection", async () => {
+  it("returns 400 when no accounting connection", async () => {
     mockIsOrgConnected.mockResolvedValue(false);
     mockGetOrgProvider.mockResolvedValue(null);
 
@@ -236,7 +236,7 @@ describe("POST /api/invoices/batch/sync", () => {
 
     expect(res.status).toBe(400);
     expect(body.code).toBe("VALIDATION_ERROR");
-    expect(body.error).toMatch(/connect quickbooks/i);
+    expect(body.error).toMatch(/connect an accounting provider/i);
   });
 
   it("returns 403 when any invoice belongs to a different org", async () => {

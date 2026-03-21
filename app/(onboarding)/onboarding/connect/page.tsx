@@ -16,8 +16,13 @@ export default function OnboardingConnectPage() {
 
 function ConnectContent() {
   const searchParams = useSearchParams()
-  const success = searchParams.get('qbo_success')
-  const error = searchParams.get('qbo_error')
+  const qboSuccess = searchParams.get('qbo_success')
+  const xeroSuccess = searchParams.get('xero_success')
+  const qboError = searchParams.get('qbo_error')
+  const xeroError = searchParams.get('xero_error')
+
+  const success = qboSuccess || xeroSuccess
+  const error = qboError || xeroError
 
   return (
     <div className="mx-auto max-w-2xl space-y-8">
@@ -36,7 +41,7 @@ function ConnectContent() {
 
           <h1 className="font-headings text-2xl font-bold text-text">Connect your business.</h1>
           <p className="mt-3 font-body text-base text-muted">
-            Link your QuickBooks account to automatically sync your verified invoices. No more manual data entry.
+            Link your accounting software to automatically sync your verified invoices. No more manual data entry.
           </p>
 
           {/* Success message */}
@@ -53,9 +58,9 @@ function ConnectContent() {
             </div>
           )}
 
-          {/* Connect button */}
+          {/* Connect buttons */}
           {!success && (
-            <div className="mt-8">
+            <div className="mt-8 flex flex-col items-center gap-3 sm:flex-row sm:justify-center">
               <a
                 href="/api/quickbooks/connect?returnTo=/onboarding/connect"
                 className="inline-flex items-center gap-2 rounded-brand-md bg-[#2CA01C] px-6 py-3 text-sm font-bold text-white hover:bg-[#238a15] transition-colors"
@@ -65,6 +70,15 @@ function ConnectContent() {
                   <path d="M12 4C7.58 4 4 7.58 4 12s3.58 8 8 8 8-3.58 8-8-3.58-8-8-8zm3.5 10.5h-2v2c0 .83-.67 1.5-1.5 1.5s-1.5-.67-1.5-1.5v-2h-2c-.83 0-1.5-.67-1.5-1.5S7.67 9 8.5 9h2V7c0-.83.67-1.5 1.5-1.5s1.5.67 1.5 1.5v2h2c.83 0 1.5.67 1.5 1.5s-.67 1.5-1.5 1.5z" fill="#2CA01C" />
                 </svg>
                 Connect QuickBooks
+              </a>
+              <a
+                href="/api/xero/connect?returnTo=/onboarding/connect"
+                className="inline-flex items-center gap-2 rounded-brand-md bg-[#13B5EA] px-6 py-3 text-sm font-bold text-white hover:bg-[#0fa3d4] transition-colors"
+              >
+                <svg viewBox="0 0 24 24" className="h-5 w-5" fill="white">
+                  <path d="M4.21 11.97l3.75-3.75a.75.75 0 000-1.06L4.21 3.41M8.54 11.97l-3.75 3.75a.75.75 0 010-1.06l3.75-3.75M10.5 7.5l1.5 4.5 1.5-4.5M16.5 7.5v9M19.79 11.97l-3.75-3.75a.75.75 0 010-1.06l3.75 3.75" />
+                </svg>
+                Connect Xero
               </a>
             </div>
           )}

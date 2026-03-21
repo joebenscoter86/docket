@@ -54,7 +54,9 @@ export async function GET() {
     // Check for a connected accounting provider
     const providerType = await getOrgProvider(adminSupabase, orgId);
     if (!providerType) {
-      return apiSuccess([]);
+      return unprocessableEntity(
+        "No accounting connection found. Connect a provider in Settings."
+      );
     }
 
     const provider = getAccountingProvider(providerType);

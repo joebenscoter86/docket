@@ -21,7 +21,7 @@ interface LineItemEditorProps {
   onMissingGlCountChange?: (count: number) => void;
   accounts: AccountOption[];
   accountsLoading: boolean;
-  qboConnected: boolean;
+  accountingConnected: boolean;
   disabled?: boolean;
 }
 
@@ -41,7 +41,7 @@ export default function LineItemEditor({
   onMissingGlCountChange,
   accounts,
   accountsLoading,
-  qboConnected,
+  accountingConnected,
   disabled = false,
 }: LineItemEditorProps) {
   const [state, dispatch] = useReducer(lineItemsReducer, lineItems, initLineItemsState);
@@ -50,6 +50,7 @@ export default function LineItemEditor({
   const [adding, setAdding] = useState(false);
   const [addError, setAddError] = useState<string | null>(null);
   const [confirmRemoveId, setConfirmRemoveId] = useState<string | null>(null);
+  const [acceptingAll, setAcceptingAll] = useState(false);
   const descriptionRefs = useRef<Record<string, HTMLInputElement | null>>({});
 
   const calculateSubtotal = useCallback(
@@ -254,6 +255,34 @@ export default function LineItemEditor({
     [saveField, state.items, onMissingGlCountChange]
   );
 
+  const pendingAiItems = state.items.filter(
+    (i) => i.values.suggested_gl_account_id && !i.values.gl_account_id && i.values.gl_suggestion_source === "ai"
+  );
+
+  const handleAcceptAllAiSuggestions = useCallback(async () => {
+    setAcceptingAll(true);
+    const pending = state.items.filter(
+      (i) => i.values.suggested_gl_account_id && !i.values.gl_account_id && i.values.gl_suggestion_source === "ai"
+    );
+    const results = await Promise.all(
+      pending.map((item) => handleGlAccountSelect(item.id, item.values.suggested_gl_account_id as string))
+    );
+    // Fix stale-closure race: each concurrent handleGlAccountSelect computed
+    // the missing count using the same pre-batch state.items snapshot, so only
+    // its own item was subtracted. Recompute the true count after all saves.
+    if (onMissingGlCountChange && pending.length > 0) {
+      const acceptedIds = new Set(
+        pending.filter((_, i) => results[i]).map((item) => item.id)
+      );
+      const correctedCount = state.items.filter((item) => {
+        if (acceptedIds.has(item.id)) return false;
+        return !item.values.gl_account_id;
+      }).length;
+      onMissingGlCountChange(correctedCount);
+    }
+    setAcceptingAll(false);
+  }, [state.items, handleGlAccountSelect, onMissingGlCountChange]);
+
   const inputBase =
     "w-full border border-border rounded-md px-2 py-1.5 text-sm focus:outline-none focus-visible:ring-[3px] focus-visible:ring-[#BFDBFE] focus:border-primary";
 
@@ -283,9 +312,36 @@ export default function LineItemEditor({
 
   return (
     <div>
-      <h3 className="text-xs font-semibold uppercase tracking-wide text-muted mb-4">
-        Line Items
-      </h3>
+      <div className="flex items-center justify-between mb-4">
+        <h3 className="text-xs font-semibold uppercase tracking-wide text-muted">
+          Line Items
+        </h3>
+        {pendingAiItems.length >= 2 && (
+          <button
+            type="button"
+            onClick={handleAcceptAllAiSuggestions}
+            disabled={acceptingAll || disabled}
+            className="flex items-center gap-1 text-xs text-primary hover:text-primary-hover disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {acceptingAll ? (
+              <>
+                <svg className="h-3 w-3 animate-spin" viewBox="0 0 24 24" fill="none">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                </svg>
+                Accepting...
+              </>
+            ) : (
+              <>
+                <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+                </svg>
+                Accept all AI suggestions ({pendingAiItems.length})
+              </>
+            )}
+          </button>
+        )}
+      </div>
 
       {/* Table header */}
       <div className="grid grid-cols-[1fr_70px_100px_100px_140px_32px] gap-x-2 items-center mb-1">
@@ -414,7 +470,7 @@ export default function LineItemEditor({
             <GlAccountSelect
               accounts={accounts}
               loading={accountsLoading}
-              connected={qboConnected}
+              connected={accountingConnected}
               currentAccountId={item.values.gl_account_id as string | null}
               onSelect={(accountId) => handleGlAccountSelect(item.id, accountId)}
               disabled={disabled}

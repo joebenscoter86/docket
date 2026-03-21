@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import type { VendorOption, AccountOption } from "@/lib/accounting";
 
-interface QboOptionsState {
+interface AccountingOptionsState {
   vendors: VendorOption[];
   accounts: AccountOption[];
   loading: boolean;
@@ -11,8 +11,8 @@ interface QboOptionsState {
   error: string | null;
 }
 
-export function useQboOptions(): QboOptionsState & { addVendor: (vendor: VendorOption) => void } {
-  const [state, setState] = useState<QboOptionsState>({
+export function useAccountingOptions(): AccountingOptionsState & { addVendor: (vendor: VendorOption) => void } {
+  const [state, setState] = useState<AccountingOptionsState>({
     vendors: [],
     accounts: [],
     loading: true,
@@ -32,7 +32,7 @@ export function useQboOptions(): QboOptionsState & { addVendor: (vendor: VendorO
 
         if (cancelled) return;
 
-        // 401 means token expired — treat as disconnected
+        // 401 means token expired, 422 means no provider connected — treat as disconnected
         if (vendorRes.status === 401 || accountRes.status === 401) {
           setState({
             vendors: [],
@@ -40,6 +40,17 @@ export function useQboOptions(): QboOptionsState & { addVendor: (vendor: VendorO
             loading: false,
             connected: false,
             error: "Accounting connection expired. Reconnect in Settings.",
+          });
+          return;
+        }
+
+        if (vendorRes.status === 422 || accountRes.status === 422) {
+          setState({
+            vendors: [],
+            accounts: [],
+            loading: false,
+            connected: false,
+            error: null,
           });
           return;
         }

@@ -17,7 +17,7 @@ export default function OnboardingBanner({ hasConnection, hasInvoices }: Onboard
   let href: string
 
   if (!hasConnection) {
-    message = 'Complete setup: Connect QuickBooks'
+    message = 'Complete setup: Connect your accounting software'
     href = '/onboarding/connect'
   } else if (!hasInvoices) {
     message = 'Complete setup: Upload your first invoice'

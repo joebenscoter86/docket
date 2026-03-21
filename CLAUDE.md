@@ -642,7 +642,7 @@ All four checks must pass before a PR can be merged. No exceptions.
 - **Production redirect URI must be registered separately.** The sandbox app and production app have independent redirect URI lists in the Intuit developer portal. Add `https://dockett.app/api/auth/callback/quickbooks` to the production app's Redirect URIs tab — forgetting this causes "redirect_uri is invalid" error on OAuth.
 - **Preview and production share the same Supabase database currently.** This means sandbox QBO tokens and production QBO tokens coexist in `accounting_connections`. Disconnect sandbox connection before connecting production to avoid stale token issues.
 
-**Xero (Phase 2 — validated 2026-03-20, DOC-53):**
+**Xero (validated 2026-03-20, DOC-53; E2E confirmed 2026-03-20, DOC-61):**
 - **Granular scopes required for post-March-2026 apps.** `accounting.transactions` is invalid — use `accounting.invoices`, `accounting.payments`, `accounting.banktransactions`, `accounting.manualjournals` instead. Immediate auth blocker if wrong.
 - **Access token lifetime is 30 minutes** (not 1 hour like QBO). Set refresh threshold to <5 min remaining.
 - **Refresh tokens rotate.** Old refresh token is invalidated on every use. Must store the new token from every refresh response — if lost, user must re-authorize.
@@ -660,6 +660,10 @@ All four checks must pass before a PR can be merged. No exceptions.
 - **All IDs are UUIDs.** Unlike QBO's numeric strings.
 - **Rate limit headers are returned** (`x-minlimit-remaining`, `x-daylimit-remaining`). 60/min/tenant, 1000/day/tenant. Easy to implement backoff.
 - Required header on every API call: `xero-tenant-id: {tenantId}`. Tenant UUID obtained from `GET https://api.xero.com/connections` after auth.
+- **E2E findings (DOC-61):** Full happy path confirmed -- upload, extract, review, map vendor/accounts, sync to Xero sandbox, bill + PDF attachment visible. Token auto-refresh works transparently (30-min access token refreshed without user intervention). Idempotency guard prevents duplicate bills. Provider switching (QBO to Xero and back) preserves correct provider labels on previously synced invoices.
+- **Accounting API routes must return 422 (not 200 with empty data) when no provider is connected.** Without this, the frontend `useAccountingOptions` hook treats the response as `connected: true` and the sync blocker never fires. Fixed in DOC-61.
+- **OAuth PKCE flow verified end-to-end.** Connect button redirects to `login.xero.com` with proper `code_challenge`, `code_challenge_method=S256`, all required scopes, and CSRF `state` parameter. Single JSON cookie (`xero_oauth_pkce`) stores state + verifier atomically.
+- **Disconnect flow includes confirmation dialog.** Best-effort token revocation at Xero (fire-and-forget), then DB row delete. Settings page shows success banner and both provider cards become available.
 
 **Supabase:**
 - Do NOT insert auth users via SQL. Use the Auth Admin API with `email_confirm: true`.

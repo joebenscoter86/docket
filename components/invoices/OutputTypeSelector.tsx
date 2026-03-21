@@ -13,7 +13,7 @@ interface OutputTypeSelectorProps {
   orgDefaultPaymentAccountId: string | null;
   orgDefaultPaymentAccountName: string | null;
   disabled: boolean;
-  qboConnected: boolean;
+  accountingConnected: boolean;
   onOutputTypeChange: (outputType: OutputType) => void;
   onPaymentAccountChange: (accountId: string | null, accountName: string | null) => void;
 }
@@ -33,7 +33,7 @@ export default function OutputTypeSelector({
   orgDefaultPaymentAccountId,
   orgDefaultPaymentAccountName,
   disabled,
-  qboConnected,
+  accountingConnected,
   onOutputTypeChange,
   onPaymentAccountChange,
 }: OutputTypeSelectorProps) {
@@ -146,7 +146,7 @@ export default function OutputTypeSelector({
       )}
 
       {/* Payment account selector for non-bill types */}
-      {!isBill && qboConnected && (
+      {!isBill && accountingConnected && (
         <PaymentAccountSelect
           outputType={outputType}
           selectedAccountId={paymentAccountId}
@@ -156,10 +156,10 @@ export default function OutputTypeSelector({
         />
       )}
 
-      {/* No QBO connection warning for non-bill types */}
-      {!isBill && !qboConnected && (
+      {/* No accounting connection warning for non-bill types */}
+      {!isBill && !accountingConnected && (
         <p className="text-xs text-warning">
-          Connect QuickBooks in Settings to use this option.
+          Connect your accounting software in Settings to use this option.
         </p>
       )}
     </div>

@@ -22,7 +22,7 @@ export default function OnboardingWelcomePage() {
             Welcome to Docket. Let AI handle the paperwork while you focus on your business.
           </h1>
           <p className="mt-4 font-body text-base text-muted">
-            Automatically extract data from invoices and sync to QuickBooks in seconds. Save hours every week.
+            Automatically extract data from invoices and sync to your accounting software in seconds. Save hours every week.
           </p>
           <div className="mt-8 flex items-center gap-3">
             <Link href="/onboarding/connect">
