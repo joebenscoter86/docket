@@ -82,13 +82,24 @@ export async function POST(request: Request) {
     return validationError("Invalid JSON body.");
   }
 
-  const { batch_id: batchId } = (body as Record<string, unknown>) ?? {};
+  const { batch_id: batchId, create_vendor_for_invoice_ids: createVendorForInvoiceIds } =
+    (body as Record<string, unknown>) ?? {};
 
   if (!batchId || typeof batchId !== "string") {
     return validationError("batch_id is required.");
   }
   if (!UUID_REGEX.test(batchId)) {
     return validationError("batch_id must be a valid UUID.");
+  }
+
+  // Validate create_vendor_for_invoice_ids if provided
+  const vendorCreateSet = new Set<string>();
+  if (Array.isArray(createVendorForInvoiceIds)) {
+    for (const id of createVendorForInvoiceIds) {
+      if (typeof id === "string" && UUID_REGEX.test(id)) {
+        vendorCreateSet.add(id);
+      }
+    }
   }
 
   // 5. Fetch all invoices for this batch
@@ -214,7 +225,13 @@ export async function POST(request: Request) {
     }
   }
 
-  // 11. Process each candidate: auto-match vendors, accept GL suggestions, approve
+  // 11. Get the accounting provider for vendor creation
+  let provider: ReturnType<typeof getAccountingProvider> | null = null;
+  if (providerType) {
+    provider = getAccountingProvider(providerType);
+  }
+
+  // 12. Process each candidate: auto-match/create vendors, accept GL suggestions, approve
   const toApprove: string[] = [];
   const skippedInvoices: Array<{
     id: string;
@@ -222,6 +239,7 @@ export async function POST(request: Request) {
     reason: string;
   }> = [];
   let vendorsMatched = 0;
+  let vendorsCreated = 0;
   let glSuggestionsAccepted = 0;
 
   for (const inv of candidates) {
@@ -252,10 +270,12 @@ export async function POST(request: Request) {
     }
 
     // Auto-match vendor if possible (don't overwrite existing vendor_ref)
-    if (!ed.vendor_ref && ed.vendor_name && providerType) {
+    let vendorResolved = !!ed.vendor_ref;
+    if (!vendorResolved && ed.vendor_name && providerType) {
       const normalizedName = ed.vendor_name.toLowerCase().trim();
       const matchedVendorId = vendorMap.get(normalizedName);
       if (matchedVendorId) {
+        // Existing vendor match
         const { error: vendorErr } = await admin
           .from("extracted_data")
           .update({ vendor_ref: matchedVendorId })
@@ -263,12 +283,55 @@ export async function POST(request: Request) {
 
         if (!vendorErr) {
           vendorsMatched++;
+          vendorResolved = true;
         } else {
           logger.warn("prepare_and_approve.vendor_match_write_failed", {
             invoiceId: inv.id,
             error: vendorErr.message,
           });
         }
+      } else if (vendorCreateSet.has(inv.id) && provider) {
+        // User opted to create this vendor in accounting system
+        try {
+          const created = await provider.createVendor(admin, orgId, ed.vendor_name);
+          const { error: vendorErr } = await admin
+            .from("extracted_data")
+            .update({ vendor_ref: created.value })
+            .eq("id", ed.id);
+
+          if (!vendorErr) {
+            vendorsCreated++;
+            vendorResolved = true;
+            // Add to vendorMap so subsequent invoices with the same name match
+            vendorMap.set(normalizedName, created.value);
+          } else {
+            logger.warn("prepare_and_approve.vendor_create_ref_write_failed", {
+              invoiceId: inv.id,
+              error: vendorErr.message,
+            });
+          }
+        } catch (err) {
+          logger.warn("prepare_and_approve.vendor_create_failed", {
+            invoiceId: inv.id,
+            vendorName: ed.vendor_name,
+            error: err instanceof Error ? err.message : String(err),
+          });
+          // Invoice stays in pending_review
+          skippedInvoices.push({
+            id: inv.id,
+            fileName: inv.file_name,
+            reason: `Failed to create vendor "${ed.vendor_name}"`,
+          });
+          continue;
+        }
+      } else if (!vendorResolved && providerType) {
+        // No match and user didn't opt to create -- leave in pending_review
+        skippedInvoices.push({
+          id: inv.id,
+          fileName: inv.file_name,
+          reason: `No vendor match for "${ed.vendor_name}" -- needs manual review`,
+        });
+        continue;
       }
     }
 
@@ -329,6 +392,7 @@ export async function POST(request: Request) {
     approved: toApprove.length,
     skipped: skippedInvoices.length,
     vendorsMatched,
+    vendorsCreated,
     glSuggestionsAccepted,
     durationMs: Date.now() - start,
   });
@@ -337,6 +401,7 @@ export async function POST(request: Request) {
     batchId,
     count: toApprove.length,
     vendorsMatched,
+    vendorsCreated,
     glSuggestionsAccepted,
   });
 
@@ -344,6 +409,7 @@ export async function POST(request: Request) {
     approved: toApprove.length,
     skipped: skippedInvoices.length,
     vendorsMatched,
+    vendorsCreated,
     glSuggestionsAccepted,
     skippedInvoices,
   });

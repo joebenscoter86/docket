@@ -210,6 +210,11 @@ export async function POST(request: Request) {
     fileName: string;
     reasons: string[];
   }> = [];
+  const unmatchedVendors: Array<{
+    invoiceId: string;
+    fileName: string;
+    vendorName: string;
+  }> = [];
 
   for (const inv of candidates) {
     const ed = extractedByInvoiceId.get(inv.id);
@@ -279,6 +284,13 @@ export async function POST(request: Request) {
 
     if (!hasVendorRef && !willAutoMatchVendor && providerType) {
       manualReasons.push("No vendor match found");
+      if (ed.vendor_name) {
+        unmatchedVendors.push({
+          invoiceId: inv.id,
+          fileName: inv.file_name,
+          vendorName: ed.vendor_name,
+        });
+      }
     }
 
     const unmappedWithoutSuggestion = items.filter(
@@ -319,6 +331,7 @@ export async function POST(request: Request) {
     glSuggestionsToAccept,
     glInvoiceCount,
     needsManualReview,
+    unmatchedVendors,
     willApprove,
     willSkip,
   });

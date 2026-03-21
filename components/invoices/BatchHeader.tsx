@@ -71,6 +71,7 @@ export default function BatchHeader({
     approved: number;
     skipped: number;
     vendorsMatched: number;
+    vendorsCreated: number;
     glSuggestionsAccepted: number;
     skippedInvoices: Array<{ id: string; fileName: string; reason: string }>;
   } | null>(null);
@@ -153,7 +154,7 @@ export default function BatchHeader({
     setIsLoadingPreview(false);
   };
 
-  const handleConfirmPrepareApprove = useCallback(async () => {
+  const handleConfirmPrepareApprove = useCallback(async (createVendorForInvoiceIds: string[]) => {
     if (isExecuting) return;
 
     setIsExecuting(true);
@@ -162,7 +163,10 @@ export default function BatchHeader({
       const res = await fetch("/api/invoices/batch/prepare-and-approve", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ batch_id: batchId }),
+        body: JSON.stringify({
+          batch_id: batchId,
+          create_vendor_for_invoice_ids: createVendorForInvoiceIds,
+        }),
       });
       const body = await res.json();
       if (res.ok) {
@@ -176,7 +180,8 @@ export default function BatchHeader({
 
     setIsExecuting(false);
     setPreparePreview(null);
-    router.refresh();
+    // Delay refresh so the result banner renders before server re-render
+    setTimeout(() => router.refresh(), 100);
   }, [batchId, isExecuting, router]);
 
   const handleCancelPrepareApprove = useCallback(() => {
@@ -322,12 +327,14 @@ export default function BatchHeader({
           style={{ color: "#065F46", backgroundColor: "#D1FAE5" }}
         >
           {approveResult.approved} approved
-          {(approveResult.vendorsMatched > 0 || approveResult.glSuggestionsAccepted > 0) && (
+          {(approveResult.vendorsMatched > 0 || approveResult.vendorsCreated > 0 || approveResult.glSuggestionsAccepted > 0) && (
             <span className="font-normal">
               {" "}(
               {[
                 approveResult.vendorsMatched > 0 &&
                   `${approveResult.vendorsMatched} vendor${approveResult.vendorsMatched !== 1 ? "s" : ""} matched`,
+                approveResult.vendorsCreated > 0 &&
+                  `${approveResult.vendorsCreated} vendor${approveResult.vendorsCreated !== 1 ? "s" : ""} created`,
                 approveResult.glSuggestionsAccepted > 0 &&
                   `${approveResult.glSuggestionsAccepted} GL suggestion${approveResult.glSuggestionsAccepted !== 1 ? "s" : ""} accepted`,
               ]
