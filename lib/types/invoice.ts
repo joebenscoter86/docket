@@ -71,6 +71,30 @@ export interface ExtractedLineItemRow {
   is_user_confirmed: boolean;
 }
 
+// ─── Duplicate Detection ───
+
+export interface DuplicateMatch {
+  invoiceId: string;
+  fileName: string;
+  status: string;
+  matchType: "exact" | "likely";
+  vendorName: string;
+  invoiceNumber: string | null;
+  totalAmount: number | null;
+  invoiceDate: string | null;
+}
+
+export interface DuplicateWarning {
+  type: "file_hash";
+  message: string;
+  matches: {
+    invoiceId: string;
+    fileName: string;
+    status: string;
+    uploadedAt: string;
+  }[];
+}
+
 export interface ExtractedDataRow {
   id: string;
   invoice_id: string;
@@ -91,4 +115,5 @@ export interface ExtractedDataRow {
   extraction_duration_ms: number | null;
   extracted_at: string;
   extracted_line_items: ExtractedLineItemRow[];
+  duplicate_matches?: DuplicateMatch[] | null;
 }

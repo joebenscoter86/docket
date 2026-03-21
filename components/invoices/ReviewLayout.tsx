@@ -17,7 +17,8 @@ const PdfViewer = dynamic(() => import("./PdfViewer"), {
 });
 import ExtractionForm from "./ExtractionForm";
 import { BatchNavigation } from "./BatchNavigation";
-import type { InvoiceStatus, ExtractedDataRow, OutputType } from "@/lib/types/invoice";
+import DuplicateWarningBanner from "./DuplicateWarningBanner";
+import type { InvoiceStatus, ExtractedDataRow, OutputType, DuplicateMatch } from "@/lib/types/invoice";
 import type { BatchManifestItem } from "@/lib/invoices/queries";
 import type { AccountingProviderType } from "@/lib/accounting/types";
 
@@ -73,6 +74,10 @@ export default function ReviewLayout({
           batchId={invoice.batchId}
           initialManifest={batchManifest as BatchManifestItem[]}
         />
+      )}
+      {/* Duplicate warning banner */}
+      {extractedData?.duplicate_matches && extractedData.duplicate_matches.length > 0 && (
+        <DuplicateWarningBanner matches={extractedData.duplicate_matches as DuplicateMatch[]} />
       )}
       {/* Page header */}
       <div className="flex items-center gap-3 border-b border-border bg-white px-4 py-3 md:px-6">

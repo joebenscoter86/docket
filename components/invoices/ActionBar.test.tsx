@@ -136,7 +136,7 @@ describe("ActionBar — sync phase (approved)", () => {
 
     expect(global.fetch).toHaveBeenCalledWith(
       "/api/invoices/inv-1/sync",
-      { method: "POST" }
+      { method: "POST", headers: {} }
     );
 
     expect(onStatusChange).toHaveBeenCalledWith("synced");
@@ -180,7 +180,7 @@ describe("ActionBar — sync phase (approved)", () => {
 
     expect(global.fetch).toHaveBeenCalledWith(
       "/api/invoices/inv-1/sync/retry",
-      { method: "POST" }
+      { method: "POST", headers: {} }
     );
   });
 

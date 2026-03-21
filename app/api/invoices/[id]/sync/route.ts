@@ -19,7 +19,7 @@ import {
   internalError,
   subscriptionRequired,
 } from "@/lib/utils/errors";
-import type { OutputType, ProviderEntityType } from "@/lib/types/invoice";
+import type { OutputType, ProviderEntityType, DuplicateMatch } from "@/lib/types/invoice";
 import { OUTPUT_TYPE_TO_PAYMENT_TYPE, OUTPUT_TYPE_LABELS, SYNC_SUCCESS_MESSAGES } from "@/lib/types/invoice";
 
 /**
@@ -237,6 +237,32 @@ export async function POST(
       .select("*")
       .eq("extracted_data_id", extractedData.id)
       .order("sort_order", { ascending: true });
+
+    // 7b. Duplicate confirmation gate
+    const duplicateMatches = extractedData.duplicate_matches as DuplicateMatch[] | null;
+    const exactSyncedDuplicates = duplicateMatches?.filter(
+      (m) => m.matchType === "exact" && m.status === "synced"
+    ) ?? [];
+
+    if (exactSyncedDuplicates.length > 0) {
+      const confirmDuplicate = request.headers.get("x-confirm-duplicate") === "true";
+      if (!confirmDuplicate) {
+        logger.info("sync_duplicate_gate_triggered", {
+          invoiceId, orgId, duplicateCount: exactSyncedDuplicates.length,
+        });
+        return conflict(
+          "This invoice may be a duplicate of an already-synced invoice.",
+          {
+            requiresConfirmation: true,
+            duplicates: exactSyncedDuplicates.map((d) => ({
+              invoiceId: d.invoiceId,
+              vendorName: d.vendorName,
+              invoiceNumber: d.invoiceNumber,
+            })),
+          }
+        );
+      }
+    }
 
     // 8. Validate required sync fields
     if (!extractedData.vendor_name) {

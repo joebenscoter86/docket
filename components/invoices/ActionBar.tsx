@@ -41,6 +41,10 @@ export default function ActionBar({
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [warning, setWarning] = useState<string | null>(null);
   const [syncedEntityId, setSyncedEntityId] = useState<string | null>(null);
+  const [duplicateConfirm, setDuplicateConfirm] = useState<{
+    message: string;
+    duplicates: { invoiceId: string; vendorName: string; invoiceNumber: string | null }[];
+  } | null>(null);
   const confirmTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const errorTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const approvedTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -59,6 +63,7 @@ export default function ActionBar({
     setBarState("idle");
     setErrorMessage(null);
     setWarning(null);
+    setDuplicateConfirm(null);
   }, [currentStatus]);
 
   // --- Approve validation ---
@@ -136,10 +141,24 @@ export default function ActionBar({
           ? `/api/invoices/${invoiceId}/sync/retry`
           : `/api/invoices/${invoiceId}/sync`;
 
-        const res = await fetch(endpoint, { method: "POST" });
+        const headers: Record<string, string> = {};
+        if (duplicateConfirm) {
+          headers["x-confirm-duplicate"] = "true";
+          setDuplicateConfirm(null);
+        }
+
+        const res = await fetch(endpoint, { method: "POST", headers });
         const body = await res.json();
 
         if (!res.ok) {
+          if (res.status === 409 && body.details?.requiresConfirmation) {
+            setDuplicateConfirm({
+              message: body.error,
+              duplicates: body.details.duplicates,
+            });
+            setBarState("idle");
+            return;
+          }
           throw new Error(body.error ?? "Failed to sync invoice");
         }
 
@@ -160,7 +179,7 @@ export default function ActionBar({
         }, 10000);
       }
     }
-  }, [barState, canSync, invoiceId, isRetry, onStatusChange]);
+  }, [barState, canSync, duplicateConfirm, invoiceId, isRetry, onStatusChange]);
 
   // --- Render: pending_review phase (approve) ---
   if (currentStatus === "pending_review") {
@@ -302,6 +321,40 @@ export default function ActionBar({
 
   return (
     <div className="bg-white px-6 py-4 space-y-2">
+      {duplicateConfirm && (
+        <div className="flex items-start gap-2 bg-amber-50 border border-amber-200 rounded-md p-2.5">
+          <svg className="h-4 w-4 text-amber-600 shrink-0 mt-0.5" viewBox="0 0 20 20" fill="currentColor">
+            <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+          </svg>
+          <div className="flex-1 text-xs text-amber-800">
+            <p className="font-medium mb-1">{duplicateConfirm.message}</p>
+            {duplicateConfirm.duplicates.map((d) => (
+              <p key={d.invoiceId}>
+                {d.vendorName}{d.invoiceNumber ? ` - ${d.invoiceNumber}` : ""}
+              </p>
+            ))}
+            <div className="flex gap-2 mt-2">
+              <button
+                type="button"
+                className="px-3 py-1 text-xs font-medium rounded bg-amber-600 text-white hover:bg-amber-700 transition-colors"
+                onClick={() => {
+                  setBarState("confirming");
+                  handleSync();
+                }}
+              >
+                Sync Anyway
+              </button>
+              <button
+                type="button"
+                className="px-3 py-1 text-xs font-medium rounded border border-amber-300 text-amber-700 hover:bg-amber-100 transition-colors"
+                onClick={() => setDuplicateConfirm(null)}
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       {syncBlockers.length > 0 && (
         <div className="flex items-start gap-2 bg-warning/5 border border-warning/20 rounded-md p-2.5">
           <svg className="h-4 w-4 text-warning shrink-0 mt-0.5" viewBox="0 0 20 20" fill="currentColor">

@@ -11,6 +11,7 @@ import {
   subscriptionRequired,
   apiSuccess,
 } from "@/lib/utils/errors";
+import { checkContentDuplicates } from "@/lib/invoices/duplicate-check";
 
 const UUID_REGEX =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -124,7 +125,7 @@ export async function POST(request: Request) {
 
   const { data: extractedRows, error: edErr } = await admin
     .from("extracted_data")
-    .select("id, invoice_id, vendor_name, vendor_ref, total_amount")
+    .select("id, invoice_id, vendor_name, vendor_ref, total_amount, invoice_number, invoice_date")
     .in("invoice_id", candidateIds);
 
   if (edErr) {
@@ -281,6 +282,31 @@ export async function POST(request: Request) {
 
     // Check if this invoice has remaining issues that can't be auto-fixed
     const manualReasons: string[] = [];
+
+    // Check for content-based duplicates
+    if (ed.vendor_name) {
+      try {
+        const duplicates = await checkContentDuplicates({
+          admin,
+          invoiceId: inv.id,
+          orgId,
+          vendorName: ed.vendor_name,
+          invoiceNumber: ed.invoice_number ?? null,
+          totalAmount: ed.total_amount != null ? Number(ed.total_amount) : null,
+          invoiceDate: ed.invoice_date ?? null,
+        });
+        if (duplicates.length > 0) {
+          const dup = duplicates[0];
+          const statusLabel = dup.status === "synced" ? "already synced" : dup.status;
+          manualReasons.push(`Possible duplicate of ${dup.vendorName}${dup.invoiceNumber ? ` - ${dup.invoiceNumber}` : ""} (${statusLabel})`);
+        }
+      } catch (err) {
+        logger.warn("prepare_preview.duplicate_check_failed", {
+          invoiceId: inv.id, orgId,
+          error: err instanceof Error ? err.message : String(err),
+        });
+      }
+    }
 
     if (!hasVendorRef && !willAutoMatchVendor && providerType) {
       manualReasons.push("No vendor match found");

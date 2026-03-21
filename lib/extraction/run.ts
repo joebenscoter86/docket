@@ -6,6 +6,7 @@ import { getAccountingProvider, getOrgProvider } from "@/lib/accounting";
 import { lookupGlMappings } from "./gl-mappings";
 import { normalizeForMatching } from "@/lib/utils/normalize";
 import { trackServerEvent, AnalyticsEvents } from "@/lib/analytics/events";
+import { checkContentDuplicates } from "@/lib/invoices/duplicate-check";
 import type { ExtractionResult, ExtractionContext } from "./types";
 
 export async function runExtraction(params: {
@@ -231,6 +232,41 @@ export async function runExtraction(params: {
         orgId,
         userId,
         error: statusError.message,
+      });
+    }
+
+    // 8.5. Check for content-based duplicates (non-fatal)
+    try {
+      if (result.data.vendorName) {
+        const duplicates = await checkContentDuplicates({
+          admin,
+          invoiceId,
+          orgId,
+          vendorName: result.data.vendorName,
+          invoiceNumber: result.data.invoiceNumber,
+          totalAmount: result.data.totalAmount ? Number(result.data.totalAmount) : null,
+          invoiceDate: result.data.invoiceDate,
+        });
+
+        if (duplicates.length > 0) {
+          await admin
+            .from("extracted_data")
+            .update({ duplicate_matches: duplicates })
+            .eq("invoice_id", invoiceId);
+
+          logger.info("duplicate_content_matches_found", {
+            invoiceId,
+            orgId,
+            matchCount: duplicates.length,
+            matchTypes: duplicates.map((d) => d.matchType),
+          });
+        }
+      }
+    } catch (err) {
+      logger.warn("duplicate_check_failed", {
+        invoiceId,
+        orgId,
+        error: err instanceof Error ? err.message : String(err),
       });
     }
 
