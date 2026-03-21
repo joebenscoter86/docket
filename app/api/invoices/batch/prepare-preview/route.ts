@@ -292,13 +292,13 @@ export async function POST(request: Request) {
           totalAmount: ed.total_amount != null ? Number(ed.total_amount) : null,
           invoiceDate: ed.invoice_date ?? null,
         });
-        const syncedDuplicates = duplicates.filter((d) => d.matchType === "exact" && d.status === "synced");
-        if (syncedDuplicates.length > 0) {
-          const dup = syncedDuplicates[0];
+        if (duplicates.length > 0) {
+          const dup = duplicates[0];
+          const statusLabel = dup.status === "synced" ? "already synced" : dup.status;
           needsManualReview.push({
             id: inv.id,
             fileName: inv.file_name,
-            reasons: [`Possible duplicate of ${dup.vendorName}${dup.invoiceNumber ? ` - ${dup.invoiceNumber}` : ""} (already synced)`],
+            reasons: [`Possible duplicate of ${dup.vendorName}${dup.invoiceNumber ? ` - ${dup.invoiceNumber}` : ""} (${statusLabel})`],
           });
           willApprove--;
           willSkip++;
