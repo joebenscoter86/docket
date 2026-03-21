@@ -1,11 +1,12 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { getBatchStatusSummary, getNextReviewableInvoice } from "@/lib/invoices/batch-utils";
 import type { InvoiceListItem } from "@/lib/invoices/types";
 import { formatRelativeTime } from "@/lib/utils/date";
 import { useInvoiceStatuses } from "@/lib/hooks/useInvoiceStatuses";
+import PrepareApproveDialog, { type PreparePreview } from "./PrepareApproveDialog";
 
 interface BatchHeaderProps {
   batchId: string;
@@ -62,11 +63,15 @@ export default function BatchHeader({
   const [isRetrying, setIsRetrying] = useState(false);
   const [retryResult, setRetryResult] = useState<RetryResult | null>(null);
 
-  // --- Approve All state ---
-  const [isApproving, setIsApproving] = useState(false);
+  // --- Prepare & Approve state ---
+  const [isLoadingPreview, setIsLoadingPreview] = useState(false);
+  const [preparePreview, setPreparePreview] = useState<PreparePreview | null>(null);
+  const [isExecuting, setIsExecuting] = useState(false);
   const [approveResult, setApproveResult] = useState<{
     approved: number;
     skipped: number;
+    vendorsMatched: number;
+    glSuggestionsAccepted: number;
     skippedInvoices: Array<{ id: string; fileName: string; reason: string }>;
   } | null>(null);
   const [showSkippedDetails, setShowSkippedDetails] = useState(false);
@@ -123,16 +128,38 @@ export default function BatchHeader({
     router.refresh();
   };
 
-  // --- Approve All handler ---
-  const handleApproveAll = async (e: React.MouseEvent) => {
+  // --- Prepare & Approve handlers ---
+  const handlePrepareApprove = async (e: React.MouseEvent) => {
     e.stopPropagation();
-    if (isApproving) return;
+    if (isLoadingPreview || isExecuting) return;
 
-    setIsApproving(true);
+    setIsLoadingPreview(true);
     setApproveResult(null);
 
     try {
-      const res = await fetch("/api/invoices/batch/approve", {
+      const res = await fetch("/api/invoices/batch/prepare-preview", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ batch_id: batchId }),
+      });
+      const body = await res.json();
+      if (res.ok) {
+        setPreparePreview(body.data);
+      }
+    } catch {
+      // Network error - user can retry
+    }
+
+    setIsLoadingPreview(false);
+  };
+
+  const handleConfirmPrepareApprove = useCallback(async () => {
+    if (isExecuting) return;
+
+    setIsExecuting(true);
+
+    try {
+      const res = await fetch("/api/invoices/batch/prepare-and-approve", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ batch_id: batchId }),
@@ -144,12 +171,19 @@ export default function BatchHeader({
         setTimeout(() => setApproveResult(null), 8000);
       }
     } catch {
-      // Network error — user can retry
+      // Network error - user can retry
     }
 
-    setIsApproving(false);
+    setIsExecuting(false);
+    setPreparePreview(null);
     router.refresh();
-  };
+  }, [batchId, isExecuting, router]);
+
+  const handleCancelPrepareApprove = useCallback(() => {
+    if (!isExecuting) {
+      setPreparePreview(null);
+    }
+  }, [isExecuting]);
 
   // --- Sync All handler ---
   const handleSyncAll = async (e: React.MouseEvent) => {
@@ -288,9 +322,23 @@ export default function BatchHeader({
           style={{ color: "#065F46", backgroundColor: "#D1FAE5" }}
         >
           {approveResult.approved} approved
+          {(approveResult.vendorsMatched > 0 || approveResult.glSuggestionsAccepted > 0) && (
+            <span className="font-normal">
+              {" "}(
+              {[
+                approveResult.vendorsMatched > 0 &&
+                  `${approveResult.vendorsMatched} vendor${approveResult.vendorsMatched !== 1 ? "s" : ""} matched`,
+                approveResult.glSuggestionsAccepted > 0 &&
+                  `${approveResult.glSuggestionsAccepted} GL suggestion${approveResult.glSuggestionsAccepted !== 1 ? "s" : ""} accepted`,
+              ]
+                .filter(Boolean)
+                .join(", ")}
+              )
+            </span>
+          )}
           {approveResult.skipped > 0 && (
             <>
-              , {approveResult.skipped} skipped&nbsp;&mdash;&nbsp;
+              , {approveResult.skipped} skipped&nbsp;-&nbsp;
               <button
                 type="button"
                 className="underline hover:no-underline"
@@ -462,21 +510,21 @@ export default function BatchHeader({
             </button>
           )}
 
-          {/* Approve N Ready */}
+          {/* Prepare & Approve N */}
           {summary.readyForReview > 0 && (
             <button
               type="button"
-              onClick={handleApproveAll}
-              disabled={isApproving}
+              onClick={handlePrepareApprove}
+              disabled={isLoadingPreview || isExecuting}
               className="inline-flex w-full items-center justify-center gap-1.5 rounded-md bg-blue-600 px-3 py-1.5 text-sm font-medium text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60 md:w-auto"
             >
-              {isApproving ? (
+              {isLoadingPreview ? (
                 <>
                   <Spinner />
-                  Approving&hellip;
+                  Checking&hellip;
                 </>
               ) : (
-                <>Approve {summary.readyForReview} Ready</>
+                <>Prepare &amp; Approve {summary.readyForReview}</>
               )}
             </button>
           )}
@@ -505,6 +553,16 @@ export default function BatchHeader({
           </button>
         </div>
       </div>
+
+      {/* Prepare & Approve confirmation dialog */}
+      {preparePreview && (
+        <PrepareApproveDialog
+          preview={preparePreview}
+          isExecuting={isExecuting}
+          onConfirm={handleConfirmPrepareApprove}
+          onCancel={handleCancelPrepareApprove}
+        />
+      )}
     </div>
   );
 }
