@@ -24,9 +24,9 @@ export default function LandingNav() {
           <Image
             src="/dockett_logo.png"
             alt="Docket"
-            width={270}
-            height={72}
-            style={{ width: 'auto', height: '72px' }}
+            width={150}
+            height={40}
+            style={{ width: 'auto', height: '40px' }}
             priority
           />
         </Link>
