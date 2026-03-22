@@ -18,7 +18,7 @@ import {
 import { logger } from "@/lib/utils/logger";
 import { enqueueExtraction } from "@/lib/extraction/queue";
 import { trackServerEvent, AnalyticsEvents } from "@/lib/analytics/events";
-import { sendTrialExhaustedEmail } from "@/lib/email/triggers";
+import { sendTrialExhaustedEmail, sendTrialProgressEmail } from "@/lib/email/triggers";
 import { waitUntil } from "@vercel/functions";
 import type { DuplicateWarning } from "@/lib/types/invoice";
 
@@ -96,6 +96,11 @@ export async function POST(request: Request) {
         });
       }
       trialNewCount = increment.newCount;
+
+      // Fire trial-progress email at 8/10 (deduped in trigger)
+      if (trialNewCount === 8) {
+        sendTrialProgressEmail(user.id, trialNewCount, TRIAL_INVOICE_LIMIT);
+      }
     }
 
     // 2c. Monthly usage limit check
