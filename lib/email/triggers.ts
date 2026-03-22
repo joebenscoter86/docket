@@ -5,6 +5,10 @@ import { BatchCompleteEmail } from "./templates/batch-complete";
 import { SyncSuccessEmail } from "./templates/sync-success";
 import { SyncFailureEmail } from "./templates/sync-failure";
 import { TrialExhaustedEmail } from "./templates/trial-exhausted";
+import { TrialProgressEmail } from "./templates/trial-progress";
+import { NoUploadNudgeEmail } from "./templates/no-upload-nudge";
+import { NoSyncNudgeEmail } from "./templates/no-sync-nudge";
+import { PostTrialFollowupEmail } from "./templates/post-trial-followup";
 import { SubscriptionActivatedEmail } from "./templates/subscription-activated";
 import { SubscriptionCancelledEmail } from "./templates/subscription-cancelled";
 import { ConnectionExpiringEmail } from "./templates/connection-expiring";
@@ -394,6 +398,155 @@ export async function sendConnectionExpiringEmail(
     logger.error("email_trigger_connection_expiring_failed", {
       userId,
       provider,
+      error: String(err),
+    });
+  }
+}
+
+// ------------------------------------------------------------------
+// Lifecycle email triggers (used by cron + event triggers)
+// ------------------------------------------------------------------
+
+export async function sendTrialProgressEmail(
+  userId: string,
+  invoicesUsed: number,
+  invoiceLimit: number
+): Promise<void> {
+  try {
+    // Dedup: only send once per user
+    if (await wasAlreadySent(userId, "trial_progress")) return;
+
+    const email = await getUserEmail(userId);
+    if (!email) return;
+
+    const subject = `You've used ${invoicesUsed} of ${invoiceLimit} trial invoices`;
+    await sendEmail({
+      to: email,
+      subject,
+      react: TrialProgressEmail({ invoicesUsed, invoiceLimit }),
+    });
+
+    await logEmail({
+      userId,
+      emailAddress: email,
+      emailType: "trial_progress",
+      subject,
+    });
+  } catch (err) {
+    logger.error("email_trigger_trial_progress_failed", {
+      userId,
+      error: String(err),
+    });
+  }
+}
+
+export async function sendNoUploadNudgeEmail(
+  userId: string
+): Promise<void> {
+  try {
+    if (await wasAlreadySent(userId, "no_upload_nudge")) return;
+
+    if (!(await checkPreference(userId, "marketing_emails"))) {
+      // Fall back to billing_notifications for lifecycle nudges
+      if (!(await checkPreference(userId, "billing_notifications"))) return;
+    }
+
+    const email = await getUserEmail(userId);
+    if (!email) return;
+
+    const subject = "Ready to try your first invoice? Just drag a PDF in.";
+    await sendEmail({
+      to: email,
+      subject,
+      react: NoUploadNudgeEmail(),
+    });
+
+    await logEmail({
+      userId,
+      emailAddress: email,
+      emailType: "no_upload_nudge",
+      subject,
+    });
+  } catch (err) {
+    logger.error("email_trigger_no_upload_nudge_failed", {
+      userId,
+      error: String(err),
+    });
+  }
+}
+
+export async function sendNoSyncNudgeEmail(
+  userId: string,
+  extractedCount: number
+): Promise<void> {
+  try {
+    if (await wasAlreadySent(userId, "no_sync_nudge")) return;
+
+    if (!(await checkPreference(userId, "marketing_emails"))) {
+      if (!(await checkPreference(userId, "billing_notifications"))) return;
+    }
+
+    const email = await getUserEmail(userId);
+    if (!email) return;
+
+    const subject = `You've extracted ${extractedCount} invoices but haven't synced any yet`;
+    await sendEmail({
+      to: email,
+      subject,
+      react: NoSyncNudgeEmail({ extractedCount }),
+    });
+
+    await logEmail({
+      userId,
+      emailAddress: email,
+      emailType: "no_sync_nudge",
+      subject,
+    });
+  } catch (err) {
+    logger.error("email_trigger_no_sync_nudge_failed", {
+      userId,
+      error: String(err),
+    });
+  }
+}
+
+export async function sendPostTrialFollowupEmail(
+  userId: string,
+  sequenceNumber: 1 | 2 | 3,
+  invoicesProcessed: number
+): Promise<void> {
+  try {
+    const emailType = `post_trial_followup_${sequenceNumber}`;
+    if (await wasAlreadySent(userId, emailType)) return;
+
+    if (!(await checkPreference(userId, "billing_notifications"))) return;
+
+    const email = await getUserEmail(userId);
+    if (!email) return;
+
+    const subjects: Record<number, string> = {
+      1: "Your extracted data is still here. Pick up where you left off.",
+      2: "Still entering invoices by hand? There's a faster way.",
+      3: "Last chance: your Docket trial data will be archived soon.",
+    };
+
+    const subject = subjects[sequenceNumber];
+    await sendEmail({
+      to: email,
+      subject,
+      react: PostTrialFollowupEmail({ sequenceNumber, invoicesProcessed }),
+    });
+
+    await logEmail({
+      userId,
+      emailAddress: email,
+      emailType,
+      subject,
+    });
+  } catch (err) {
+    logger.error("email_trigger_post_trial_followup_failed", {
+      userId,
+      sequenceNumber,
       error: String(err),
     });
   }

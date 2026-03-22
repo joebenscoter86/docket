@@ -9,10 +9,11 @@ const BASE_URL = "https://dockett.app";
 
 export function WelcomeEmail({ email }: WelcomeEmailProps) {
   return (
-    <EmailLayout preview="Welcome to Docket - get started in 3 steps">
+    <EmailLayout preview="Welcome to Docket - upload your first invoice to see the magic">
       <Text style={styles.heading}>Welcome to Docket</Text>
       <Text style={styles.paragraph}>
-        You&apos;re all set, {email}. Here&apos;s how to get started:
+        You&apos;re all set, {email}. Upload your first invoice and see the
+        magic. Most users finish in under 60 seconds.
       </Text>
 
       {/* Steps */}
