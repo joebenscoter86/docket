@@ -30,11 +30,12 @@ export default async function DashboardLayout({
   // Fetch onboarding state for banner
   const { data: userData } = await supabase
     .from('users')
-    .select('onboarding_completed')
+    .select('onboarding_completed, is_design_partner')
     .eq('id', user.id)
     .single()
 
   const onboardingCompleted = userData?.onboarding_completed ?? false
+  const isDesignPartner = userData?.is_design_partner ?? false
 
   let hasConnection = false
   let hasInvoices = false
@@ -58,7 +59,7 @@ export default async function DashboardLayout({
   }
 
   return (
-    <AppShell userEmail={user.email ?? ''} orgName={orgName}>
+    <AppShell userEmail={user.email ?? ''} orgName={orgName} isDesignPartner={isDesignPartner}>
       <PostHogIdentify userId={user.id} email={user.email ?? ""} />
       {!onboardingCompleted && (
         <OnboardingBanner hasConnection={hasConnection} hasInvoices={hasInvoices} />

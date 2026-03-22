@@ -40,6 +40,7 @@ interface SidebarProps {
   onClose: () => void
   userName?: string
   userEmail?: string
+  isDesignPartner?: boolean
 }
 
 function getInitials(userName?: string, userEmail?: string): string {
@@ -53,7 +54,7 @@ function getInitials(userName?: string, userEmail?: string): string {
   return '?'
 }
 
-export default function Sidebar({ isOpen, onClose, userName, userEmail }: SidebarProps) {
+export default function Sidebar({ isOpen, onClose, userName, userEmail, isDesignPartner }: SidebarProps) {
   const pathname = usePathname()
   const router = useRouter()
 
@@ -123,6 +124,14 @@ export default function Sidebar({ isOpen, onClose, userName, userEmail }: Sideba
             <p className="truncate text-sm font-body font-semibold text-text">{displayName}</p>
             {userName && userEmail && (
               <p className="truncate text-xs font-body text-muted">{userEmail}</p>
+            )}
+            {isDesignPartner && (
+              <div className="flex items-center gap-1.5 mt-1">
+                <svg className="h-3 w-3 text-[#92400E] flex-shrink-0" fill="currentColor" viewBox="0 0 24 24">
+                  <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
+                </svg>
+                <span className="text-[11px] font-medium text-[#92400E]">Design Partner</span>
+              </div>
             )}
           </div>
           <button

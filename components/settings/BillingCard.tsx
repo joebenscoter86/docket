@@ -67,8 +67,8 @@ export function BillingCard({ user, usage }: BillingCardProps) {
           </span>
         </div>
         <p className="font-body text-sm text-muted">
-          You have free access to all Pro features as a design partner. Capped
-          at 150 invoices/month.
+          Thank you for being a Docket design partner. You have free access to
+          all Pro features, with up to 150 invoices per month.
         </p>
         <div className="mt-3">
           <div className="flex items-center justify-between text-sm text-muted mb-1.5">

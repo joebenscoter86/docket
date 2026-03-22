@@ -8,10 +8,11 @@ interface AppShellProps {
   userEmail: string
   userName?: string
   orgName: string
+  isDesignPartner?: boolean
   children: React.ReactNode
 }
 
-export default function AppShell({ userEmail, userName, orgName, children }: AppShellProps) {
+export default function AppShell({ userEmail, userName, orgName, isDesignPartner, children }: AppShellProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false)
 
   return (
@@ -21,6 +22,7 @@ export default function AppShell({ userEmail, userName, orgName, children }: App
         onClose={() => setSidebarOpen(false)}
         userName={userName || orgName}
         userEmail={userEmail}
+        isDesignPartner={isDesignPartner}
       />
       <div className="flex flex-1 flex-col overflow-hidden">
         {/* Mobile header - hamburger only */}

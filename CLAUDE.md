@@ -23,7 +23,7 @@ A web app where small businesses upload invoices (PDF, image, or email), AI extr
 - Dashboard/analytics (Phase 3)
 - API access (Phase 4)
 
-**Launch model:** First 10 customers get permanent free access to all MVP features, capped at 100 invoices/month. They are design partners, not revenue. Phase 2+ features get paywalled for these users. General availability after that: 14-day free trial, then paid tiers.
+**Launch model:** First 10 customers get permanent free access to all MVP features, capped at 150 invoices/month. They are design partners, not revenue. Phase 2+ features get paywalled for these users. General availability after that: 14-day free trial, then paid tiers.
 
 ---
 
