@@ -2,14 +2,19 @@ import { type NextRequest, NextResponse } from 'next/server'
 import { createServerClient } from '@supabase/ssr'
 import { sendEmail } from '@/lib/email/send'
 import { WelcomeEmail } from '@/lib/email/templates/welcome'
+import { AdminNewSignupEmail } from '@/lib/email/templates/admin-new-signup'
+
+const ADMIN_EMAIL = 'joebenscoter@gmail.com'
 
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url)
   const token_hash = searchParams.get('token_hash')
   const type = searchParams.get('type')
+  const code = searchParams.get('code')
   const next = searchParams.get('next') ?? '/invoices'
 
-  if (!token_hash || !type) {
+  // Need either a PKCE code or a token_hash+type pair
+  if (!code && (!token_hash || !type)) {
     return NextResponse.redirect(new URL('/login', request.url))
   }
 
@@ -32,10 +37,20 @@ export async function GET(request: NextRequest) {
     }
   )
 
-  const { error } = await supabase.auth.verifyOtp({
-    token_hash,
-    type: type as 'signup' | 'email' | 'recovery',
-  })
+  let error: Error | null = null
+
+  if (code) {
+    // PKCE flow (used by resetPasswordForEmail and magic links)
+    const result = await supabase.auth.exchangeCodeForSession(code)
+    error = result.error
+  } else if (token_hash && type) {
+    // Token hash flow (used by email confirmation)
+    const result = await supabase.auth.verifyOtp({
+      token_hash,
+      type: type as 'signup' | 'email' | 'recovery',
+    })
+    error = result.error
+  }
 
   if (error) {
     return NextResponse.redirect(new URL('/login', request.url))
@@ -50,6 +65,14 @@ export async function GET(request: NextRequest) {
         to: user.email,
         subject: 'Welcome to Docket',
         react: WelcomeEmail({ email: user.email }),
+      })
+      sendEmail({
+        to: ADMIN_EMAIL,
+        subject: `New signup: ${user.email}`,
+        react: AdminNewSignupEmail({
+          userEmail: user.email,
+          signupDate: new Date().toLocaleString('en-US', { timeZone: 'America/Los_Angeles' }),
+        }),
       })
     }
   }
