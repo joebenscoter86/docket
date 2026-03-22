@@ -102,7 +102,16 @@ docs: description (PREFIX-X)
 
 12. **Rate limiting on upload and extraction endpoints.** Use Vercel's built-in rate limiting (via `vercel.json` or middleware) on `POST /api/invoices/upload` and `POST /api/invoices/[id]/extract`. MVP limits: 20 uploads/minute/user, 10 extractions/minute/user.
 
-13. **Token encryption uses AES-256-GCM.** `lib/utils/encryption.ts` must use AES-256-GCM with a random 12-byte IV per encryption. The IV is prepended to the ciphertext and stored together. `ENCRYPTION_KEY` must be exactly 32 bytes (256 bits), hex-encoded in `.env`. Key rotation deferred to Phase 2.
+13. **Token encryption uses AES-256-GCM with key rotation support.** `lib/utils/encryption.ts` uses AES-256-GCM with a random 12-byte IV per encryption. Encrypted payloads include a 1-byte version tag (`0x01`). Legacy data (no version tag) is auto-detected. Decryption tries `ENCRYPTION_KEY` first, falls back to `ENCRYPTION_KEY_PREVIOUS` if set.
+
+### Encryption Key Rotation Procedure
+
+1. Generate a new 32-byte hex key: `openssl rand -hex 32`
+2. Set `ENCRYPTION_KEY_PREVIOUS` = current `ENCRYPTION_KEY`
+3. Set `ENCRYPTION_KEY` = new key
+4. Deploy (new encryptions use new key, decryptions fall back to old key)
+5. Run migration: `npx tsx scripts/rotate-encryption-key.ts` (use `--dry-run` first to verify)
+6. After confirming all tokens re-encrypted, remove `ENCRYPTION_KEY_PREVIOUS`
 
 ---
 
