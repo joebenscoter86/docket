@@ -9,7 +9,10 @@
     "lint": "next lint",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:coverage": "vitest run --coverage"
+    "test:coverage": "vitest run --coverage",
+    "test:e2e": "playwright test",
+    "test:e2e:headed": "playwright test --headed",
+    "test:e2e:ui": "playwright test --ui"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.78.0",
@@ -31,6 +34,7 @@
     "stripe": "^20.4.1"
   },
   "devDependencies": {
+    "@playwright/test": "^1.58.2",
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.2",
     "@testing-library/user-event": "^14.6.1",
@@ -39,6 +43,7 @@
     "@types/react-dom": "^18",
     "@vitejs/plugin-react": "^6.0.1",
     "dotenv": "^17.3.1",
+    "dotenv-cli": "^11.0.0",
     "eslint": "^8",
     "eslint-config-next": "14.2.35",
     "jsdom": "^29.0.0",
