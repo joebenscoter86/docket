@@ -12,6 +12,8 @@ export default function SignupPage() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
+  const [inviteCode, setInviteCode] = useState('')
+  const [showInviteField, setShowInviteField] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
 
@@ -31,10 +33,33 @@ export default function SignupPage() {
 
     setLoading(true)
 
+    // Validate invite code server-side before signup
+    const trimmedCode = inviteCode.trim()
+    if (trimmedCode) {
+      try {
+        const res = await fetch('/api/auth/validate-invite-code', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ code: trimmedCode }),
+        })
+        const result = await res.json()
+        if (!res.ok) {
+          setLoading(false)
+          setError(result.error || 'Invalid invite code.')
+          return
+        }
+      } catch {
+        setLoading(false)
+        setError('Unable to validate invite code. Please try again.')
+        return
+      }
+    }
+
     const supabase = createClient()
     const { error: authError } = await supabase.auth.signUp({
       email,
       password,
+      options: trimmedCode ? { data: { invite_code: trimmedCode } } : undefined,
     })
 
     if (authError) {
@@ -130,6 +155,37 @@ export default function SignupPage() {
               className="block w-full rounded-xl border border-border bg-white px-4 py-3 text-sm text-text placeholder-muted transition-colors focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
               placeholder="Re-enter your password"
             />
+          </div>
+
+          {/* Invite code */}
+          <div>
+            {!showInviteField ? (
+              <button
+                type="button"
+                onClick={() => setShowInviteField(true)}
+                className="text-sm font-medium text-primary hover:text-primary-hover transition-colors"
+              >
+                Have an invite code?
+              </button>
+            ) : (
+              <div>
+                <label htmlFor="inviteCode" className="mb-1.5 block text-sm font-semibold text-text">
+                  Invite Code
+                </label>
+                <input
+                  id="inviteCode"
+                  type="text"
+                  value={inviteCode}
+                  onChange={(e) => setInviteCode(e.target.value)}
+                  autoComplete="off"
+                  className="block w-full rounded-xl border border-border bg-white px-4 py-3 text-sm text-text placeholder-muted transition-colors focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+                  placeholder="Enter your invite code"
+                />
+                <p className="mt-1.5 text-xs text-muted">
+                  Design partners get free access to all features.
+                </p>
+              </div>
+            )}
           </div>
 
           {error && (
