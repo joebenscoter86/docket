@@ -29,3 +29,54 @@ jobs:
 
       - name: Build
         run: npm run build
+
+  e2e:
+    runs-on: ubuntu-latest
+    needs: ci
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - run: npm ci
+
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Run E2E tests
+        run: npm run test:e2e
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.TEST_SUPABASE_URL }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.TEST_SUPABASE_ANON_KEY }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.TEST_SUPABASE_SERVICE_ROLE_KEY }}
+          ENCRYPTION_KEY: ${{ secrets.TEST_ENCRYPTION_KEY }}
+          ANTHROPIC_API_KEY: sk-ant-placeholder
+          STRIPE_SECRET_KEY: sk_test_placeholder
+          NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY: pk_test_placeholder
+          STRIPE_WEBHOOK_SECRET: whsec_placeholder
+          STRIPE_STARTER_MONTHLY_PRICE_ID: price_placeholder
+          STRIPE_STARTER_ANNUAL_PRICE_ID: price_placeholder
+          STRIPE_PRO_MONTHLY_PRICE_ID: price_placeholder
+          STRIPE_PRO_ANNUAL_PRICE_ID: price_placeholder
+          STRIPE_GROWTH_MONTHLY_PRICE_ID: price_placeholder
+          STRIPE_GROWTH_ANNUAL_PRICE_ID: price_placeholder
+          STRIPE_DESIGN_PARTNER_COUPON_ID: placeholder
+          QBO_CLIENT_ID: placeholder
+          QBO_CLIENT_SECRET: placeholder
+          QBO_REDIRECT_URI: http://localhost:3000/api/auth/callback/quickbooks
+          QBO_ENVIRONMENT: sandbox
+          XERO_CLIENT_ID: placeholder
+          XERO_CLIENT_SECRET: placeholder
+          RESEND_API_KEY: ""
+
+      - name: Upload test results
+        uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 7
