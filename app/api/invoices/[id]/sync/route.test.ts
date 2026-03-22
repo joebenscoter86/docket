@@ -133,6 +133,11 @@ vi.mock("@/lib/billing/access", () => ({
   checkInvoiceAccess: (...args: unknown[]) => mockCheckInvoiceAccess(...args),
 }));
 
+const mockGetUserTierFeatures = vi.fn();
+vi.mock("@/lib/billing/tier-context", () => ({
+  getUserTierFeatures: (...args: unknown[]) => mockGetUserTierFeatures(...args),
+}));
+
 vi.mock("@/lib/utils/logger", () => ({
   logger: { info: vi.fn(), error: vi.fn(), warn: vi.fn() },
 }));
@@ -185,10 +190,28 @@ const fakeLineItems = [
 
 const fakeFileBlob = new Blob(["fake-pdf"]);
 
+const proTierInfo = {
+  features: {
+    batch_upload: true,
+    bill_to_check: true,
+    email_forwarding: false,
+    vendor_matching: true,
+    multi_entity: false,
+    api_access: false,
+    ai_gl_inference: true,
+    both_platforms: true,
+    one_click_nav: true,
+  },
+  tier: "pro" as const,
+  isTrial: false,
+  isDesignPartner: false,
+};
+
 function setupSuccessMocks(invoiceOverrides: Partial<typeof fakeInvoice> = {}) {
   mockGetUser.mockResolvedValue({ data: { user: { id: "user-1" } }, error: null });
   mockMembershipSelect.mockResolvedValue({ data: { org_id: "org-1" }, error: null });
   mockCheckInvoiceAccess.mockResolvedValue({ allowed: true });
+  mockGetUserTierFeatures.mockResolvedValue(proTierInfo);
   mockInvoiceSelect.mockResolvedValue({ data: { ...fakeInvoice, ...invoiceOverrides }, error: null });
   mockSyncLogSelect.mockResolvedValue({ data: null, error: { code: "PGRST116" } });
   mockGetOrgProvider.mockResolvedValue("quickbooks");
@@ -429,5 +452,53 @@ describe("POST /api/invoices/[id]/sync", () => {
 
     expect(res.status).toBe(401);
     expect(body.code).toBe("AUTH_ERROR");
+  });
+
+  // ── Tier gating ──
+
+  describe("tier gating for non-bill output types", () => {
+    it("rejects non-bill output type for Starter tier", async () => {
+      setupSuccessMocks({ output_type: "check", payment_account_id: "bank-1" });
+      mockGetUserTierFeatures.mockResolvedValue({
+        features: {
+          batch_upload: false,
+          bill_to_check: false,
+          email_forwarding: false,
+          vendor_matching: true,
+          multi_entity: false,
+          api_access: false,
+          ai_gl_inference: true,
+          both_platforms: true,
+          one_click_nav: true,
+        },
+        tier: "starter" as const,
+        isTrial: false,
+        isDesignPartner: false,
+      });
+
+      const { request, params } = makeRequest();
+      const res = await POST(request, { params });
+      const body = await res.json();
+
+      expect(res.status).toBe(400);
+      expect(body.code).toBe("VALIDATION_ERROR");
+      expect(body.error).toContain("Pro or Growth plan");
+    });
+
+    it("allows non-bill output type for Pro tier", async () => {
+      setupSuccessMocks({ output_type: "check", payment_account_id: "bank-1" });
+      // proTierInfo (bill_to_check: true) is already set by setupSuccessMocks --
+      // just verify the request gets past the tier gate (it may fail later for
+      // other reasons such as missing extracted data fields).
+
+      const { request, params } = makeRequest();
+      const res = await POST(request, { params });
+      const body = await res.json();
+
+      // Must NOT be a tier gate error
+      expect(body.error ?? "").not.toContain("Pro or Growth plan");
+      // Request proceeded past the tier gate (200 success or a different error)
+      expect([200, 400, 409, 500].includes(res.status)).toBe(true);
+    });
   });
 });
