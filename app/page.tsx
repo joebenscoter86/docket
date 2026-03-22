@@ -2,10 +2,12 @@
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import type { Metadata } from 'next'
+import { getAllTiers } from '@/lib/billing/tiers'
 import LandingNav from '@/components/landing/LandingNav'
 import ScrollHero from '@/components/landing/ScrollHero'
 import HowItWorksSection from '@/components/landing/HowItWorksSection'
 import FeaturesSection from '@/components/landing/FeaturesSection'
+import PricingSection from '@/components/landing/PricingSection'
 import BottomCTA from '@/components/landing/BottomCTA'
 import Footer from '@/components/layout/Footer'
 
@@ -71,6 +73,7 @@ export default async function Home() {
           <div className="rounded-[40px] shadow-2xl overflow-hidden bg-white ring-1 ring-white/20">
             <HowItWorksSection />
             <FeaturesSection />
+            <PricingSection tiers={getAllTiers()} />
             <BottomCTA />
           </div>
         </div>
