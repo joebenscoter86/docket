@@ -13,9 +13,15 @@ interface TestInvoice {
   status: string
 }
 
+// Minimal valid PDF (blank page) for test uploads
+const MINIMAL_PDF = Buffer.from(
+  '%PDF-1.0\n1 0 obj<</Pages 2 0 R>>endobj\n2 0 obj<</Kids[3 0 R]/Count 1>>endobj\n3 0 obj<</MediaBox[0 0 612 792]>>endobj\ntrailer<</Root 1 0 R>>'
+)
+
 /**
  * Create a test invoice row directly in the database.
- * Does NOT upload a file -- just creates the metadata row.
+ * Also uploads a minimal PDF to Supabase Storage so the review page
+ * can generate a signed URL (without this, it shows "Could not load document").
  */
 export async function createTestInvoice(
   options: CreateInvoiceOptions
@@ -27,15 +33,28 @@ export async function createTestInvoice(
     outputType = 'bill',
   } = options
 
+  const filePath = `test/${orgId}/${Date.now()}.pdf`
+
+  // Upload minimal PDF to storage so signed URL works
+  const { error: uploadError } = await adminClient.storage
+    .from('invoices')
+    .upload(filePath, MINIMAL_PDF, {
+      contentType: 'application/pdf',
+      upsert: true,
+    })
+  if (uploadError) {
+    throw new Error(`Failed to upload test file: ${uploadError.message}`)
+  }
+
   const { data, error } = await adminClient
     .from('invoices')
     .insert({
       org_id: orgId,
       status,
-      file_path: `test/${orgId}/${Date.now()}.pdf`,
+      file_path: filePath,
       file_name: fileName,
       file_type: 'application/pdf',
-      file_size_bytes: 12345,
+      file_size_bytes: MINIMAL_PDF.length,
       output_type: outputType,
     })
     .select('id, org_id, status')
