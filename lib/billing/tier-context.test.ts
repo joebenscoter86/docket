@@ -78,4 +78,14 @@ describe("getUserTierFeatures", () => {
     expect(result.features.bill_to_check).toBe(true);
     expect(result.tier).toBe("growth");
   });
+
+  it("returns Starter features (most restrictive) when DB lookup fails", async () => {
+    mockSingle.mockResolvedValue({ data: null, error: { message: "DB error" } });
+    const result = await getUserTierFeatures("user-1");
+    expect(result.features.batch_upload).toBe(false);
+    expect(result.features.bill_to_check).toBe(false);
+    expect(result.tier).toBeNull();
+    expect(result.isTrial).toBe(false);
+    expect(result.isDesignPartner).toBe(false);
+  });
 });
