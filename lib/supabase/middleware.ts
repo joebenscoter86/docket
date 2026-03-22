@@ -5,7 +5,7 @@ import { NextResponse, type NextRequest } from 'next/server'
 const PROTECTED_PATHS = ['/invoices', '/upload', '/settings']
 
 // Routes only accessible when NOT authenticated
-const AUTH_PATHS = ['/login', '/signup']
+const AUTH_PATHS = ['/login', '/signup', '/forgot-password']
 
 export async function updateSession(request: NextRequest) {
   let supabaseResponse = NextResponse.next({

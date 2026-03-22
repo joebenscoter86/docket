@@ -18,6 +18,7 @@ import {
 import { logger } from "@/lib/utils/logger";
 import { enqueueExtraction } from "@/lib/extraction/queue";
 import { trackServerEvent, AnalyticsEvents } from "@/lib/analytics/events";
+import { sendTrialExhaustedEmail } from "@/lib/email/triggers";
 import { waitUntil } from "@vercel/functions";
 import type { DuplicateWarning } from "@/lib/types/invoice";
 
@@ -66,6 +67,11 @@ export async function POST(request: Request) {
         subscriptionStatus: access.subscriptionStatus,
         trialExhausted: access.trialExhausted,
       });
+      // Fire-and-forget trial exhausted email if applicable (deduped in trigger)
+      if (access.trialExhausted) {
+        sendTrialExhaustedEmail(user.id, TRIAL_INVOICE_LIMIT);
+      }
+
       return subscriptionRequired("Subscription required to upload invoices.", {
         subscriptionStatus: access.subscriptionStatus,
         trialExhausted: access.trialExhausted,
@@ -82,6 +88,9 @@ export async function POST(request: Request) {
           userId: user.id,
           orgId,
         });
+        // Fire-and-forget trial exhausted email (deduped in trigger)
+        sendTrialExhaustedEmail(user.id, TRIAL_INVOICE_LIMIT);
+
         return subscriptionRequired("Trial limit reached. Choose a plan to continue.", {
           trialExhausted: true,
         });

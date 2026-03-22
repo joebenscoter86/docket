@@ -3,7 +3,11 @@ import { stripe } from "@/lib/stripe/client";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { logger } from "@/lib/utils/logger";
 import type Stripe from "stripe";
-import type { SubscriptionTier } from "@/lib/billing/tiers";
+import { getTierConfig, type SubscriptionTier } from "@/lib/billing/tiers";
+import {
+  sendSubscriptionActivatedEmail,
+  sendSubscriptionCancelledEmail,
+} from "@/lib/email/triggers";
 
 /**
  * Map Stripe subscription status to our internal status.
@@ -152,6 +156,17 @@ export async function POST(request: Request) {
             tier,
             status: "active",
           });
+
+          // Email notification (fire-and-forget)
+          if (tier) {
+            const config = getTierConfig(tier);
+            sendSubscriptionActivatedEmail(
+              userId,
+              config.name,
+              `$${config.monthlyPrice}/mo`,
+              config.invoiceCap
+            );
+          }
         }
         break;
       }
@@ -190,6 +205,9 @@ export async function POST(request: Request) {
         const userId = await findUserByStripeCustomerId(customerId);
 
         if (userId) {
+          const cancelledTier = extractTier(
+            subscription.metadata as Record<string, string>
+          );
           await updateSubscriptionStatus(userId, "cancelled", {
             subscriptionTier: null,
           });
@@ -198,6 +216,12 @@ export async function POST(request: Request) {
             stripeCustomerId: customerId,
             status: "cancelled",
           });
+
+          // Email notification (fire-and-forget)
+          const tierName = cancelledTier
+            ? getTierConfig(cancelledTier).name
+            : "your";
+          sendSubscriptionCancelledEmail(userId, tierName);
         }
         break;
       }
