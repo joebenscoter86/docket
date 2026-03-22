@@ -2,6 +2,7 @@
 
 import { useState, useRef, useCallback, useEffect } from "react";
 import Button from "@/components/ui/Button";
+import UpgradePrompt from "@/components/billing/UpgradePrompt";
 import type { DuplicateWarning } from "@/lib/types/invoice";
 
 type UploadState = "idle" | "dragging" | "uploading" | "success";
@@ -20,6 +21,7 @@ interface SelectedFile {
 interface UploadZoneProps {
   onUploadComplete?: (invoiceId: string) => void;
   onUploadStart?: (files: File[]) => void;
+  batchUploadAllowed?: boolean;
 }
 
 function formatFileSize(bytes: number): string {
@@ -38,7 +40,7 @@ function validateFile(file: File): string | null {
   return null;
 }
 
-export default function UploadZone({ onUploadComplete, onUploadStart }: UploadZoneProps) {
+export default function UploadZone({ onUploadComplete, onUploadStart, batchUploadAllowed = true }: UploadZoneProps) {
   const [state, setState] = useState<UploadState>("idle");
   const [error, setError] = useState<string | null>(null);
   const [progress, setProgress] = useState(0);
@@ -131,10 +133,12 @@ export default function UploadZone({ onUploadComplete, onUploadStart }: UploadZo
       const fileArray = Array.from(files);
       if (fileArray.length === 0) return;
 
+      const filesToProcess = batchUploadAllowed ? fileArray : fileArray.slice(0, 1);
+
       setError(null);
       setCapWarning(null);
 
-      const newEntries: SelectedFile[] = fileArray.map((file) => {
+      const newEntries: SelectedFile[] = filesToProcess.map((file) => {
         const validationError = validateFile(file);
         return {
           file,
@@ -156,7 +160,7 @@ export default function UploadZone({ onUploadComplete, onUploadStart }: UploadZo
       });
       setState("idle");
     },
-    [state]
+    [state, batchUploadAllowed]
   );
 
   const handleRemoveFile = useCallback((id: string) => {
@@ -325,7 +329,7 @@ export default function UploadZone({ onUploadComplete, onUploadStart }: UploadZo
           ref={inputRef}
           type="file"
           accept=".pdf,.jpg,.jpeg,.png"
-          multiple
+          multiple={batchUploadAllowed}
           className="hidden"
           onChange={handleInputChange}
         />
@@ -352,9 +356,13 @@ export default function UploadZone({ onUploadComplete, onUploadStart }: UploadZo
             <p className="font-body text-sm text-muted">
               PDF, PNG, JPG up to 10MB
             </p>
-            <p className="font-body text-sm text-muted">
-              <span className="font-bold">Upload up to 25 files at a time</span>
-            </p>
+            {batchUploadAllowed ? (
+              <p className="font-body text-sm text-muted">
+                <span className="font-bold">Upload up to 25 files at a time</span>
+              </p>
+            ) : (
+              <UpgradePrompt featureName="Batch upload" requiredTier="pro" />
+            )}
             <Button
               variant="primary"
               type="button"
