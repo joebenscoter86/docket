@@ -5,7 +5,7 @@ import "./globals.css";
 export const metadata: Metadata = {
   metadataBase: new URL('https://dockett.app'),
   title: "Docket",
-  description: "Invoice processing for small businesses",
+  description: "AI-powered invoice processing for small businesses. Upload, extract, and sync to QuickBooks or Xero.",
 };
 
 const organizationSchema = {

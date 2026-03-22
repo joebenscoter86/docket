@@ -8,20 +8,23 @@ import ScrollHero from '@/components/landing/ScrollHero'
 import HowItWorksSection from '@/components/landing/HowItWorksSection'
 import FeaturesSection from '@/components/landing/FeaturesSection'
 import PricingSection from '@/components/landing/PricingSection'
+import DefinitionSection from '@/components/landing/DefinitionSection'
+import WhoItsForSection from '@/components/landing/WhoItsForSection'
+import WhyDocketSection from '@/components/landing/WhyDocketSection'
 import BottomCTA from '@/components/landing/BottomCTA'
 import Footer from '@/components/layout/Footer'
 
 export const metadata: Metadata = {
-  title: 'Docket -- Invoice to QuickBooks in Under a Minute',
+  title: 'Docket - AI Invoice Processing for QuickBooks & Xero',
   description:
-    'Upload invoices, AI extracts the data, sync to QuickBooks with one click. Built for small businesses and bookkeepers.',
+    'Upload invoices, AI extracts the data, sync to QuickBooks or Xero with one click. Start free with 10 invoices. Built for small businesses and bookkeepers.',
   alternates: {
     canonical: '/',
   },
   openGraph: {
-    title: 'Docket -- Invoice to QuickBooks in Under a Minute',
+    title: 'Docket - AI Invoice Processing for QuickBooks & Xero',
     description:
-      'Upload invoices, AI extracts the data, sync to QuickBooks with one click.',
+      'Upload invoices, AI extracts the data, sync to QuickBooks or Xero with one click. Start free with 10 invoices. Built for small businesses and bookkeepers.',
     url: 'https://dockett.app',
     siteName: 'Docket',
     type: 'website',
@@ -30,9 +33,16 @@ export const metadata: Metadata = {
         url: 'https://dockett.app/images/og-image.png',
         width: 1200,
         height: 630,
-        alt: 'Docket -- Invoice to QuickBooks in Under a Minute',
+        alt: 'Docket - AI Invoice Processing for QuickBooks & Xero',
       },
     ],
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'Docket - AI Invoice Processing for QuickBooks & Xero',
+    description:
+      'Upload invoices, AI extracts the data, sync to QuickBooks or Xero with one click. Start free with 10 invoices. Built for small businesses and bookkeepers.',
+    images: ['https://dockett.app/images/og-image.png'],
   },
 }
 
@@ -141,8 +151,11 @@ export default async function Home() {
         <div className="relative z-10 w-full max-w-[1400px] mx-auto px-4 sm:px-8 py-8 lg:py-12 space-y-8 lg:space-y-12">
           {/* Features Card */}
           <div className="rounded-[40px] shadow-2xl overflow-hidden bg-white ring-1 ring-white/20">
+            <DefinitionSection />
             <HowItWorksSection />
+            <WhoItsForSection />
             <FeaturesSection />
+            <WhyDocketSection />
             <PricingSection tiers={getAllTiers()} />
             <BottomCTA />
           </div>

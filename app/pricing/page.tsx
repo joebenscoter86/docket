@@ -5,21 +5,22 @@ import {
   type SubscriptionTier,
 } from "@/lib/billing/tiers";
 import PricingCards from "@/components/pricing/PricingCards";
+import FAQSection from "@/components/pricing/FAQSection";
 import LandingNav from "@/components/landing/LandingNav";
 import Footer from "@/components/layout/Footer";
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "Pricing -- Docket",
+  title: "Pricing - AI Invoice Processing from $29/mo | Docket",
   description:
-    "Simple, transparent pricing. Extract invoices with AI and sync to QuickBooks or Xero.",
+    "Simple, transparent pricing for AI invoice processing. QuickBooks + Xero sync included on all plans. Start free with 10 invoices, no credit card required.",
   alternates: {
     canonical: "/pricing",
   },
   openGraph: {
-    title: "Pricing - Docket",
+    title: "Pricing - AI Invoice Processing from $29/mo | Docket",
     description:
-      "AI invoice processing from $29/mo. QuickBooks + Xero. Start free with 10 invoices, no credit card required.",
+      "Simple, transparent pricing for AI invoice processing. QuickBooks + Xero sync included on all plans. Start free with 10 invoices, no credit card required.",
     url: "https://dockett.app/pricing",
     siteName: "Docket",
     type: "website",
@@ -34,9 +35,9 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: "summary_large_image",
-    title: "Pricing - Docket",
+    title: "Pricing - AI Invoice Processing from $29/mo | Docket",
     description:
-      "AI invoice processing from $29/mo. QuickBooks + Xero. Start free with 10 invoices.",
+      "Simple, transparent pricing for AI invoice processing. QuickBooks + Xero sync included on all plans. Start free with 10 invoices, no credit card required.",
     images: ["https://dockett.app/images/og-image.png"],
   },
 };
@@ -147,6 +148,8 @@ export default async function PricingPage() {
           isAuthenticated={!!user}
           hasStripeCustomer={!!stripeCustomerId}
         />
+
+        <FAQSection />
       </main>
 
       {/* Footer */}
