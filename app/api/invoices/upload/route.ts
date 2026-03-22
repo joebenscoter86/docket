@@ -4,6 +4,8 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { validateFileMagicBytes, validateFileSize } from "@/lib/upload/validate";
 import { checkInvoiceAccess } from "@/lib/billing/access";
 import { checkUsageLimit } from "@/lib/billing/usage";
+import { incrementTrialInvoice } from "@/lib/billing/trial";
+import { TRIAL_INVOICE_LIMIT } from "@/lib/billing/tiers";
 import {
   authError,
   forbiddenError,
@@ -68,6 +70,23 @@ export async function POST(request: Request) {
         subscriptionStatus: access.subscriptionStatus,
         trialExhausted: access.trialExhausted,
       });
+    }
+
+    // 2b-ii. Trial invoice reservation (atomic, race-safe)
+    let trialNewCount: number | null = null;
+    if (access.allowed && access.reason === "trial") {
+      const increment = await incrementTrialInvoice(user.id);
+      if (!increment.success) {
+        logger.warn("invoice_upload_trial_exhausted_race", {
+          action: "upload",
+          userId: user.id,
+          orgId,
+        });
+        return subscriptionRequired("Trial limit reached. Choose a plan to continue.", {
+          trialExhausted: true,
+        });
+      }
+      trialNewCount = increment.newCount;
     }
 
     // 2c. Monthly usage limit check
@@ -338,6 +357,9 @@ export async function POST(request: Request) {
       fileName,
       signedUrl: signedUrlData?.signedUrl || null,
       duplicateWarning,
+      ...(trialNewCount !== null && trialNewCount >= 0 && {
+        trialRemaining: TRIAL_INVOICE_LIMIT - trialNewCount,
+      }),
     });
   } catch (error) {
     const durationMs = Date.now() - startTime;

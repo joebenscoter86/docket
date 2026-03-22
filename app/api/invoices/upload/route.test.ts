@@ -75,6 +75,11 @@ vi.mock("@/lib/billing/access", () => ({
   checkInvoiceAccess: (...args: unknown[]) => mockCheckInvoiceAccess(...args),
 }));
 
+const mockIncrementTrialInvoice = vi.fn();
+vi.mock("@/lib/billing/trial", () => ({
+  incrementTrialInvoice: (...args: unknown[]) => mockIncrementTrialInvoice(...args),
+}));
+
 const mockCheckUsageLimit = vi.fn().mockResolvedValue({
   allowed: true,
   usage: { used: 5, limit: null, percentUsed: null, periodStart: new Date(), periodEnd: new Date(), isDesignPartner: false },
@@ -134,6 +139,7 @@ describe("POST /api/invoices/upload", () => {
       modelVersion: "claude-sonnet-4-20250514",
       durationMs: 3000,
     });
+    mockIncrementTrialInvoice.mockResolvedValue({ success: true, newCount: 3 });
   });
 
   it("returns 401 when user is not authenticated", async () => {
@@ -536,5 +542,106 @@ describe("POST /api/invoices/upload", () => {
 
     expect(res.status).toBe(500);
     expect(mockStorageRemove).not.toHaveBeenCalled();
+  });
+
+  // --- trial invoice counter tests ---
+
+  it("increments trial counter for trial users on successful upload", async () => {
+    setupSuccessPath();
+    mockCheckInvoiceAccess.mockResolvedValueOnce({ allowed: true, reason: "trial" });
+    mockIncrementTrialInvoice.mockResolvedValue({ success: true, newCount: 3 });
+
+    const req = createUploadRequest({
+      name: "invoice.pdf",
+      type: "application/pdf",
+      content: Buffer.from("%PDF-1.4"),
+    });
+
+    const res = await POST(req);
+    expect(res.status).toBe(200);
+    expect(mockIncrementTrialInvoice).toHaveBeenCalledWith("user-1");
+  });
+
+  it("does not increment trial counter for active subscribers", async () => {
+    setupSuccessPath();
+    mockCheckInvoiceAccess.mockResolvedValueOnce({ allowed: true, reason: "active_subscription" });
+
+    const req = createUploadRequest({
+      name: "invoice.pdf",
+      type: "application/pdf",
+      content: Buffer.from("%PDF-1.4"),
+    });
+
+    const res = await POST(req);
+    expect(res.status).toBe(200);
+    expect(mockIncrementTrialInvoice).not.toHaveBeenCalled();
+  });
+
+  it("does not increment trial counter for design partners", async () => {
+    setupSuccessPath();
+    mockCheckInvoiceAccess.mockResolvedValueOnce({ allowed: true, reason: "design_partner" });
+
+    const req = createUploadRequest({
+      name: "invoice.pdf",
+      type: "application/pdf",
+      content: Buffer.from("%PDF-1.4"),
+    });
+
+    const res = await POST(req);
+    expect(res.status).toBe(200);
+    expect(mockIncrementTrialInvoice).not.toHaveBeenCalled();
+  });
+
+  it("returns 402 when trial increment fails due to race (limit reached)", async () => {
+    setupAuthenticatedUser();
+    mockCheckInvoiceAccess.mockResolvedValueOnce({ allowed: true, reason: "trial" });
+    mockIncrementTrialInvoice.mockResolvedValue({ success: false, reason: "trial_exhausted" });
+
+    const req = createUploadRequest({
+      name: "invoice.pdf",
+      type: "application/pdf",
+      content: Buffer.from("%PDF-1.4"),
+    });
+
+    const res = await POST(req);
+    const body = await res.json();
+
+    expect(res.status).toBe(402);
+    expect(body.code).toBe("SUBSCRIPTION_REQUIRED");
+    expect(body.details?.trialExhausted).toBe(true);
+    expect(mockStorageUpload).not.toHaveBeenCalled();
+  });
+
+  it("proceeds with upload when trial increment fails open (transient error)", async () => {
+    setupSuccessPath();
+    mockCheckInvoiceAccess.mockResolvedValueOnce({ allowed: true, reason: "trial" });
+    mockIncrementTrialInvoice.mockResolvedValue({ success: true, newCount: -1, failedOpen: true });
+
+    const req = createUploadRequest({
+      name: "invoice.pdf",
+      type: "application/pdf",
+      content: Buffer.from("%PDF-1.4"),
+    });
+
+    const res = await POST(req);
+    expect(res.status).toBe(200);
+  });
+
+  it("returns trialRemaining in success response for trial users", async () => {
+    setupSuccessPath();
+    mockCheckInvoiceAccess.mockResolvedValueOnce({ allowed: true, reason: "trial" });
+    mockIncrementTrialInvoice.mockResolvedValue({ success: true, newCount: 5 });
+
+    const req = createUploadRequest({
+      name: "invoice.pdf",
+      type: "application/pdf",
+      content: Buffer.from("%PDF-1.4"),
+    });
+
+    const res = await POST(req);
+    const body = await res.json();
+
+    expect(res.status).toBe(200);
+    expect(body.data.trialRemaining).toBe(5);
   });
 });

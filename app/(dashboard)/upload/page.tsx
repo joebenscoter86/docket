@@ -5,6 +5,7 @@ import { getUsageThisPeriod } from "@/lib/billing/usage";
 import UploadFlow from "@/components/invoices/UploadFlow";
 import UploadGate from "@/components/billing/UploadGate";
 import { UsageLimitBanner } from "@/components/settings/UsageLimitBanner";
+import { TrialProgressBanner } from "@/components/billing/TrialProgressBanner";
 
 export default async function UploadPage() {
   const supabase = createClient();
@@ -68,6 +69,12 @@ export default async function UploadPage() {
             limit={usageInfo.limit}
             percentUsed={usageInfo.percentUsed}
             periodEnd={usageInfo.periodEnd.toISOString()}
+          />
+        )}
+        {usageInfo && usageInfo.isTrial && (
+          <TrialProgressBanner
+            used={usageInfo.trialInvoicesUsed}
+            limit={usageInfo.trialLimit}
           />
         )}
         {isAtLimit ? (

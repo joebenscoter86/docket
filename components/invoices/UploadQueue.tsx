@@ -190,12 +190,13 @@ export default function UploadQueue({ files, onComplete }: UploadQueueProps) {
   );
 
   // Cancel remaining queued files
-  const cancelRemaining = useCallback(() => {
+  const cancelRemaining = useCallback((reason?: string) => {
     cancelledRef.current = true;
+    const message = reason || "Upload limit reached.";
     setEntries((prev) =>
       prev.map((e) =>
         e.status === "queued"
-          ? { ...e, status: "error", errorMessage: "Monthly limit reached.", usageLimitHit: true }
+          ? { ...e, status: "error", errorMessage: message, usageLimitHit: true }
           : e
       )
     );
@@ -227,13 +228,20 @@ export default function UploadQueue({ files, onComplete }: UploadQueueProps) {
         const body = await res.json();
 
         if (!res.ok) {
-          if (body.code === "USAGE_LIMIT") {
+          // Trial exhausted or monthly usage limit -- cancel remaining files
+          if (
+            body.code === "USAGE_LIMIT_REACHED" ||
+            (body.code === "SUBSCRIPTION_REQUIRED" && body.details?.trialExhausted)
+          ) {
+            const msg = body.details?.trialExhausted
+              ? "Trial limit reached."
+              : "Monthly limit reached.";
             updateEntry(entry.id, {
               status: "error",
-              errorMessage: "Monthly limit reached.",
+              errorMessage: msg,
               usageLimitHit: true,
             });
-            cancelRemaining();
+            cancelRemaining(msg);
             return;
           }
           updateEntry(entry.id, {
