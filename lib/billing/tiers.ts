@@ -198,3 +198,31 @@ export function validatePriceId(
 export function isTrialExhausted(trialInvoicesUsed: number): boolean {
   return trialInvoicesUsed >= TRIAL_INVOICE_LIMIT;
 }
+
+// -- Price IDs for pricing page (server-side only) --
+
+export interface TierPriceIds {
+  monthly: string | null;
+  annual: string | null;
+}
+
+/**
+ * Get Stripe price IDs mapped by tier. Server-side only (reads env vars).
+ * Returns null for any price ID not configured.
+ */
+export function getTierPriceIds(): Record<SubscriptionTier, TierPriceIds> {
+  return {
+    starter: {
+      monthly: process.env.STRIPE_STARTER_MONTHLY_PRICE_ID ?? null,
+      annual: process.env.STRIPE_STARTER_ANNUAL_PRICE_ID ?? null,
+    },
+    pro: {
+      monthly: process.env.STRIPE_PRO_MONTHLY_PRICE_ID ?? null,
+      annual: process.env.STRIPE_PRO_ANNUAL_PRICE_ID ?? null,
+    },
+    growth: {
+      monthly: process.env.STRIPE_GROWTH_MONTHLY_PRICE_ID ?? null,
+      annual: process.env.STRIPE_GROWTH_ANNUAL_PRICE_ID ?? null,
+    },
+  };
+}

@@ -11,7 +11,7 @@ function getGateContent(subscriptionStatus: string, trialExhausted: boolean) {
       heading: "Monthly limit reached",
       body: "You've reached your invoice limit for this month. Upgrade your plan for a higher limit, or wait for your next billing period.",
       ctaText: "View Plans",
-      ctaHref: "/app/settings",
+      ctaHref: "/pricing",
     };
   }
 
@@ -20,7 +20,7 @@ function getGateContent(subscriptionStatus: string, trialExhausted: boolean) {
       heading: "Trial complete",
       body: "You've used all 10 trial invoices. Choose a plan to continue processing.",
       ctaText: "View Plans",
-      ctaHref: "/app/settings",
+      ctaHref: "/pricing",
     };
   }
 
@@ -29,7 +29,7 @@ function getGateContent(subscriptionStatus: string, trialExhausted: boolean) {
       heading: "Your subscription is inactive",
       body: "Resubscribe to continue processing invoices.",
       ctaText: "View Plans",
-      ctaHref: "/app/settings",
+      ctaHref: "/pricing",
     };
   }
 
@@ -47,7 +47,7 @@ function getGateContent(subscriptionStatus: string, trialExhausted: boolean) {
     heading: "Subscribe to process invoices",
     body: "Start your subscription to upload, extract, and sync invoices.",
     ctaText: "View Plans",
-    ctaHref: "/app/settings",
+    ctaHref: "/pricing",
   };
 }
 
