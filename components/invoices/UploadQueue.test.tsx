@@ -171,7 +171,7 @@ describe("UploadQueue", () => {
         ok: false,
         json: async () => ({
           error: "Monthly invoice limit reached",
-          code: "USAGE_LIMIT",
+          code: "USAGE_LIMIT_REACHED",
         }),
       });
 
