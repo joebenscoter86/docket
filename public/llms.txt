@@ -1,0 +1,30 @@
+# Docket
+
+> AI-powered invoice processing for small businesses and bookkeepers.
+
+Docket automates invoice data entry. Users upload PDF invoices, AI extracts vendor details, line items, and totals, and one click syncs the data to QuickBooks Online or Xero as a bill, check, or cash expense.
+
+## Key Features
+- AI extraction of invoice headers and line items from PDFs
+- Side-by-side review UI with confidence scoring
+- AI GL account inference that learns from corrections
+- Vendor auto-matching
+- QuickBooks Online and Xero integration
+- Batch upload (up to 25 invoices)
+- Bill, check, or cash expense creation
+- PDF attachment to synced transactions
+
+## Pricing
+- Starter: $29/mo (75 invoices/month)
+- Pro: $59/mo (200 invoices/month)
+- Growth: $99/mo (500 invoices/month)
+- Free trial: 10 invoices, no credit card required
+- Annual billing saves 20%
+
+## Links
+- Website: https://dockett.app
+- Pricing: https://dockett.app/pricing
+- Sign Up: https://dockett.app/signup
+- Privacy: https://dockett.app/privacy
+- Terms: https://dockett.app/terms
+- Support: support@dockett.app

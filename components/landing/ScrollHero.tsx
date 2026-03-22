@@ -103,14 +103,14 @@ export default function ScrollHero() {
 
                 {/* LEFT COLUMN: Hero Copy & CTA */}
                 <div className="flex flex-col justify-center text-center lg:text-left z-10 w-full min-w-0">
-                  <h2 className="font-headings text-[40px] font-extrabold leading-[1.1] tracking-tight text-[#0F172A] sm:text-5xl lg:text-[48px] xl:text-[64px]">
+                  <h1 className="font-headings text-[40px] font-extrabold leading-[1.1] tracking-tight text-[#0F172A] sm:text-5xl lg:text-[48px] xl:text-[64px]">
                     From invoice to{' '}
                     <span className="bg-gradient-to-r from-[#00C6FF] to-[#0072FF] bg-clip-text text-transparent">
                       QuickBooks or Xero
                     </span>
                     <br />
                     in under a minute.
-                  </h2>
+                  </h1>
 
                   <p className="mt-6 mx-auto lg:mx-0 max-w-lg text-[20px] sm:text-[22px] leading-relaxed text-[#475569]">
                     Upload your invoices. AI pulls out the details.

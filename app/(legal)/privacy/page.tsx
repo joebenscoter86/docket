@@ -4,6 +4,9 @@ import type { Metadata } from 'next'
 export const metadata: Metadata = {
   title: 'Privacy Policy | Docket',
   description: 'How Docket collects, uses, and protects your data.',
+  alternates: {
+    canonical: '/privacy',
+  },
 }
 
 export default function PrivacyPolicyPage() {

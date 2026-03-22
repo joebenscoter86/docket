@@ -13,6 +13,41 @@ export const metadata: Metadata = {
   title: "Pricing -- Docket",
   description:
     "Simple, transparent pricing. Extract invoices with AI and sync to QuickBooks or Xero.",
+  alternates: {
+    canonical: "/pricing",
+  },
+  openGraph: {
+    title: "Pricing - Docket",
+    description:
+      "AI invoice processing from $29/mo. QuickBooks + Xero. Start free with 10 invoices, no credit card required.",
+    url: "https://dockett.app/pricing",
+    siteName: "Docket",
+    type: "website",
+    images: [
+      {
+        url: "https://dockett.app/images/og-image.png",
+        width: 1200,
+        height: 630,
+        alt: "Docket - AI-powered invoice processing",
+      },
+    ],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Pricing - Docket",
+    description:
+      "AI invoice processing from $29/mo. QuickBooks + Xero. Start free with 10 invoices.",
+    images: ["https://dockett.app/images/og-image.png"],
+  },
+};
+
+const breadcrumbSchema = {
+  '@context': 'https://schema.org',
+  '@type': 'BreadcrumbList',
+  itemListElement: [
+    { '@type': 'ListItem', position: 1, name: 'Home', item: 'https://dockett.app' },
+    { '@type': 'ListItem', position: 2, name: 'Pricing', item: 'https://dockett.app/pricing' },
+  ],
 };
 
 export default async function PricingPage() {
@@ -49,6 +84,10 @@ export default async function PricingPage() {
 
   return (
     <div className="flex min-h-screen flex-col bg-[#F8FAFC]">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbSchema) }}
+      />
       {/* Nav -- reuse landing nav for unauth, simple back-link for auth */}
       {!user ? (
         <div className="mx-auto w-full max-w-[1400px] px-4 pt-4 sm:px-8 sm:pt-6">

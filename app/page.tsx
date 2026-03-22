@@ -15,6 +15,9 @@ export const metadata: Metadata = {
   title: 'Docket -- Invoice to QuickBooks in Under a Minute',
   description:
     'Upload invoices, AI extracts the data, sync to QuickBooks with one click. Built for small businesses and bookkeepers.',
+  alternates: {
+    canonical: '/',
+  },
   openGraph: {
     title: 'Docket -- Invoice to QuickBooks in Under a Minute',
     description:
@@ -33,6 +36,69 @@ export const metadata: Metadata = {
   },
 }
 
+const softwareSchema = {
+  '@context': 'https://schema.org',
+  '@type': 'SoftwareApplication',
+  '@id': 'https://dockett.app/#application',
+  name: 'Docket',
+  url: 'https://dockett.app',
+  applicationCategory: 'BusinessApplication',
+  operatingSystem: 'Web',
+  description:
+    'Docket is AI-powered invoice processing software that extracts data from PDFs and syncs directly to QuickBooks Online and Xero. Built for small businesses and bookkeepers.',
+  provider: { '@id': 'https://dockett.app/#organization' },
+  offers: [
+    {
+      '@type': 'Offer',
+      name: 'Starter',
+      price: '29.00',
+      priceCurrency: 'USD',
+      priceSpecification: {
+        '@type': 'UnitPriceSpecification',
+        price: '29.00',
+        priceCurrency: 'USD',
+        billingDuration: 'P1M',
+        unitText: 'month',
+      },
+      description:
+        '75 invoices/month. AI extraction, review UI, confidence scoring, vendor auto-matching, QuickBooks + Xero.',
+      url: 'https://dockett.app/pricing',
+    },
+    {
+      '@type': 'Offer',
+      name: 'Pro',
+      price: '59.00',
+      priceCurrency: 'USD',
+      priceSpecification: {
+        '@type': 'UnitPriceSpecification',
+        price: '59.00',
+        priceCurrency: 'USD',
+        billingDuration: 'P1M',
+        unitText: 'month',
+      },
+      description:
+        '200 invoices/month. Everything in Starter plus batch upload, bill-to-check toggle, priority email support.',
+      url: 'https://dockett.app/pricing',
+    },
+    {
+      '@type': 'Offer',
+      name: 'Growth',
+      price: '99.00',
+      priceCurrency: 'USD',
+      priceSpecification: {
+        '@type': 'UnitPriceSpecification',
+        price: '99.00',
+        priceCurrency: 'USD',
+        billingDuration: 'P1M',
+        unitText: 'month',
+      },
+      description:
+        '500 invoices/month. Everything in Pro plus priority support with onboarding call.',
+      url: 'https://dockett.app/pricing',
+    },
+  ],
+};
+
 export default async function Home() {
   const supabase = createClient()
   const {
@@ -45,6 +111,10 @@ export default async function Home() {
 
   return (
     <div className="flex min-h-screen flex-col relative selection:bg-[#00C6FF]/30 bg-[#1A1C20]">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(softwareSchema) }}
+      />
       {/* Fixed navigation overlay */}
       <div className="fixed top-0 left-0 right-0 z-50">
         <div className="mx-auto max-w-[1400px] px-4 pt-4 sm:px-8 sm:pt-6">
