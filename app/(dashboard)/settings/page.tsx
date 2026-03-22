@@ -7,6 +7,7 @@ import { ConnectionHealthBanner } from "@/components/settings/ConnectionHealthBa
 import { SettingsAlert } from "@/components/settings/SettingsAlert";
 import { BillingCard } from "@/components/settings/BillingCard";
 import { AccountCard } from "@/components/settings/AccountCard";
+import { EmailPreferencesCard } from "@/components/settings/EmailPreferencesCard";
 import { getUsageThisPeriod } from "@/lib/billing/usage";
 import type { SubscriptionTier } from "@/lib/billing/tiers";
 
@@ -186,6 +187,14 @@ export default async function SettingsPage({
           Account
         </p>
         <AccountCard email={user?.email ?? ""} orgName={orgName} orgId={orgId} />
+      </div>
+
+      {/* Email Notifications Section */}
+      <div>
+        <p className="text-[13px] font-bold uppercase tracking-wider text-muted mb-3">
+          Email Notifications
+        </p>
+        <EmailPreferencesCard />
       </div>
 
       {/* Billing Section */}

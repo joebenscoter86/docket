@@ -7,6 +7,10 @@ import { lookupGlMappings } from "./gl-mappings";
 import { normalizeForMatching } from "@/lib/utils/normalize";
 import { trackServerEvent, AnalyticsEvents } from "@/lib/analytics/events";
 import { checkContentDuplicates } from "@/lib/invoices/duplicate-check";
+import {
+  sendExtractionCompleteEmail,
+  checkAndSendBatchCompleteEmail,
+} from "@/lib/email/triggers";
 import type { ExtractionResult, ExtractionContext } from "./types";
 
 export async function runExtraction(params: {
@@ -287,6 +291,29 @@ export async function runExtraction(params: {
       confidenceScore: result.data.confidenceScore,
       durationMs: result.durationMs,
     });
+
+    // 10. Email notification (fire-and-forget)
+    // Fetch invoice file_name and batch_id for email context
+    const { data: invoiceMeta } = await admin
+      .from("invoices")
+      .select("file_name, batch_id")
+      .eq("id", invoiceId)
+      .single();
+
+    if (invoiceMeta?.batch_id) {
+      // Batch upload: check if entire batch is done, send single summary
+      checkAndSendBatchCompleteEmail(userId, invoiceMeta.batch_id);
+    } else {
+      // Single upload: send per-invoice email
+      sendExtractionCompleteEmail(
+        userId,
+        invoiceId,
+        invoiceMeta?.file_name ?? "invoice",
+        result.data.vendorName,
+        result.data.totalAmount?.toString() ?? null,
+        result.data.confidenceScore ?? "medium"
+      );
+    }
 
     return result;
   } catch (error) {

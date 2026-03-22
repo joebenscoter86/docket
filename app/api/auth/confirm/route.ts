@@ -1,5 +1,7 @@
 import { type NextRequest, NextResponse } from 'next/server'
 import { createServerClient } from '@supabase/ssr'
+import { sendEmail } from '@/lib/email/send'
+import { WelcomeEmail } from '@/lib/email/templates/welcome'
 
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url)
@@ -32,11 +34,24 @@ export async function GET(request: NextRequest) {
 
   const { error } = await supabase.auth.verifyOtp({
     token_hash,
-    type: type as 'signup' | 'email',
+    type: type as 'signup' | 'email' | 'recovery',
   })
 
   if (error) {
     return NextResponse.redirect(new URL('/login', request.url))
+  }
+
+  // Send welcome email on signup confirmation only (not recovery or email change)
+  if (type === 'signup') {
+    const { data: { user } } = await supabase.auth.getUser()
+    if (user?.email) {
+      // Fire-and-forget: don't await, don't block redirect
+      sendEmail({
+        to: user.email,
+        subject: 'Welcome to Docket',
+        react: WelcomeEmail({ email: user.email }),
+      })
+    }
   }
 
   return supabaseResponse

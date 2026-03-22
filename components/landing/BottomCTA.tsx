@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import { NewsletterSignup } from './NewsletterSignup'
 
 export default function BottomCTA() {
   return (
@@ -14,6 +15,12 @@ export default function BottomCTA() {
           >
             Get Started Free
           </Link>
+        </div>
+        <div className="mt-10 border-t border-border pt-8">
+          <p className="text-sm text-muted mb-4">
+            Not ready yet? Get product updates delivered to your inbox.
+          </p>
+          <NewsletterSignup />
         </div>
       </div>
     </section>

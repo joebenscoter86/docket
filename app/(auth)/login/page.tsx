@@ -88,7 +88,7 @@ export default function LoginPage() {
                 Password
               </label>
               <Link
-                href="/login"
+                href="/forgot-password"
                 className="text-sm font-medium text-primary hover:text-primary-hover"
                 tabIndex={-1}
               >

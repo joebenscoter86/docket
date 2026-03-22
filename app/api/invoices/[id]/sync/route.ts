@@ -22,6 +22,7 @@ import {
 } from "@/lib/utils/errors";
 import type { OutputType, ProviderEntityType, DuplicateMatch } from "@/lib/types/invoice";
 import { OUTPUT_TYPE_TO_PAYMENT_TYPE, OUTPUT_TYPE_LABELS, SYNC_SUCCESS_MESSAGES } from "@/lib/types/invoice";
+import { sendSyncSuccessEmail, sendSyncFailureEmail } from "@/lib/email/triggers";
 
 /**
  * Translate accounting API errors into user-friendly messages.
@@ -389,6 +390,16 @@ export async function POST(
         durationMs: Date.now() - startTime,
       });
 
+      // Email notification for sync failure (fire-and-forget)
+      sendSyncFailureEmail(
+        user.id,
+        invoiceId,
+        invoice.file_name,
+        extractedData.vendor_name,
+        providerType as "quickbooks" | "xero",
+        errorMessage
+      );
+
       if (error instanceof AccountingApiError) {
         const friendlyMessage = translateAccountingError(error, outputType);
         return validationError(friendlyMessage);
@@ -447,6 +458,17 @@ export async function POST(
     });
 
     trackServerEvent(user.id, AnalyticsEvents.INVOICE_SYNCED, { invoiceId });
+
+    // Email notification (fire-and-forget)
+    sendSyncSuccessEmail(
+      user.id,
+      invoiceId,
+      invoice.file_name,
+      extractedData.vendor_name,
+      extractedData.total_amount?.toString() ?? "",
+      providerType as "quickbooks" | "xero",
+      result.entityId
+    );
 
     return apiSuccess({
       billId: result.entityId,
