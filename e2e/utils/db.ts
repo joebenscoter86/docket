@@ -68,6 +68,16 @@ export async function cleanupTestUser(userId: string) {
         .in('invoice_id', invoiceIds)
     }
 
+    // Clean up storage files for test invoices
+    const { data: invoiceFiles } = await adminClient
+      .from('invoices')
+      .select('file_path')
+      .in('org_id', orgIds)
+    const filePaths = invoiceFiles?.map((i) => i.file_path).filter(Boolean) ?? []
+    if (filePaths.length > 0) {
+      await adminClient.storage.from('invoices').remove(filePaths)
+    }
+
     await adminClient.from('invoices').delete().in('org_id', orgIds)
     await adminClient
       .from('accounting_connections')
