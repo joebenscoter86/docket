@@ -37,15 +37,19 @@ vi.mock("@/lib/supabase/admin", () => ({
 function mockUser(overrides: {
   is_design_partner?: boolean;
   subscription_status?: string;
+  subscription_tier?: string | null;
   billing_period_start?: string | null;
   billing_period_end?: string | null;
+  trial_invoices_used?: number;
 } = {}) {
   mockUserSelect.mockResolvedValue({
     data: {
       is_design_partner: overrides.is_design_partner ?? false,
       subscription_status: overrides.subscription_status ?? "inactive",
+      subscription_tier: overrides.subscription_tier ?? null,
       billing_period_start: overrides.billing_period_start ?? null,
       billing_period_end: overrides.billing_period_end ?? null,
+      trial_invoices_used: overrides.trial_invoices_used ?? 0,
     },
     error: null,
   });
@@ -66,23 +70,24 @@ describe("getUsageThisPeriod", () => {
     vi.useRealTimers();
   });
 
-  it("returns calendar month period for design partners", async () => {
+  it("returns design partner cap of 150", async () => {
     mockUser({ is_design_partner: true });
     mockInvoiceCountResult(42);
 
     const result = await getUsageThisPeriod("org-1", "user-1");
 
     expect(result.used).toBe(42);
-    expect(result.limit).toBe(100);
-    expect(result.percentUsed).toBeCloseTo(42);
+    expect(result.limit).toBe(150);
+    expect(result.percentUsed).toBeCloseTo(28);
     expect(result.isDesignPartner).toBe(true);
     expect(result.periodStart).toEqual(new Date("2026-03-01T00:00:00.000Z"));
     expect(result.periodEnd).toEqual(new Date("2026-04-01T00:00:00.000Z"));
   });
 
-  it("returns Stripe billing period for active subscribers with cached dates", async () => {
+  it("returns tier-specific cap for active subscribers", async () => {
     mockUser({
       subscription_status: "active",
+      subscription_tier: "starter",
       billing_period_start: "2026-03-10T00:00:00Z",
       billing_period_end: "2026-04-10T00:00:00Z",
     });
@@ -91,32 +96,60 @@ describe("getUsageThisPeriod", () => {
     const result = await getUsageThisPeriod("org-1", "user-1");
 
     expect(result.used).toBe(15);
-    expect(result.limit).toBe(null);
-    expect(result.percentUsed).toBe(null);
-    expect(result.isDesignPartner).toBe(false);
+    expect(result.limit).toBe(75);
+    expect(result.subscriptionTier).toBe("starter");
     expect(result.periodStart).toEqual(new Date("2026-03-10T00:00:00Z"));
-    expect(result.periodEnd).toEqual(new Date("2026-04-10T00:00:00Z"));
   });
 
-  it("falls back to calendar month when billing period not cached", async () => {
-    mockUser({ subscription_status: "active" });
-    mockInvoiceCountResult(5);
+  it("returns pro cap (200) for pro subscribers", async () => {
+    mockUser({
+      subscription_status: "active",
+      subscription_tier: "pro",
+      billing_period_start: "2026-03-10T00:00:00Z",
+      billing_period_end: "2026-04-10T00:00:00Z",
+    });
+    mockInvoiceCountResult(100);
 
     const result = await getUsageThisPeriod("org-1", "user-1");
 
-    expect(result.periodStart).toEqual(new Date("2026-03-01T00:00:00.000Z"));
-    expect(result.periodEnd).toEqual(new Date("2026-04-01T00:00:00.000Z"));
+    expect(result.limit).toBe(200);
+    expect(result.subscriptionTier).toBe("pro");
   });
 
-  it("returns calendar month for trial users", async () => {
-    mockUser({ subscription_status: "inactive" });
+  it("returns growth cap (500) for growth subscribers", async () => {
+    mockUser({
+      subscription_status: "active",
+      subscription_tier: "growth",
+      billing_period_start: "2026-03-10T00:00:00Z",
+      billing_period_end: "2026-04-10T00:00:00Z",
+    });
+    mockInvoiceCountResult(300);
+
+    const result = await getUsageThisPeriod("org-1", "user-1");
+
+    expect(result.limit).toBe(500);
+    expect(result.subscriptionTier).toBe("growth");
+  });
+
+  it("returns trial info for new users", async () => {
+    mockUser({ subscription_status: "inactive", trial_invoices_used: 3 });
     mockInvoiceCountResult(3);
 
     const result = await getUsageThisPeriod("org-1", "user-1");
 
-    expect(result.used).toBe(3);
+    expect(result.isTrial).toBe(true);
+    expect(result.trialInvoicesUsed).toBe(3);
+    expect(result.trialLimit).toBe(10);
     expect(result.limit).toBe(null);
-    expect(result.isDesignPartner).toBe(false);
+  });
+
+  it("marks trial as false when exhausted", async () => {
+    mockUser({ subscription_status: "inactive", trial_invoices_used: 10 });
+    mockInvoiceCountResult(10);
+
+    const result = await getUsageThisPeriod("org-1", "user-1");
+
+    expect(result.isTrial).toBe(false);
   });
 
   it("throws when user lookup fails", async () => {
@@ -145,9 +178,9 @@ describe("checkUsageLimit", () => {
     expect(result.usage.used).toBe(80);
   });
 
-  it("blocks when design partner at limit", async () => {
+  it("blocks when design partner at limit (150)", async () => {
     mockUser({ is_design_partner: true });
-    mockInvoiceCountResult(100);
+    mockInvoiceCountResult(150);
 
     const result = await checkUsageLimit("org-1", "user-1");
     expect(result.allowed).toBe(false);
@@ -156,25 +189,39 @@ describe("checkUsageLimit", () => {
     }
   });
 
-  it("blocks when design partner over limit", async () => {
-    mockUser({ is_design_partner: true });
-    mockInvoiceCountResult(105);
+  it("blocks starter subscriber at cap (75)", async () => {
+    mockUser({ subscription_status: "active", subscription_tier: "starter" });
+    mockInvoiceCountResult(75);
 
     const result = await checkUsageLimit("org-1", "user-1");
     expect(result.allowed).toBe(false);
+    if (!result.allowed) {
+      expect(result.reason).toBe("monthly_limit_reached");
+    }
   });
 
-  it("always allows active subscribers (unlimited)", async () => {
-    mockUser({ subscription_status: "active" });
-    mockInvoiceCountResult(9999);
+  it("allows starter subscriber under cap", async () => {
+    mockUser({ subscription_status: "active", subscription_tier: "starter" });
+    mockInvoiceCountResult(50);
 
     const result = await checkUsageLimit("org-1", "user-1");
     expect(result.allowed).toBe(true);
   });
 
-  it("always allows trial users (no hard limit)", async () => {
-    mockUser({ subscription_status: "inactive" });
-    mockInvoiceCountResult(500);
+  it("blocks trial user at 10 invoices", async () => {
+    mockUser({ subscription_status: "inactive", trial_invoices_used: 10 });
+    mockInvoiceCountResult(10);
+
+    const result = await checkUsageLimit("org-1", "user-1");
+    expect(result.allowed).toBe(false);
+    if (!result.allowed) {
+      expect(result.reason).toBe("trial_exhausted");
+    }
+  });
+
+  it("allows trial user with fewer than 10 invoices", async () => {
+    mockUser({ subscription_status: "inactive", trial_invoices_used: 5 });
+    mockInvoiceCountResult(5);
 
     const result = await checkUsageLimit("org-1", "user-1");
     expect(result.allowed).toBe(true);

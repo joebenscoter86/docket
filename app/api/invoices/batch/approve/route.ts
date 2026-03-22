@@ -58,7 +58,7 @@ export async function POST(request: Request) {
       "Subscription required to approve invoices.",
       {
         subscriptionStatus: access.subscriptionStatus,
-        trialExpired: access.trialExpired,
+        trialExhausted: access.trialExhausted,
       }
     );
   }

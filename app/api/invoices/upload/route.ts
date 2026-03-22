@@ -62,11 +62,11 @@ export async function POST(request: Request) {
         orgId,
         reason: access.reason,
         subscriptionStatus: access.subscriptionStatus,
-        trialExpired: access.trialExpired,
+        trialExhausted: access.trialExhausted,
       });
       return subscriptionRequired("Subscription required to upload invoices.", {
         subscriptionStatus: access.subscriptionStatus,
-        trialExpired: access.trialExpired,
+        trialExhausted: access.trialExhausted,
       });
     }
 

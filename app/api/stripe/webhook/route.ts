@@ -3,6 +3,7 @@ import { stripe } from "@/lib/stripe/client";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { logger } from "@/lib/utils/logger";
 import type Stripe from "stripe";
+import type { SubscriptionTier } from "@/lib/billing/tiers";
 
 /**
  * Map Stripe subscription status to our internal status.
@@ -23,6 +24,19 @@ function mapSubscriptionStatus(stripeStatus: string): string {
 }
 
 /**
+ * Extract the subscription tier from metadata.
+ */
+function extractTier(
+  metadata: Record<string, string> | null
+): SubscriptionTier | null {
+  const tier = metadata?.tier;
+  if (tier === "starter" || tier === "pro" || tier === "growth") {
+    return tier;
+  }
+  return null;
+}
+
+/**
  * Look up a user by their Stripe customer ID.
  */
 async function findUserByStripeCustomerId(
@@ -39,28 +53,38 @@ async function findUserByStripeCustomerId(
 }
 
 /**
- * Update a user's subscription status.
+ * Update a user's subscription status and tier.
  */
 async function updateSubscriptionStatus(
   userId: string,
   status: string,
   options?: {
     stripeCustomerId?: string;
+    subscriptionTier?: SubscriptionTier | null;
     billingPeriodStart?: number;
     billingPeriodEnd?: number;
   }
 ): Promise<void> {
   const admin = createAdminClient();
-  const updates: Record<string, string | null> = { subscription_status: status };
+  const updates: Record<string, string | null> = {
+    subscription_status: status,
+  };
 
   if (options?.stripeCustomerId) {
     updates.stripe_customer_id = options.stripeCustomerId;
   }
+  if (options?.subscriptionTier !== undefined) {
+    updates.subscription_tier = options.subscriptionTier;
+  }
   if (options?.billingPeriodStart !== undefined) {
-    updates.billing_period_start = new Date(options.billingPeriodStart * 1000).toISOString();
+    updates.billing_period_start = new Date(
+      options.billingPeriodStart * 1000
+    ).toISOString();
   }
   if (options?.billingPeriodEnd !== undefined) {
-    updates.billing_period_end = new Date(options.billingPeriodEnd * 1000).toISOString();
+    updates.billing_period_end = new Date(
+      options.billingPeriodEnd * 1000
+    ).toISOString();
   }
 
   await admin.from("users").update(updates).eq("id", userId);
@@ -107,12 +131,25 @@ export async function POST(request: Request) {
         const userId = session.client_reference_id;
 
         if (userId) {
+          // Retrieve subscription to get tier metadata
+          let tier: SubscriptionTier | null = null;
+          if (session.subscription) {
+            const subscription = await stripe.subscriptions.retrieve(
+              session.subscription as string
+            );
+            tier = extractTier(
+              subscription.metadata as Record<string, string>
+            );
+          }
+
           await updateSubscriptionStatus(userId, "active", {
             stripeCustomerId: session.customer as string,
+            subscriptionTier: tier,
           });
           logger.info("stripe_webhook.checkout_completed", {
             userId,
             stripeCustomerId: session.customer as string,
+            tier,
             status: "active",
           });
         }
@@ -127,8 +164,12 @@ export async function POST(request: Request) {
 
         if (userId) {
           const newStatus = mapSubscriptionStatus(subscription.status);
+          const tier = extractTier(
+            subscription.metadata as Record<string, string>
+          );
           const firstItem = subscription.items.data[0];
           await updateSubscriptionStatus(userId, newStatus, {
+            subscriptionTier: tier,
             billingPeriodStart: firstItem?.current_period_start,
             billingPeriodEnd: firstItem?.current_period_end,
           });
@@ -136,6 +177,7 @@ export async function POST(request: Request) {
             userId,
             stripeCustomerId: customerId,
             eventType: event.type,
+            tier,
             status: newStatus,
           });
         }
@@ -148,7 +190,9 @@ export async function POST(request: Request) {
         const userId = await findUserByStripeCustomerId(customerId);
 
         if (userId) {
-          await updateSubscriptionStatus(userId, "cancelled");
+          await updateSubscriptionStatus(userId, "cancelled", {
+            subscriptionTier: null,
+          });
           logger.info("stripe_webhook.subscription_deleted", {
             userId,
             stripeCustomerId: customerId,

@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { stripe } from "@/lib/stripe/client";
 import { getOrCreateStripeCustomer } from "@/lib/stripe/helpers";
+import { validatePriceId } from "@/lib/billing/tiers";
 import {
   authError,
   validationError,
@@ -27,7 +28,20 @@ export async function POST(request: Request) {
   logger.info("stripe_checkout.start", { userId: user.id });
 
   try {
-    // 2. Fetch org membership
+    // 2. Parse and validate priceId
+    const body = await request.json().catch(() => ({}));
+    const { priceId } = body as { priceId?: string };
+
+    if (!priceId || typeof priceId !== "string") {
+      return validationError("Missing priceId.");
+    }
+
+    const priceMapping = validatePriceId(priceId);
+    if (!priceMapping) {
+      return validationError("Invalid price ID.");
+    }
+
+    // 3. Fetch org membership
     const { data: membership } = await supabase
       .from("org_memberships")
       .select("org_id")
@@ -37,7 +51,7 @@ export async function POST(request: Request) {
 
     const orgId = membership?.org_id ?? "";
 
-    // 3. Guard: check design partner and subscription status
+    // 4. Guard: check design partner and subscription status
     const { data: userData, error: userErr } = await supabase
       .from("users")
       .select("is_design_partner, subscription_status")
@@ -56,19 +70,19 @@ export async function POST(request: Request) {
       return conflict("Subscription already active.");
     }
 
-    // 4. Get or create Stripe customer
+    // 5. Get or create Stripe customer
     const stripeCustomerId = await getOrCreateStripeCustomer(
       user.id,
       user.email!
     );
 
-    // 5. Create Checkout Session
+    // 6. Create Checkout Session with tier metadata
     const origin = new URL(request.url).origin;
     const session = await stripe.checkout.sessions.create({
       mode: "subscription",
       line_items: [
         {
-          price: process.env.STRIPE_GROWTH_PRICE_ID!,
+          price: priceId,
           quantity: 1,
         },
       ],
@@ -77,13 +91,20 @@ export async function POST(request: Request) {
       cancel_url: `${origin}/app/settings`,
       client_reference_id: user.id,
       subscription_data: {
-        metadata: { userId: user.id, orgId },
+        metadata: {
+          userId: user.id,
+          orgId,
+          tier: priceMapping.tier,
+          billing_period: priceMapping.interval,
+        },
       },
     });
 
     logger.info("stripe_checkout.success", {
       userId: user.id,
       orgId,
+      tier: priceMapping.tier,
+      billingPeriod: priceMapping.interval,
       status: "success",
       durationMs: Date.now() - start,
     });

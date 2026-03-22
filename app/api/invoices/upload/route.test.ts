@@ -184,7 +184,7 @@ describe("POST /api/invoices/upload", () => {
       allowed: false,
       reason: "no_subscription",
       subscriptionStatus: "inactive",
-      trialExpired: true,
+      trialExhausted: true,
     });
 
     const req = createUploadRequest({

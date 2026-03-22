@@ -56,7 +56,7 @@ export async function POST(request: Request) {
   if (!access.allowed) {
     return subscriptionRequired("Subscription required.", {
       subscriptionStatus: access.subscriptionStatus,
-      trialExpired: access.trialExpired,
+      trialExhausted: access.trialExhausted,
     });
   }
 

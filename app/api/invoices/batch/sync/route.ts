@@ -73,7 +73,7 @@ export async function POST(request: Request) {
     });
     return subscriptionRequired("Subscription required to sync invoices.", {
       subscriptionStatus: access.subscriptionStatus,
-      trialExpired: access.trialExpired,
+      trialExhausted: access.trialExhausted,
     });
   }
 

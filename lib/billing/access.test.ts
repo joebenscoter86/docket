@@ -20,13 +20,13 @@ vi.mock("@/lib/supabase/admin", () => ({
 function mockUser(overrides: {
   is_design_partner?: boolean;
   subscription_status?: string;
-  trial_ends_at?: string | null;
+  trial_invoices_used?: number;
 } = {}) {
   mockUserSelect.mockResolvedValue({
     data: {
       is_design_partner: overrides.is_design_partner ?? false,
       subscription_status: overrides.subscription_status ?? "inactive",
-      trial_ends_at: overrides.trial_ends_at ?? null,
+      trial_invoices_used: overrides.trial_invoices_used ?? 0,
     },
     error: null,
   });
@@ -38,7 +38,7 @@ describe("checkInvoiceAccess", () => {
   });
 
   it("allows design partners regardless of subscription or trial", async () => {
-    mockUser({ is_design_partner: true, subscription_status: "inactive", trial_ends_at: null });
+    mockUser({ is_design_partner: true, subscription_status: "inactive" });
     const result = await checkInvoiceAccess("user-1");
     expect(result).toEqual({ allowed: true, reason: "design_partner" });
   });
@@ -49,55 +49,59 @@ describe("checkInvoiceAccess", () => {
     expect(result).toEqual({ allowed: true, reason: "active_subscription" });
   });
 
-  it("allows users within trial period", async () => {
-    const futureDate = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
-    mockUser({ trial_ends_at: futureDate });
+  it("allows trial users with fewer than 10 invoices used", async () => {
+    mockUser({ trial_invoices_used: 5 });
     const result = await checkInvoiceAccess("user-1");
     expect(result).toEqual({ allowed: true, reason: "trial" });
   });
 
-  it("denies users with expired trial", async () => {
-    const pastDate = new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString();
-    mockUser({ trial_ends_at: pastDate });
+  it("allows trial users with 0 invoices used", async () => {
+    mockUser({ trial_invoices_used: 0 });
+    const result = await checkInvoiceAccess("user-1");
+    expect(result).toEqual({ allowed: true, reason: "trial" });
+  });
+
+  it("denies users who have exhausted trial (10 invoices)", async () => {
+    mockUser({ trial_invoices_used: 10 });
     const result = await checkInvoiceAccess("user-1");
     expect(result).toEqual({
       allowed: false,
       reason: "no_subscription",
       subscriptionStatus: "inactive",
-      trialExpired: true,
+      trialExhausted: true,
     });
   });
 
-  it("denies users with null trial_ends_at (pre-migration users)", async () => {
-    mockUser({ trial_ends_at: null });
+  it("denies users who have exceeded trial limit", async () => {
+    mockUser({ trial_invoices_used: 15 });
     const result = await checkInvoiceAccess("user-1");
     expect(result).toEqual({
       allowed: false,
       reason: "no_subscription",
       subscriptionStatus: "inactive",
-      trialExpired: false,
+      trialExhausted: true,
     });
   });
 
-  it("denies users with past_due subscription", async () => {
-    mockUser({ subscription_status: "past_due" });
+  it("denies users with past_due subscription and exhausted trial", async () => {
+    mockUser({ subscription_status: "past_due", trial_invoices_used: 10 });
     const result = await checkInvoiceAccess("user-1");
     expect(result).toEqual({
       allowed: false,
       reason: "no_subscription",
       subscriptionStatus: "past_due",
-      trialExpired: false,
+      trialExhausted: true,
     });
   });
 
-  it("denies users with cancelled subscription", async () => {
-    mockUser({ subscription_status: "cancelled" });
+  it("denies users with cancelled subscription and exhausted trial", async () => {
+    mockUser({ subscription_status: "cancelled", trial_invoices_used: 10 });
     const result = await checkInvoiceAccess("user-1");
     expect(result).toEqual({
       allowed: false,
       reason: "no_subscription",
       subscriptionStatus: "cancelled",
-      trialExpired: false,
+      trialExhausted: true,
     });
   });
 

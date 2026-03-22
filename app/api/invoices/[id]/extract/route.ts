@@ -33,11 +33,11 @@ export async function POST(
       userId: user.id,
       reason: access.reason,
       subscriptionStatus: access.subscriptionStatus,
-      trialExpired: access.trialExpired,
+      trialExhausted: access.trialExhausted,
     });
     return subscriptionRequired("Subscription required to extract invoice data.", {
       subscriptionStatus: access.subscriptionStatus,
-      trialExpired: access.trialExpired,
+      trialExhausted: access.trialExhausted,
     });
   }
 

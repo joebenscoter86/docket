@@ -143,11 +143,11 @@ export async function POST(
         orgId,
         reason: access.reason,
         subscriptionStatus: access.subscriptionStatus,
-        trialExpired: access.trialExpired,
+        trialExhausted: access.trialExhausted,
       });
       return subscriptionRequired("Subscription required to sync invoices.", {
         subscriptionStatus: access.subscriptionStatus,
-        trialExpired: access.trialExpired,
+        trialExhausted: access.trialExhausted,
       });
     }
 

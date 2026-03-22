@@ -2,23 +2,23 @@ import Link from "next/link";
 
 interface UploadGateProps {
   subscriptionStatus: string;
-  trialExpired: boolean;
+  trialExhausted: boolean;
 }
 
-function getGateContent(subscriptionStatus: string, trialExpired: boolean) {
+function getGateContent(subscriptionStatus: string, trialExhausted: boolean) {
   if (subscriptionStatus === "usage_limit") {
     return {
       heading: "Monthly limit reached",
-      body: "You've reached your invoice limit for this month. Your limit will reset at the start of your next billing period.",
-      ctaText: "View Billing",
+      body: "You've reached your invoice limit for this month. Upgrade your plan for a higher limit, or wait for your next billing period.",
+      ctaText: "View Plans",
       ctaHref: "/app/settings",
     };
   }
 
-  if (trialExpired) {
+  if (subscriptionStatus === "trial_exhausted" || trialExhausted) {
     return {
-      heading: "Your free trial has ended",
-      body: "Subscribe to continue processing invoices.",
+      heading: "Trial complete",
+      body: "You've used all 10 trial invoices. Choose a plan to continue processing.",
       ctaText: "View Plans",
       ctaHref: "/app/settings",
     };
@@ -28,7 +28,7 @@ function getGateContent(subscriptionStatus: string, trialExpired: boolean) {
     return {
       heading: "Your subscription is inactive",
       body: "Resubscribe to continue processing invoices.",
-      ctaText: "Manage Subscription",
+      ctaText: "View Plans",
       ctaHref: "/app/settings",
     };
   }
@@ -51,8 +51,8 @@ function getGateContent(subscriptionStatus: string, trialExpired: boolean) {
   };
 }
 
-export default function UploadGate({ subscriptionStatus, trialExpired }: UploadGateProps) {
-  const { heading, body, ctaText, ctaHref } = getGateContent(subscriptionStatus, trialExpired);
+export default function UploadGate({ subscriptionStatus, trialExhausted }: UploadGateProps) {
+  const { heading, body, ctaText, ctaHref } = getGateContent(subscriptionStatus, trialExhausted);
 
   return (
     <div className="flex flex-col items-center justify-center rounded-brand-lg border border-border bg-surface px-8 py-16 text-center">
