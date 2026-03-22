@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { checkInvoiceAccess } from "@/lib/billing/access";
 import { getUsageThisPeriod } from "@/lib/billing/usage";
+import { getUserTierFeatures } from "@/lib/billing/tier-context";
 import UploadFlow from "@/components/invoices/UploadFlow";
 import UploadGate from "@/components/billing/UploadGate";
 import { UsageLimitBanner } from "@/components/settings/UsageLimitBanner";
@@ -16,6 +17,7 @@ export default async function UploadPage() {
   }
 
   const access = await checkInvoiceAccess(user.id);
+  const tierInfo = await getUserTierFeatures(user.id);
 
   if (!access.allowed) {
     return (
@@ -83,7 +85,7 @@ export default async function UploadPage() {
             trialExhausted={false}
           />
         ) : (
-          <UploadFlow />
+          <UploadFlow batchUploadAllowed={tierInfo.features.batch_upload} />
         )}
       </div>
     </div>
