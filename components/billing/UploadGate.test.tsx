@@ -8,13 +8,13 @@ describe("UploadGate", () => {
     render(<UploadGate subscriptionStatus="inactive" trialExhausted={true} />);
     expect(screen.getByText("Trial complete")).toBeInTheDocument();
     expect(screen.getByText("You've used all 10 trial invoices. Choose a plan to continue processing.")).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "View Plans" })).toHaveAttribute("href", "/app/settings");
+    expect(screen.getByRole("link", { name: "View Plans" })).toHaveAttribute("href", "/pricing");
   });
 
   it("shows cancelled copy when subscriptionStatus is cancelled", () => {
     render(<UploadGate subscriptionStatus="cancelled" trialExhausted={false} />);
     expect(screen.getByText("Your subscription is inactive")).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "View Plans" })).toHaveAttribute("href", "/app/settings");
+    expect(screen.getByRole("link", { name: "View Plans" })).toHaveAttribute("href", "/pricing");
   });
 
   it("shows past_due copy when subscriptionStatus is past_due", () => {
@@ -27,12 +27,12 @@ describe("UploadGate", () => {
     render(<UploadGate subscriptionStatus="inactive" trialExhausted={false} />);
     expect(screen.getByText("Subscribe to process invoices")).toBeInTheDocument();
     expect(screen.getByText("Start your subscription to upload, extract, and sync invoices.")).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "View Plans" })).toHaveAttribute("href", "/app/settings");
+    expect(screen.getByRole("link", { name: "View Plans" })).toHaveAttribute("href", "/pricing");
   });
 
   it("shows usage limit copy", () => {
     render(<UploadGate subscriptionStatus="usage_limit" trialExhausted={false} />);
     expect(screen.getByText("Monthly limit reached")).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "View Plans" })).toHaveAttribute("href", "/app/settings");
+    expect(screen.getByRole("link", { name: "View Plans" })).toHaveAttribute("href", "/pricing");
   });
 });
