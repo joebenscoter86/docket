@@ -49,3 +49,10 @@ scripts/sandbox/test-invoice.pdf
 scripts/sandbox/fixtures/*.pdf
 scripts/sandbox/fixtures/extraction-results.json
 .worktrees/
+
+# playwright
+/test-results/
+/playwright-report/
+/blob-report/
+/playwright/.cache/
+.env.test
