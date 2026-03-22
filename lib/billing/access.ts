@@ -1,4 +1,5 @@
 import { createAdminClient } from "@/lib/supabase/admin";
+import { TRIAL_INVOICE_LIMIT } from "@/lib/billing/tiers";
 
 export type AccessStatus =
   | { allowed: true; reason: "design_partner" | "active_subscription" | "trial" }
@@ -6,7 +7,7 @@ export type AccessStatus =
       allowed: false;
       reason: "no_subscription";
       subscriptionStatus: string;
-      trialExpired: boolean;
+      trialExhausted: boolean;
     };
 
 /**
@@ -15,9 +16,9 @@ export type AccessStatus =
  * Access is granted if ANY of:
  * 1. User is a design partner
  * 2. subscription_status is 'active'
- * 3. trial_ends_at is in the future
+ * 3. User is on usage-based trial with < 10 invoices used
  *
- * Uses the admin client to bypass RLS — this is a billing check,
+ * Uses the admin client to bypass RLS -- this is a billing check,
  * not a data access check.
  */
 export async function checkInvoiceAccess(userId: string): Promise<AccessStatus> {
@@ -25,7 +26,7 @@ export async function checkInvoiceAccess(userId: string): Promise<AccessStatus> 
 
   const { data: user, error } = await admin
     .from("users")
-    .select("is_design_partner, subscription_status, trial_ends_at")
+    .select("is_design_partner, subscription_status, trial_invoices_used")
     .eq("id", userId)
     .single();
 
@@ -43,18 +44,17 @@ export async function checkInvoiceAccess(userId: string): Promise<AccessStatus> 
     return { allowed: true, reason: "active_subscription" };
   }
 
-  // 3. Active trial
-  if (user.trial_ends_at && new Date(user.trial_ends_at) > new Date()) {
+  // 3. Usage-based trial (10 invoices lifetime, no time limit)
+  const trialUsed = user.trial_invoices_used ?? 0;
+  if (trialUsed < TRIAL_INVOICE_LIMIT) {
     return { allowed: true, reason: "trial" };
   }
 
-  // Denied — determine if trial existed and expired
-  const trialExpired = user.trial_ends_at !== null;
-
+  // Denied
   return {
     allowed: false,
     reason: "no_subscription",
     subscriptionStatus: user.subscription_status ?? "inactive",
-    trialExpired,
+    trialExhausted: trialUsed >= TRIAL_INVOICE_LIMIT,
   };
 }

@@ -1,6 +1,9 @@
 import { createAdminClient } from "@/lib/supabase/admin";
-
-const DESIGN_PARTNER_LIMIT = 100;
+import {
+  getInvoiceCap,
+  TRIAL_INVOICE_LIMIT,
+  type SubscriptionTier,
+} from "@/lib/billing/tiers";
 
 export interface UsageInfo {
   used: number;
@@ -9,11 +12,15 @@ export interface UsageInfo {
   periodStart: Date;
   periodEnd: Date;
   isDesignPartner: boolean;
+  subscriptionTier: SubscriptionTier | null;
+  isTrial: boolean;
+  trialInvoicesUsed: number;
+  trialLimit: number;
 }
 
 type UsageLimitResult =
   | { allowed: true; usage: UsageInfo }
-  | { allowed: false; usage: UsageInfo; reason: "monthly_limit_reached" };
+  | { allowed: false; usage: UsageInfo; reason: "monthly_limit_reached" | "trial_exhausted" };
 
 /**
  * Get the current billing period boundaries.
@@ -78,7 +85,9 @@ export async function getUsageThisPeriod(orgId: string, userId: string): Promise
 
   const { data: user, error } = await admin
     .from("users")
-    .select("is_design_partner, subscription_status, billing_period_start, billing_period_end")
+    .select(
+      "is_design_partner, subscription_status, subscription_tier, billing_period_start, billing_period_end, trial_invoices_used"
+    )
     .eq("id", userId)
     .single();
 
@@ -90,7 +99,22 @@ export async function getUsageThisPeriod(orgId: string, userId: string): Promise
   const used = await countInvoicesInPeriod(orgId, periodStart);
 
   const isDesignPartner = user.is_design_partner ?? false;
-  const limit = isDesignPartner ? DESIGN_PARTNER_LIMIT : null;
+  const tier = (user.subscription_tier as SubscriptionTier) ?? null;
+  const trialInvoicesUsed = user.trial_invoices_used ?? 0;
+  const isTrial =
+    !isDesignPartner &&
+    user.subscription_status !== "active" &&
+    trialInvoicesUsed < TRIAL_INVOICE_LIMIT;
+
+  // Determine limit based on user type
+  let limit: number | null = null;
+  if (isDesignPartner) {
+    limit = getInvoiceCap(null, true);
+  } else if (user.subscription_status === "active" && tier) {
+    limit = getInvoiceCap(tier, false);
+  }
+  // Trial users don't have a monthly cap -- they have a lifetime 10-invoice limit
+
   const percentUsed = limit !== null ? (used / limit) * 100 : null;
 
   return {
@@ -100,17 +124,29 @@ export async function getUsageThisPeriod(orgId: string, userId: string): Promise
     periodStart,
     periodEnd,
     isDesignPartner,
+    subscriptionTier: tier,
+    isTrial,
+    trialInvoicesUsed,
+    trialLimit: TRIAL_INVOICE_LIMIT,
   };
 }
 
 /**
  * Check if an org can upload more invoices this period.
- * Only design partners have a hard limit (100/mo).
- * All other plans are unlimited for now.
  */
 export async function checkUsageLimit(orgId: string, userId: string): Promise<UsageLimitResult> {
   const usage = await getUsageThisPeriod(orgId, userId);
 
+  // Trial users (active or exhausted): check lifetime limit
+  const isTrialUser =
+    !usage.isDesignPartner &&
+    usage.subscriptionTier === null &&
+    usage.limit === null;
+  if (isTrialUser && usage.trialInvoicesUsed >= TRIAL_INVOICE_LIMIT) {
+    return { allowed: false, usage, reason: "trial_exhausted" };
+  }
+
+  // Paid users and design partners: check monthly limit
   if (usage.limit !== null && usage.used >= usage.limit) {
     return { allowed: false, usage, reason: "monthly_limit_reached" };
   }

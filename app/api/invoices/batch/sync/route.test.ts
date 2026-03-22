@@ -217,7 +217,7 @@ describe("POST /api/invoices/batch/sync", () => {
       allowed: false,
       reason: "no_subscription",
       subscriptionStatus: "inactive",
-      trialExpired: false,
+      trialExhausted: false,
     });
 
     const res = await POST(makeRequest());

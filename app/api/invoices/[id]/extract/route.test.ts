@@ -112,7 +112,7 @@ describe("POST /api/invoices/[id]/extract", () => {
       allowed: false,
       reason: "no_subscription",
       subscriptionStatus: "inactive",
-      trialExpired: true,
+      trialExhausted: true,
     });
 
     const { request, params } = makeRequest();

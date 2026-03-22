@@ -177,7 +177,7 @@ describe("POST /api/invoices/batch/approve", () => {
       allowed: false,
       reason: "no_subscription",
       subscriptionStatus: "inactive",
-      trialExpired: false,
+      trialExhausted: false,
     });
 
     const res = await POST(makeRequest());

@@ -8,6 +8,7 @@ import { SettingsAlert } from "@/components/settings/SettingsAlert";
 import { BillingCard } from "@/components/settings/BillingCard";
 import { AccountCard } from "@/components/settings/AccountCard";
 import { getUsageThisPeriod } from "@/lib/billing/usage";
+import type { SubscriptionTier } from "@/lib/billing/tiers";
 
 export default async function SettingsPage({
   searchParams,
@@ -32,7 +33,7 @@ export default async function SettingsPage({
   // Fetch user billing data
   const { data: userData } = await supabase
     .from("users")
-    .select("id, stripe_customer_id, subscription_status, is_design_partner")
+    .select("id, stripe_customer_id, subscription_status, subscription_tier, is_design_partner")
     .eq("id", user!.id)
     .single();
 
@@ -41,6 +42,7 @@ export default async function SettingsPage({
     email: user!.email!,
     stripe_customer_id: userData?.stripe_customer_id ?? null,
     subscription_status: userData?.subscription_status ?? null,
+    subscription_tier: (userData?.subscription_tier as SubscriptionTier) ?? null,
     is_design_partner: userData?.is_design_partner ?? false,
   };
 
@@ -88,7 +90,15 @@ export default async function SettingsPage({
   };
 
   // Get usage info
-  let usage = { used: 0, limit: null as number | null, percentUsed: null as number | null, periodEnd: new Date().toISOString() };
+  let usage = {
+    used: 0,
+    limit: null as number | null,
+    percentUsed: null as number | null,
+    periodEnd: new Date().toISOString(),
+    isTrial: false,
+    trialInvoicesUsed: 0,
+    trialLimit: 10,
+  };
   if (orgId) {
     try {
       const usageInfo = await getUsageThisPeriod(orgId, user!.id);
@@ -97,11 +107,18 @@ export default async function SettingsPage({
         limit: usageInfo.limit,
         percentUsed: usageInfo.percentUsed,
         periodEnd: usageInfo.periodEnd.toISOString(),
+        isTrial: usageInfo.isTrial,
+        trialInvoicesUsed: usageInfo.trialInvoicesUsed,
+        trialLimit: usageInfo.trialLimit,
       };
     } catch {
       // Fail-open: show 0 usage if query fails
     }
   }
+
+  const tierLabel = billingUser.subscription_tier
+    ? { starter: "Starter", pro: "Pro", growth: "Growth" }[billingUser.subscription_tier]
+    : null;
 
   return (
     <div className="max-w-[600px] mx-auto space-y-9">
@@ -127,8 +144,11 @@ export default async function SettingsPage({
       {searchParams.xero_error && (
         <SettingsAlert type="error" message={searchParams.xero_error} />
       )}
-      {searchParams.subscribed === "true" && (
-        <SettingsAlert type="success" message="Subscription activated! You're on the Growth plan." />
+      {searchParams.subscribed === "true" && tierLabel && (
+        <SettingsAlert type="success" message={`Subscription activated! You're on the ${tierLabel} plan.`} />
+      )}
+      {searchParams.subscribed === "true" && !tierLabel && (
+        <SettingsAlert type="success" message="Subscription activated!" />
       )}
 
       {/* Connections Section */}

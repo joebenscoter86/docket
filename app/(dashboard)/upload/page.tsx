@@ -21,12 +21,12 @@ export default async function UploadPage() {
       <div className="mx-auto max-w-2xl">
         <h1 className="font-headings font-bold text-[32px] text-text tracking-tight">Upload Invoices</h1>
         <p className="font-body text-[15px] text-muted mt-2">
-          Drop your PDF or image files — AI will extract the data automatically.
+          Drop your PDF or image files -- AI will extract the data automatically.
         </p>
         <div className="mt-6">
           <UploadGate
             subscriptionStatus={access.subscriptionStatus}
-            trialExpired={access.trialExpired}
+            trialExhausted={access.trialExhausted}
           />
         </div>
       </div>
@@ -59,7 +59,7 @@ export default async function UploadPage() {
     <div className="mx-auto max-w-2xl">
       <h1 className="font-headings font-bold text-[32px] text-text tracking-tight">Upload Invoices</h1>
       <p className="font-body text-[15px] text-muted mt-2">
-        Drop your PDF or image files — AI will extract the data automatically.
+        Drop your PDF or image files -- AI will extract the data automatically.
       </p>
       <div className="mt-6 space-y-4">
         {usageInfo && usageInfo.limit !== null && (
@@ -73,7 +73,7 @@ export default async function UploadPage() {
         {isAtLimit ? (
           <UploadGate
             subscriptionStatus="usage_limit"
-            trialExpired={false}
+            trialExhausted={false}
           />
         ) : (
           <UploadFlow />
