@@ -47,6 +47,7 @@
 
 | File | Change |
 |------|--------|
+| `middleware.ts` | Exclude `/api/email/inbound` from auth middleware matcher |
 | `lib/analytics/events.ts` | Add email ingestion analytics events |
 | `lib/email/triggers.ts` | Add ingestion notification trigger functions |
 | `components/invoices/InvoiceList.tsx` | Add email source indicator (icon + tooltip) |
@@ -349,15 +350,15 @@ Expected: FAIL (module not found)
 Create `lib/email/address.ts`:
 
 ```typescript
-import { nanoid, customAlphabet } from "nanoid";
+import { customAlphabet } from "nanoid";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 const INBOUND_DOMAIN = "ingest.dockett.app";
 const ADDRESS_PREFIX = "invoices";
 const ID_LENGTH = 10;
 
-// Lowercase alphanumeric minus ambiguous chars: 0/O, 1/l
-// Uses 2-9 + a-k + m-n + p-z = 32 chars
+// Lowercase alphanumeric minus ambiguous chars: 0/O, 1/l/i
+// Uses 2-9 (8) + a-h,j-k,m-n,p-z (23) = 31 chars
 const generateId = customAlphabet("23456789abcdefghjkmnpqrstuvwxyz", ID_LENGTH);
 
 /**
@@ -781,8 +782,8 @@ export function filterValidAttachments(attachments: EmailAttachment[]): {
       continue;
     }
 
-    // Check file size (10MB limit)
-    if (!validateFileSize(att.sizeBytes)) {
+    // Check file size (10MB limit) -- use actual buffer length, not claimed size
+    if (!validateFileSize(att.content.length)) {
       rejected.push({
         filename: att.filename,
         reason: `File exceeds 10MB limit (${Math.round(att.sizeBytes / 1024 / 1024)}MB).`,
@@ -1118,7 +1119,19 @@ Mock: `svix` Webhook verify, `createAdminClient`, `enqueueExtraction`, `sendEmai
 Run: `npx vitest run app/api/email/inbound/route.test.ts`
 Expected: FAIL
 
-- [ ] **Step 3: Implement the webhook endpoint**
+- [ ] **Step 3: Exclude webhook from auth middleware**
+
+Update `middleware.ts` to exclude `/api/email/inbound` from the matcher. This prevents wasteful `auth.getUser()` calls on every inbound email webhook (which has no Supabase session):
+
+```typescript
+export const config = {
+  matcher: [
+    '/((?!_next/static|_next/image|favicon.ico|api/email/inbound|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
+  ],
+}
+```
+
+- [ ] **Step 4: Implement the webhook endpoint**
 
 Create `app/api/email/inbound/route.ts`:
 
@@ -1227,6 +1240,17 @@ export async function POST(request: Request) {
         action: "email_inbound",
         orgId,
         messageId: parsedEmail.messageId,
+      });
+      // Log duplicate to ingestion log for audit trail
+      await admin.from("email_ingestion_log").insert({
+        org_id: orgId,
+        message_id: parsedEmail.messageId + "_dup_" + Date.now(),
+        sender: parsedEmail.from,
+        subject: parsedEmail.subject,
+        total_attachment_count: parsedEmail.attachments.length,
+        valid_attachment_count: 0,
+        status: "duplicate",
+        rejection_reason: "Duplicate Message-ID: " + parsedEmail.messageId,
       });
       return OK();
     }
@@ -1429,20 +1453,20 @@ export async function POST(request: Request) {
 }
 ```
 
-- [ ] **Step 4: Run tests to verify they pass**
+- [ ] **Step 5: Run tests to verify they pass**
 
 Run: `npx vitest run app/api/email/inbound/route.test.ts`
 Expected: PASS
 
-- [ ] **Step 5: Run full test suite**
+- [ ] **Step 6: Run full test suite**
 
 Run: `npm run test`
 Expected: All tests pass, no regressions
 
-- [ ] **Step 6: Commit**
+- [ ] **Step 7: Commit**
 
 ```bash
-git add app/api/email/inbound/route.ts app/api/email/inbound/route.test.ts
+git add middleware.ts app/api/email/inbound/route.ts app/api/email/inbound/route.test.ts
 git commit -m "feat: inbound email webhook endpoint with full pipeline (DOC-62, DOC-64, DOC-65, DOC-67)"
 ```
 
