@@ -217,7 +217,21 @@ export default function InvoiceList({
         onClick={() => router.push(`/invoices/${invoice.id}/review`)}
       >
         <td className="py-3.5 px-3 text-[14px] text-text truncate max-w-[200px]">
-          {invoice.file_name}
+          <span className="inline-flex items-center gap-1.5">
+            {invoice.file_name}
+            {invoice.source === "email" && (
+              <span
+                className="inline-flex items-center gap-0.5 px-1.5 py-0.5 text-[11px] font-medium bg-blue-50 text-blue-600 rounded-full"
+                title={invoice.email_sender ? `From: ${invoice.email_sender}` : "Received via email"}
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" className="w-3 h-3">
+                  <path d="M2.5 3A1.5 1.5 0 001 4.5v.793c.026.009.051.02.076.032L7.674 8.51c.206.1.446.1.652 0l6.598-3.185A.755.755 0 0115 5.293V4.5A1.5 1.5 0 0013.5 3h-11z" />
+                  <path d="M15 6.954L8.978 9.86a2.25 2.25 0 01-1.956 0L1 6.954V11.5A1.5 1.5 0 002.5 13h11a1.5 1.5 0 001.5-1.5V6.954z" />
+                </svg>
+                Email
+              </span>
+            )}
+          </span>
         </td>
         <td className="py-3.5 px-3 text-[14px] font-medium text-text">
           {invoice.extracted_data?.vendor_name ?? (

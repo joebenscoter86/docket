@@ -1,0 +1,205 @@
+"use client";
+
+import { useState, useEffect } from "react";
+import Button from "@/components/ui/Button";
+
+export function EmailIngestionCard() {
+  const [address, setAddress] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [enabling, setEnabling] = useState(false);
+  const [disabling, setDisabling] = useState(false);
+  const [showConfirm, setShowConfirm] = useState(false);
+  const [copied, setCopied] = useState(false);
+  const [showInstructions, setShowInstructions] = useState(false);
+
+  useEffect(() => {
+    fetch("/api/email/address")
+      .then((r) => r.json())
+      .then((res) => {
+        setAddress(res.data?.address ?? null);
+        setLoading(false);
+      })
+      .catch(() => setLoading(false));
+  }, []);
+
+  async function handleEnable() {
+    setEnabling(true);
+    try {
+      const res = await fetch("/api/email/address", { method: "POST" });
+      const data = await res.json();
+      if (data.data?.address) {
+        setAddress(data.data.address);
+        setShowInstructions(true);
+      }
+    } catch {
+      // Fail silently -- user can retry
+    } finally {
+      setEnabling(false);
+    }
+  }
+
+  async function handleDisable() {
+    setDisabling(true);
+    try {
+      await fetch("/api/email/address", { method: "DELETE" });
+      setAddress(null);
+      setShowConfirm(false);
+    } catch {
+      // Fail silently
+    } finally {
+      setDisabling(false);
+    }
+  }
+
+  function handleCopy() {
+    if (!address) return;
+    navigator.clipboard.writeText(address);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  }
+
+  if (loading) {
+    return (
+      <div className="bg-surface rounded-brand-lg shadow-soft px-6 py-5">
+        <div className="animate-pulse h-11 bg-gray-100 rounded-brand-md" />
+      </div>
+    );
+  }
+
+  return (
+    <div className="bg-surface rounded-brand-lg shadow-soft px-6 py-5 transition-all duration-150 ease-in-out hover:-translate-y-0.5 hover:shadow-float">
+      <div className="flex items-center gap-5">
+        {/* Email icon */}
+        <div className="flex h-11 w-11 items-center justify-center rounded-brand-md bg-blue-600 text-white font-bold text-sm flex-shrink-0">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-5 h-5">
+            <path d="M3 4a2 2 0 00-2 2v1.161l8.441 4.221a1.25 1.25 0 001.118 0L19 7.162V6a2 2 0 00-2-2H3z" />
+            <path d="M19 8.839l-7.77 3.885a2.75 2.75 0 01-2.46 0L1 8.839V14a2 2 0 002 2h14a2 2 0 002-2V8.839z" />
+          </svg>
+        </div>
+
+        {/* Content */}
+        <div className="flex-1 min-w-0">
+          <p className="font-body font-bold text-[15px] text-text">
+            Email Forwarding
+          </p>
+          <p className="font-body text-[13px] text-muted">
+            {address
+              ? "Forward invoices from your email to automatically extract and process them."
+              : "Forward invoices from your email to automatically extract and process them."}
+          </p>
+        </div>
+
+        {/* Action */}
+        {!address && (
+          <Button
+            onClick={handleEnable}
+            disabled={enabling}
+          >
+            {enabling ? "Enabling..." : "Enable"}
+          </Button>
+        )}
+      </div>
+
+      {/* Enabled state: show address + instructions */}
+      {address && (
+        <div className="mt-5 space-y-4">
+          {/* Address display */}
+          <div>
+            <label className="block text-[13px] font-medium text-muted mb-1.5">
+              Your forwarding address
+            </label>
+            <div className="flex items-center gap-2">
+              <input
+                type="text"
+                readOnly
+                value={address}
+                className="flex-1 font-mono text-[14px] bg-gray-50 border border-border rounded-brand-md px-3 py-2 text-text select-all"
+              />
+              <button
+                onClick={handleCopy}
+                className="px-3 py-2 text-[13px] font-medium bg-blue-600 text-white rounded-brand-md hover:bg-blue-700 transition-colors whitespace-nowrap"
+              >
+                {copied ? "Copied!" : "Copy"}
+              </button>
+            </div>
+          </div>
+
+          {/* Test email link */}
+          <a
+            href={`mailto:${address}?subject=Test%20Invoice&body=This%20is%20a%20test%20email%20to%20verify%20forwarding.`}
+            className="inline-flex items-center gap-1.5 text-[13px] font-medium text-blue-600 hover:text-blue-700"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" className="w-3.5 h-3.5">
+              <path d="M2.87 2.298a.75.75 0 00-1.24.845L5.22 8 1.63 12.857a.75.75 0 001.24.845L7.25 8.5h5a.75.75 0 100-1.5h-5L2.87 2.298z" />
+            </svg>
+            Send a test email
+          </a>
+
+          {/* Setup instructions (collapsible) */}
+          <button
+            onClick={() => setShowInstructions(!showInstructions)}
+            className="flex items-center gap-1.5 text-[13px] font-medium text-muted hover:text-text transition-colors"
+          >
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              viewBox="0 0 16 16"
+              fill="currentColor"
+              className={`w-3.5 h-3.5 transition-transform ${showInstructions ? "rotate-90" : ""}`}
+            >
+              <path fillRule="evenodd" d="M6.22 4.22a.75.75 0 011.06 0l3.25 3.25a.75.75 0 010 1.06l-3.25 3.25a.75.75 0 01-1.06-1.06L8.94 8 6.22 5.28a.75.75 0 010-1.06z" clipRule="evenodd" />
+            </svg>
+            Setup instructions
+          </button>
+
+          {showInstructions && (
+            <div className="bg-gray-50 rounded-brand-md p-4 space-y-3 text-[13px] text-muted">
+              <div>
+                <p className="font-medium text-text mb-1">Gmail</p>
+                <p>Settings &gt; Forwarding and POP/IMAP &gt; Add a forwarding address &gt; paste the address above &gt; confirm.</p>
+              </div>
+              <div>
+                <p className="font-medium text-text mb-1">Outlook</p>
+                <p>Settings &gt; Mail &gt; Forwarding &gt; Enable forwarding &gt; paste the address above.</p>
+              </div>
+              <div>
+                <p className="font-medium text-text mb-1">Other</p>
+                <p>Add the address above as a forwarding rule in your email client. You only need to do this once.</p>
+              </div>
+            </div>
+          )}
+
+          {/* Disable button */}
+          <div className="pt-2 border-t border-border">
+            {!showConfirm ? (
+              <button
+                onClick={() => setShowConfirm(true)}
+                className="text-[13px] font-medium text-red-600 hover:text-red-700 transition-colors"
+              >
+                Disable Email Forwarding
+              </button>
+            ) : (
+              <div className="flex items-center gap-3">
+                <p className="text-[13px] text-muted">
+                  Emails to this address will no longer be processed.
+                </p>
+                <button
+                  onClick={handleDisable}
+                  disabled={disabling}
+                  className="px-3 py-1.5 text-[13px] font-medium bg-red-600 text-white rounded-brand-md hover:bg-red-700 transition-colors disabled:opacity-50"
+                >
+                  {disabling ? "Disabling..." : "Confirm"}
+                </button>
+                <button
+                  onClick={() => setShowConfirm(false)}
+                  className="text-[13px] font-medium text-muted hover:text-text transition-colors"
+                >
+                  Cancel
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
