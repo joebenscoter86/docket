@@ -47,7 +47,7 @@ export default function PricingSection({ tiers }: PricingSectionProps) {
   }
 
   return (
-    <section className="bg-white py-24 sm:py-32">
+    <section id="pricing" className="bg-white py-24 sm:py-32">
       <div className="mx-auto max-w-7xl px-8">
         {/* Heading */}
         <div className="text-center">

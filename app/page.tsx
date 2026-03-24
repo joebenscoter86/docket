@@ -5,12 +5,13 @@ import type { Metadata } from 'next'
 import { getAllTiers } from '@/lib/billing/tiers'
 import LandingNav from '@/components/landing/LandingNav'
 import ScrollHero from '@/components/landing/ScrollHero'
-import HowItWorksSection from '@/components/landing/HowItWorksSection'
+import StatsBar from '@/components/landing/StatsBar'
 import FeaturesSection from '@/components/landing/FeaturesSection'
-import PricingSection from '@/components/landing/PricingSection'
-import DefinitionSection from '@/components/landing/DefinitionSection'
+import ExtractionDemo from '@/components/landing/ExtractionDemo'
+import HowItWorksSection from '@/components/landing/HowItWorksSection'
 import WhoItsForSection from '@/components/landing/WhoItsForSection'
-import WhyDocketSection from '@/components/landing/WhyDocketSection'
+import PricingSection from '@/components/landing/PricingSection'
+import FAQSection from '@/components/landing/FAQSection'
 import BottomCTA from '@/components/landing/BottomCTA'
 import Footer from '@/components/layout/Footer'
 
@@ -120,7 +121,7 @@ export default async function Home() {
   }
 
   return (
-    <div className="flex min-h-screen flex-col relative selection:bg-[#00C6FF]/30 bg-[#1A1C20]">
+    <div className="flex min-h-screen flex-col relative selection:bg-[#00C6FF]/30 bg-[#1A1C20] scroll-smooth">
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(softwareSchema) }}
@@ -128,35 +129,38 @@ export default async function Home() {
       {/* Fixed navigation overlay */}
       <div className="fixed top-0 left-0 right-0 z-50">
         <div className="mx-auto max-w-[1400px] px-4 pt-4 sm:px-8 sm:pt-6">
-          <div className="rounded-[40px] bg-white shadow-2xl ring-1 ring-white/20">
+          <div className="rounded-full bg-white/95 backdrop-blur-sm shadow-lg ring-1 ring-black/5">
             <LandingNav />
           </div>
         </div>
       </div>
 
-      {/* Dark background with dotted pattern -- covers entire page */}
+      {/* Dark background with dotted pattern */}
       <div className="relative">
-        {/* Stitch Dotted Canvas Background */}
         <div
           className="absolute inset-0 z-0 pointer-events-none opacity-50"
           style={{ backgroundImage: 'radial-gradient(#ffffff 1.5px, transparent 1px)', backgroundSize: '32px 32px' }}
         />
 
-        {/* Scroll-driven hero animation -- pill card over dark bg */}
+        {/* Hero */}
         <div className="relative z-10">
           <ScrollHero />
         </div>
 
-        {/* Content sections */}
-        <div className="relative z-10 w-full max-w-[1400px] mx-auto px-4 sm:px-8 py-8 lg:py-12 space-y-8 lg:space-y-12">
-          {/* Features Card */}
+        {/* Stats Bar */}
+        <div className="relative z-10">
+          <StatsBar />
+        </div>
+
+        {/* Main content card */}
+        <div className="relative z-10 w-full max-w-[1400px] mx-auto px-4 sm:px-8 py-8 space-y-0">
           <div className="rounded-[40px] shadow-2xl overflow-hidden bg-white ring-1 ring-white/20">
-            <DefinitionSection />
+            <FeaturesSection />
+            <ExtractionDemo />
             <HowItWorksSection />
             <WhoItsForSection />
-            <FeaturesSection />
-            <WhyDocketSection />
             <PricingSection tiers={getAllTiers()} />
+            <FAQSection />
             <BottomCTA />
           </div>
         </div>
