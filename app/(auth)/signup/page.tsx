@@ -79,6 +79,14 @@ export default function SignupPage() {
     }
 
     posthog.capture("signup");
+
+    // Fire-and-forget: send welcome + admin notification emails
+    fetch('/api/auth/signup-notify', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email }),
+    }).catch(function noop() { /* non-critical */ })
+
     router.push('/onboarding')
     router.refresh()
   }
