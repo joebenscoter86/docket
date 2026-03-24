@@ -698,6 +698,17 @@ All four checks must pass before a PR can be merged. No exceptions.
 - Always copy-paste verification codes. Characters like uppercase I, lowercase l, and 1 are visually ambiguous.
 - GoDaddy won't allow a new CNAME if one exists for the same name. Edit the existing record.
 
+**Resend Inbound (email forwarding, validated 2026-03-24):**
+- **Webhook payload wraps email data in `data` object.** `{ type: "email.received", data: { email_id, from, to, subject, attachments } }`. Don't read from top level.
+- **Webhook attachments are metadata only.** The webhook includes `{ id, filename, content_type }` but NOT the file content. Must fetch binary separately via the Resend API.
+- **Received email attachment API path is `/emails/receiving/{emailId}/attachments/{attachmentId}`**, NOT `/emails/{emailId}/attachments/{attachmentId}` (that's for sent emails and returns 404).
+- **Attachment API returns a `download_url`**, not base64 content. Two-step: GET metadata for signed CDN URL, then fetch binary from that URL.
+- **`from`/`to` fields include display names.** Resend sends `"Display Name <email@example.com>"`. Must extract bare email with regex before DB lookup.
+- **Async extraction via `waitUntil` requires awaiting the extraction promise.** Fire-and-forget (`enqueueExtraction().catch(...)`) causes Vercel to kill the function before Claude responds. Must `await enqueueExtraction()` inside the `waitUntil` promise chain.
+- **Always return 200 to Resend.** Non-200 triggers retry loops. Log errors internally, never surface via HTTP status (except 401 for invalid signature).
+- **Domain DNS is on Vercel, not GoDaddy.** MX records for `ingest.dockett.app` configured via `vercel dns add`. DKIM TXT record at `resend._domainkey.ingest`.
+- **Webhook signing secret:** Stored as `RESEND_INBOUND_WEBHOOK_SECRET` in `.env.local` and Vercel (Production + Preview). Uses Svix under the hood.
+
 **General:**
 - Resend has a direct GoDaddy integration for auto-configuring DNS records.
 - Fire-and-forget for non-critical operations: email failures must never fail the parent operation.
@@ -768,6 +779,8 @@ Run these before declaring any issue done:
 
 | Date | Decision | Rationale | Issue |
 |------|----------|-----------|-------|
+| 2026-03-24 | Email forwarding uses Resend Inbound with two-step attachment fetch | Webhook receives metadata only. Attachment binary fetched via `GET /emails/receiving/{id}/attachments/{id}` then downloaded from signed CDN URL. Extraction awaited inside `waitUntil` to keep Vercel function alive. | DOC-62 |
+| 2026-03-24 | DNS for email forwarding hosted on Vercel, not GoDaddy | `ingest.dockett.app` MX + DKIM records managed via `vercel dns add`. Domain verified in Resend with receiving enabled. | DOC-62 |
 | 2026-03-21 | Feature gating uses prop-drilling from server components, not client-side tier checks | Server components fetch `getUserTierFeatures(userId)` from `lib/billing/tier-context.ts` and pass boolean flags (`batchUploadAllowed`, `billToCheckAllowed`) as props to client components. No client-side tier string checks. Sync route has independent server-side validation as defense-in-depth. | DOC-93 |
 | 2026-03-21 | `getUserTierFeatures` fails closed to Starter features on DB error | If the users table lookup fails, return the most restrictive feature set (Starter) rather than throwing. Prevents feature leakage from transient DB issues. Tested. | DOC-93 |
 | 2026-03-21 | Reusable `UpgradePrompt` component with inline and banner variants | `components/billing/UpgradePrompt.tsx` accepts `featureName`, `requiredTier`, and `variant`. Used for all current and future feature gates. Links to `/pricing`. | DOC-93 |
