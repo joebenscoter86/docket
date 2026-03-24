@@ -7,6 +7,8 @@ export interface InvoiceListItem {
   uploaded_at: string;
   output_type: OutputType | null;
   batch_id: string | null;
+  source: "upload" | "email" | "api";
+  email_sender: string | null;
   extracted_data: {
     vendor_name: string | null;
     invoice_number: string | null;

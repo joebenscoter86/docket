@@ -183,6 +183,8 @@ export async function fetchInvoiceList(
       uploaded_at,
       output_type,
       batch_id,
+      source,
+      email_sender,
       extracted_data (
         vendor_name,
         invoice_number,
@@ -267,6 +269,8 @@ export async function fetchInvoiceList(
         uploaded_at: row.uploaded_at as string,
         output_type: (row.output_type as InvoiceListItem["output_type"]) ?? null,
         batch_id: (row.batch_id as string) ?? null,
+        source: (row.source as InvoiceListItem["source"]) ?? "upload",
+        email_sender: (row.email_sender as string) ?? null,
         extracted_data: extracted
           ? {
               vendor_name: (extracted as Record<string, unknown>).vendor_name as string | null,
