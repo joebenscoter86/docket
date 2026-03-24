@@ -37,7 +37,6 @@ interface ExtractionFormProps {
   batchId?: string | null;
   batchManifest?: { id: string; status: string }[];
   accountingProvider: AccountingProviderType | null;
-  billToCheckAllowed?: boolean;
 }
 
 const FIELD_CONFIG: Record<
@@ -76,7 +75,6 @@ export default function ExtractionForm({
   batchId,
   batchManifest,
   accountingProvider,
-  billToCheckAllowed = true,
 }: ExtractionFormProps) {
   const router = useRouter();
   const [state, dispatch] = useReducer(
@@ -429,7 +427,6 @@ export default function ExtractionForm({
         orgDefaultPaymentAccountName={orgDefaults.defaultPaymentAccountName}
         disabled={currentStatus === "synced"}
         accountingConnected={accountingOptions.connected}
-        billToCheckAllowed={billToCheckAllowed}
         onOutputTypeChange={setCurrentOutputType}
         onPaymentAccountChange={(id, name) => {
           setCurrentPaymentAccountId(id);

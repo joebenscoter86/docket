@@ -35,48 +35,19 @@ const CHECK_ICON = (
   </svg>
 );
 
-const COMING_SOON_ICON = (
-  <svg
-    className="h-5 w-5 text-muted/50 shrink-0"
-    fill="none"
-    viewBox="0 0 24 24"
-    strokeWidth={2}
-    stroke="currentColor"
-  >
-    <path
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"
-    />
-  </svg>
-);
-
-// All tiers include these (ungated)
-const CORE_FEATURES = [
+// All features included on every tier
+const ALL_FEATURES = [
   "Full header + line-item extraction",
   "Side-by-side review UI",
   "Confidence scoring",
   "AI GL account inference",
   "Vendor auto-matching",
-  "One-click navigation to created item",
   "QuickBooks + Xero integration",
-  "PDF attachment to bills",
-  "Email support",
-];
-
-// Pro+ only features (gated for Starter)
-const PRO_FEATURES = [
   "Batch upload (up to 25 files)",
-  "Bill-to-check toggle",
-  "Priority email support",
-];
-
-// Growth-only features
-const GROWTH_FEATURES: { label: string; comingSoon: boolean }[] = [
-  { label: "Email forwarding ingestion", comingSoon: true },
-  { label: "Multi-entity support", comingSoon: true },
-  { label: "Priority support + onboarding call", comingSoon: false },
-  { label: "API access", comingSoon: true },
+  "Bill, check, cash, or credit card sync",
+  "PDF attachment to synced items",
+  "Email forwarding ingestion",
+  "Email support",
 ];
 
 export default function PricingCards({
@@ -191,27 +162,8 @@ export default function PricingCards({
     }
   }
 
-  function getFeaturesForTier(tier: TierConfig) {
-    const features: { label: string; comingSoon: boolean }[] = [];
-
-    if (tier.tier === "starter") {
-      // Starter: show only core features
-      for (const f of CORE_FEATURES) {
-        features.push({ label: f, comingSoon: false });
-      }
-    } else if (tier.tier === "pro") {
-      // Pro: show only Pro differentiators (header says "Everything in Starter, plus")
-      for (const f of PRO_FEATURES) {
-        features.push({ label: f, comingSoon: false });
-      }
-    } else {
-      // Growth: show only Growth differentiators (header says "Everything in Pro, plus")
-      for (const f of GROWTH_FEATURES) {
-        features.push({ label: f.label, comingSoon: f.comingSoon });
-      }
-    }
-
-    return features;
+  function getFeaturesForTier() {
+    return ALL_FEATURES;
   }
 
   return (
@@ -263,7 +215,7 @@ export default function PricingCards({
         {tiers.map((tier) => {
           const isRecommended = tier.recommended;
           const isCurrent = isActiveSubscriber && currentTier === tier.tier;
-          const features = getFeaturesForTier(tier);
+          const features = getFeaturesForTier();
 
           return (
             <div
@@ -345,30 +297,17 @@ export default function PricingCards({
               {/* Features */}
               <div className="px-6 py-6 flex-1">
                 <p className="text-xs font-bold text-muted uppercase tracking-wider mb-4">
-                  {tier.tier === "starter"
-                    ? "Everything you need"
-                    : tier.tier === "pro"
-                      ? "Everything in Starter, plus"
-                      : "Everything in Pro, plus"}
+                  Everything included
                 </p>
                 <ul className="space-y-3">
                   {features.map((feature) => (
                     <li
-                      key={feature.label}
+                      key={feature}
                       className="flex items-start gap-2.5"
                     >
-                      {feature.comingSoon ? COMING_SOON_ICON : CHECK_ICON}
-                      <span
-                        className={`font-body text-sm ${
-                          feature.comingSoon ? "text-muted" : "text-text"
-                        }`}
-                      >
-                        {feature.label}
-                        {feature.comingSoon && (
-                          <span className="ml-1.5 text-xs text-muted/70 font-medium">
-                            Coming soon
-                          </span>
-                        )}
+                      {CHECK_ICON}
+                      <span className="font-body text-sm text-text">
+                        {feature}
                       </span>
                     </li>
                   ))}
@@ -379,14 +318,6 @@ export default function PricingCards({
         })}
       </div>
 
-      {/* Trial callout */}
-      {!isActiveSubscriber && !isDesignPartner && (
-        <div className="mt-12 text-center">
-          <p className="font-body text-sm text-muted">
-            Pro-level features included during your free trial.
-          </p>
-        </div>
-      )}
     </div>
   );
 }

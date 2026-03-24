@@ -42,7 +42,7 @@ const faqs: FAQItem[] = [
   {
     question: "Can I create checks and cash expenses, not just bills?",
     answer:
-      "Yes, on Pro and Growth plans. When syncing to QuickBooks, you can choose whether each invoice creates a Bill, Check, or Cash Expense. Xero supports bills and bank transactions.",
+      "Yes, on all plans. When syncing to QuickBooks, you can choose whether each invoice creates a Bill, Check, or Cash Expense. Xero supports bills and bank transactions.",
   },
   {
     question: "Is my data secure?",

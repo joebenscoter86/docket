@@ -13,19 +13,19 @@ const TIER_HIGHLIGHTS: Record<string, string[]> = {
     "75 invoices/month",
     "AI extraction + review UI",
     "QuickBooks + Xero sync",
-    "AI GL account inference",
+    "All features included",
   ],
   pro: [
-    "200 invoices/month",
-    "Batch upload (up to 25 files)",
-    "Bill-to-check toggle",
-    "Priority email support",
+    "150 invoices/month",
+    "AI extraction + review UI",
+    "QuickBooks + Xero sync",
+    "All features included",
   ],
   growth: [
     "500 invoices/month",
-    "Everything in Pro, plus",
-    "Multi-entity support",
-    "Priority support + onboarding",
+    "AI extraction + review UI",
+    "QuickBooks + Xero sync",
+    "All features included",
   ],
 };
 

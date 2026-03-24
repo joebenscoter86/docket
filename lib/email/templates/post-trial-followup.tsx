@@ -23,7 +23,7 @@ export function PostTrialFollowupEmail({
         </Text>
 
         <Text style={styles.paragraph}>
-          Plans start at <strong>$29/mo</strong> for 75 invoices. No setup
+          Plans start at <strong>$19/mo</strong> for 75 invoices. No setup
           fees, cancel anytime.
         </Text>
 
@@ -50,7 +50,7 @@ export function PostTrialFollowupEmail({
         </Text>
 
         <PrimaryButton href={`${BASE_URL}/pricing`}>
-          View Plans Starting at $29/mo
+          View Plans Starting at $19/mo
         </PrimaryButton>
       </EmailLayout>
     );
@@ -72,13 +72,13 @@ export function PostTrialFollowupEmail({
           <tr>
             <td style={tierCell}>
               <Text style={tierName}>Starter</Text>
-              <Text style={tierPrice}>$29/mo</Text>
+              <Text style={tierPrice}>$19/mo</Text>
               <Text style={tierDesc}>75 invoices/mo</Text>
             </td>
             <td style={{ ...tierCell, ...recommendedCell }}>
               <Text style={tierName}>Pro</Text>
-              <Text style={tierPrice}>$59/mo</Text>
-              <Text style={tierDesc}>200 invoices/mo</Text>
+              <Text style={tierPrice}>$39/mo</Text>
+              <Text style={tierDesc}>150 invoices/mo</Text>
             </td>
             <td style={tierCell}>
               <Text style={tierName}>Growth</Text>

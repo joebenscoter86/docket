@@ -28,7 +28,7 @@ export function TrialProgressEmail({
       </Text>
 
       <Text style={styles.paragraph}>
-        Plans start at <strong>$29/mo</strong> for 75 invoices. All plans
+        Plans start at <strong>$19/mo</strong> for 75 invoices. All plans
         include AI extraction, vendor matching, GL account inference, and
         QuickBooks + Xero integration.
       </Text>

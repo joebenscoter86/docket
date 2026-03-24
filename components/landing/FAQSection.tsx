@@ -31,7 +31,7 @@ const faqs = [
   {
     question: 'Can I try it before committing to a plan?',
     answer:
-      'Yes! Start with 10 free invoices -- no credit card required. Process real invoices with all Pro features unlocked during your trial. Pick a plan only when you\'re ready to continue.',
+      'Yes! Start with 10 free invoices -- no credit card required. Process real invoices with all features unlocked during your trial. Pick a plan only when you\'re ready to continue.',
   },
 ]
 

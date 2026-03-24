@@ -101,7 +101,7 @@ describe("getUsageThisPeriod", () => {
     expect(result.periodStart).toEqual(new Date("2026-03-10T00:00:00Z"));
   });
 
-  it("returns pro cap (200) for pro subscribers", async () => {
+  it("returns pro cap (150) for pro subscribers", async () => {
     mockUser({
       subscription_status: "active",
       subscription_tier: "pro",
@@ -112,7 +112,7 @@ describe("getUsageThisPeriod", () => {
 
     const result = await getUsageThisPeriod("org-1", "user-1");
 
-    expect(result.limit).toBe(200);
+    expect(result.limit).toBe(150);
     expect(result.subscriptionTier).toBe("pro");
   });
 

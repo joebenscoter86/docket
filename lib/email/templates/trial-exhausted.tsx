@@ -24,13 +24,13 @@ export function TrialExhaustedEmail({
           <tr>
             <td style={tierCell}>
               <Text style={tierName}>Starter</Text>
-              <Text style={tierPrice}>$29/mo</Text>
+              <Text style={tierPrice}>$19/mo</Text>
               <Text style={tierDesc}>75 invoices/mo</Text>
             </td>
             <td style={{ ...tierCell, ...recommendedCell }}>
               <Text style={tierName}>Pro</Text>
-              <Text style={tierPrice}>$59/mo</Text>
-              <Text style={tierDesc}>200 invoices/mo</Text>
+              <Text style={tierPrice}>$39/mo</Text>
+              <Text style={tierDesc}>150 invoices/mo</Text>
             </td>
             <td style={tierCell}>
               <Text style={tierName}>Growth</Text>

@@ -11,11 +11,7 @@ type FlowState =
   | { mode: "single"; invoiceId: string }
   | { mode: "batch"; files: File[] };
 
-interface UploadFlowProps {
-  batchUploadAllowed?: boolean;
-}
-
-export default function UploadFlow({ batchUploadAllowed = true }: UploadFlowProps) {
+export default function UploadFlow() {
   const [flow, setFlow] = useState<FlowState>({ mode: "select" });
   const [retryError, setRetryError] = useState<string | null>(null);
 
@@ -72,7 +68,6 @@ export default function UploadFlow({ batchUploadAllowed = true }: UploadFlowProp
     <UploadZone
       onUploadComplete={handleUploadComplete}
       onUploadStart={handleUploadStart}
-      batchUploadAllowed={batchUploadAllowed}
     />
   );
 }

@@ -43,7 +43,6 @@ interface ReviewLayoutProps {
   };
   batchManifest?: { id: string; status: string }[];
   accountingProvider?: AccountingProviderType | null;
-  billToCheckAllowed?: boolean;
 }
 
 type MobileTab = "document" | "details";
@@ -61,7 +60,6 @@ export default function ReviewLayout({
   orgDefaults,
   batchManifest,
   accountingProvider,
-  billToCheckAllowed = true,
 }: ReviewLayoutProps) {
   const [activeTab, setActiveTab] = useState<MobileTab>("document");
 
@@ -187,7 +185,6 @@ export default function ReviewLayout({
                 batchId={invoice.batchId}
                 batchManifest={batchManifest}
                 accountingProvider={accountingProvider ?? null}
-                billToCheckAllowed={billToCheckAllowed}
               />
             ) : (
               <div className="flex items-center justify-center h-full text-sm text-muted">

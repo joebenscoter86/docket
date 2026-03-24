@@ -4,7 +4,6 @@ import { useState, useCallback } from "react";
 import type { OutputType } from "@/lib/types/invoice";
 import { OUTPUT_TYPE_LABELS, OUTPUT_TYPE_HELPER_TEXT } from "@/lib/types/invoice";
 import PaymentAccountSelect from "./PaymentAccountSelect";
-import UpgradePrompt from "@/components/billing/UpgradePrompt";
 
 interface OutputTypeSelectorProps {
   invoiceId: string;
@@ -15,7 +14,6 @@ interface OutputTypeSelectorProps {
   orgDefaultPaymentAccountName: string | null;
   disabled: boolean;
   accountingConnected: boolean;
-  billToCheckAllowed?: boolean;
   onOutputTypeChange: (outputType: OutputType) => void;
   onPaymentAccountChange: (accountId: string | null, accountName: string | null) => void;
 }
@@ -36,7 +34,6 @@ export default function OutputTypeSelector({
   orgDefaultPaymentAccountName,
   disabled,
   accountingConnected,
-  billToCheckAllowed = true,
   onOutputTypeChange,
   onPaymentAccountChange,
 }: OutputTypeSelectorProps) {
@@ -116,7 +113,7 @@ export default function OutputTypeSelector({
     <div className="space-y-3">
       {/* Pill buttons */}
       <div className="flex flex-wrap gap-2">
-        {OUTPUT_TYPE_OPTIONS.filter(({ type }) => billToCheckAllowed || type === "bill").map(({ type, icon }) => {
+        {OUTPUT_TYPE_OPTIONS.map(({ type, icon }) => {
           const isSelected = outputType === type;
           return (
             <button
@@ -140,13 +137,6 @@ export default function OutputTypeSelector({
           );
         })}
       </div>
-      {!billToCheckAllowed && (
-        <UpgradePrompt
-          featureName="Check, cash, and credit card output types"
-          requiredTier="pro"
-        />
-      )}
-
       {/* Helper text for non-bill types */}
       {!isBill && (
         <p className="text-xs text-muted">

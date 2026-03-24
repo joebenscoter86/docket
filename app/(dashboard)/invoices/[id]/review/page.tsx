@@ -11,7 +11,6 @@ import Link from "next/link";
 import type { InvoiceStatus, ExtractedDataRow, OutputType } from "@/lib/types/invoice";
 import type { AccountingProviderType } from "@/lib/accounting/types";
 import { fetchBatchManifest, type BatchManifestItem } from "@/lib/invoices/queries";
-import { getUserTierFeatures } from "@/lib/billing/tier-context";
 
 const PROCESSING_STATUSES: InvoiceStatus[] = ["uploading", "extracting", "error"];
 
@@ -66,8 +65,7 @@ export default async function ReviewPage({
   // Fetch extracted data, signed URL, org defaults, and accounting provider in parallel
   // Admin client required for Storage — bucket RLS restricts anon access
   const admin = createAdminClient();
-  const { data: { user: authUser } } = await supabase.auth.getUser();
-  const [extractedData, signedUrlResult, orgAndProviderResult, tierInfo] = await Promise.all([
+  const [extractedData, signedUrlResult, orgAndProviderResult] = await Promise.all([
     getExtractedData(invoice.id),
     admin.storage
       .from("invoices")
@@ -90,7 +88,6 @@ export default async function ReviewPage({
         ]);
         return { org: orgData, provider: connection?.provider ?? null };
       }),
-    authUser ? getUserTierFeatures(authUser.id) : Promise.resolve(null),
   ]);
 
   const orgResult = orgAndProviderResult?.org ?? null;
@@ -141,7 +138,6 @@ export default async function ReviewPage({
         }}
         batchManifest={batchManifest}
         accountingProvider={accountingProvider}
-        billToCheckAllowed={tierInfo?.features.bill_to_check ?? true}
       />
   );
 }

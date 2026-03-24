@@ -34,17 +34,17 @@ const TIER_CONFIGS: Record<SubscriptionTier, TierConfig> = {
   starter: {
     name: "Starter",
     tier: "starter",
-    monthlyPrice: 29,
-    annualPrice: 276,
+    monthlyPrice: 19,
+    annualPrice: 182,
     invoiceCap: 75,
     recommended: false,
     features: {
-      batch_upload: false,
-      bill_to_check: false,
-      email_forwarding: false,
-      vendor_matching: false,
-      multi_entity: false,
-      api_access: false,
+      batch_upload: true,
+      bill_to_check: true,
+      email_forwarding: true,
+      vendor_matching: true,
+      multi_entity: true,
+      api_access: true,
       ai_gl_inference: true,
       both_platforms: true,
       one_click_nav: true,
@@ -53,17 +53,17 @@ const TIER_CONFIGS: Record<SubscriptionTier, TierConfig> = {
   pro: {
     name: "Pro",
     tier: "pro",
-    monthlyPrice: 59,
-    annualPrice: 564,
-    invoiceCap: 200,
+    monthlyPrice: 39,
+    annualPrice: 374,
+    invoiceCap: 150,
     recommended: true,
     features: {
       batch_upload: true,
       bill_to_check: true,
-      email_forwarding: false,
-      vendor_matching: false,
-      multi_entity: false,
-      api_access: false,
+      email_forwarding: true,
+      vendor_matching: true,
+      multi_entity: true,
+      api_access: true,
       ai_gl_inference: true,
       both_platforms: true,
       one_click_nav: true,
@@ -73,7 +73,7 @@ const TIER_CONFIGS: Record<SubscriptionTier, TierConfig> = {
     name: "Growth",
     tier: "growth",
     monthlyPrice: 99,
-    annualPrice: 948,
+    annualPrice: 950,
     invoiceCap: 500,
     recommended: false,
     features: {
@@ -136,17 +136,6 @@ export function getInvoiceCap(
   if (isDesignPartner) return DESIGN_PARTNER_CAP;
   if (!tier) return 0;
   return TIER_CONFIGS[tier].invoiceCap;
-}
-
-/**
- * Get the next tier up from the current tier (for upgrade prompts).
- */
-export function getNextTier(
-  tier: SubscriptionTier
-): TierConfig | null {
-  if (tier === "starter") return TIER_CONFIGS.pro;
-  if (tier === "pro") return TIER_CONFIGS.growth;
-  return null;
 }
 
 // -- Price ID validation --

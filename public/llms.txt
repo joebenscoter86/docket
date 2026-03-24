@@ -15,8 +15,8 @@ Docket automates invoice data entry. Users upload PDF invoices, AI extracts vend
 - PDF attachment to synced transactions
 
 ## Pricing
-- Starter: $29/mo (75 invoices/month)
-- Pro: $59/mo (200 invoices/month)
+- Starter: $19/mo (75 invoices/month)
+- Pro: $39/mo (150 invoices/month)
 - Growth: $99/mo (500 invoices/month)
 - Free trial: 10 invoices, no credit card required
 - Annual billing saves 20%

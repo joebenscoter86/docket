@@ -25,8 +25,8 @@ interface BillingCardProps {
 }
 
 const TIER_LABELS: Record<SubscriptionTier, { name: string; price: string }> = {
-  starter: { name: "Starter", price: "$29/mo" },
-  pro: { name: "Pro", price: "$59/mo" },
+  starter: { name: "Starter", price: "$19/mo" },
+  pro: { name: "Pro", price: "$39/mo" },
   growth: { name: "Growth", price: "$99/mo" },
 };
 
@@ -68,7 +68,7 @@ export function BillingCard({ user, usage }: BillingCardProps) {
         </div>
         <p className="font-body text-sm text-muted">
           Thank you for being a Docket design partner. You have free access to
-          all Pro features, with up to 150 invoices per month.
+          all features, with up to 150 invoices per month.
         </p>
         <div className="mt-3">
           <div className="flex items-center justify-between text-sm text-muted mb-1.5">
@@ -160,11 +160,11 @@ export function BillingCard({ user, usage }: BillingCardProps) {
             Free Trial
           </h3>
           <span className="inline-flex items-center px-3 py-1 rounded-full bg-[#DBEAFE] text-[#1E40AF] text-xs font-medium">
-            Pro Features
+            Full Access
           </span>
         </div>
         <p className="font-body text-sm text-muted mb-1">
-          You have Pro-level access for your first {usage.trialLimit} invoices.
+          You have full access for your first {usage.trialLimit} invoices.
         </p>
         <div className="mt-3 mb-4">
           <div className="flex items-center justify-between text-sm text-muted mb-1.5">

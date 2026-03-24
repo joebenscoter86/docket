@@ -12,7 +12,7 @@ A web app where small businesses upload invoices (PDF, image, or email), AI extr
 - Side-by-side review/correction UI
 - QuickBooks Online integration (create bill + attach PDF)
 - Email/password auth (Supabase Auth)
-- Stripe subscription billing (three-tier: $29/$59/$99, usage-based trial. See `pricing-proposal.md`)
+- Stripe subscription billing (three-tier: $19/$39/$99, volume-only tiers, usage-based trial. See `pricing-proposal.md`)
 
 **NOT in MVP:**
 - Xero integration (Phase 2)
@@ -781,10 +781,8 @@ Run these before declaring any issue done:
 |------|----------|-----------|-------|
 | 2026-03-24 | Email forwarding uses Resend Inbound with two-step attachment fetch | Webhook receives metadata only. Attachment binary fetched via `GET /emails/receiving/{id}/attachments/{id}` then downloaded from signed CDN URL. Extraction awaited inside `waitUntil` to keep Vercel function alive. | DOC-62 |
 | 2026-03-24 | DNS for email forwarding hosted on Vercel, not GoDaddy | `ingest.dockett.app` MX + DKIM records managed via `vercel dns add`. Domain verified in Resend with receiving enabled. | DOC-62 |
-| 2026-03-21 | Feature gating uses prop-drilling from server components, not client-side tier checks | Server components fetch `getUserTierFeatures(userId)` from `lib/billing/tier-context.ts` and pass boolean flags (`batchUploadAllowed`, `billToCheckAllowed`) as props to client components. No client-side tier string checks. Sync route has independent server-side validation as defense-in-depth. | DOC-93 |
-| 2026-03-21 | `getUserTierFeatures` fails closed to Starter features on DB error | If the users table lookup fails, return the most restrictive feature set (Starter) rather than throwing. Prevents feature leakage from transient DB issues. Tested. | DOC-93 |
-| 2026-03-21 | Reusable `UpgradePrompt` component with inline and banner variants | `components/billing/UpgradePrompt.tsx` accepts `featureName`, `requiredTier`, and `variant`. Used for all current and future feature gates. Links to `/pricing`. | DOC-93 |
-| 2026-03-21 | Pricing tier feature structure finalized: **All tiers (ungated):** extraction, review UI, confidence scoring, AI GL inference, vendor auto-matching, one-click nav, QBO + Xero, PDF attachment, email support. **Pro+ only (gated for Starter):** batch upload, bill-to-check toggle, priority email support. **Growth only:** email forwarding (coming soon), multi-entity (coming soon), priority support + onboarding call, API access (coming soon). | Vendor auto-matching already shipped and is a core differentiator at $29 vs competitors. Batch upload and bill-to-check are the only meaningful Pro upsells. Growth extras are mostly coming-soon roadmap items. DOC-93 must enforce this exact structure in the UI. | DOC-91/DOC-93 |
+| 2026-03-23 | Pricing restructured to volume-only tiers, all feature gating removed | $19/$39/$99 with 75/150/500 invoice caps. All features (batch upload, bill-to-check, email forwarding, etc.) available on all tiers. UpgradePrompt component deleted. Differentiator is purely invoice volume. | Pricing |
+| 2026-03-21 | ~~Feature gating via prop-drilling~~ | **SUPERSEDED** by volume-only pricing (2026-03-23). All features ungated. | DOC-93 |
 | 2026-03-20 | Xero non-bill purchases use Bank Transactions (`Type: "SPEND"`), not ACCPAY Invoices | Xero's ACCPAY invoices don't support BankAccount references. Bank Transactions are the correct entity for Check/Cash/CreditCard expenses -- matches how Xero models direct payments. Attachments route to `/BankTransactions/{id}/Attachments/`. | DOC-90 |
 | 2026-03-20 | Xero OAuth2+PKCE connect flow in `lib/xero/auth.ts` (parallel to QBO, not shared abstraction) | OAuth flows are genuinely different (PKCE vs no PKCE, tenant selection vs realmId, different token lifetimes). Auth is provider-specific; the provider abstraction (DOC-52) handles the shared API interface. | DOC-54 |
 | 2026-03-20 | DOC-54 pre-built most of DOC-55's token management scope | `lib/xero/auth.ts` already has: `refreshAccessToken`, `getValidAccessToken` (with 5-min buffer + per-org concurrency lock), `storeConnection` (encrypted), `loadConnection`, `disconnect`. DOC-55 still needs: (1) wire into provider adapter, (2) Settings page health check (7-day refresh token expiry warning), (3) explicit `ConnectionExpiredError` type. | DOC-54/DOC-55 |
@@ -813,9 +811,9 @@ Run these before declaring any issue done:
 | 2026-03-17 | Landing page at dockett.app root, app at /app/* | Single Next.js deployment. Unauth → landing page, auth → redirect to /app/invoices. No separate marketing site. | DOC-42 |
 | 2026-03-16 | Invoice list: server-side rendering with URL state (Approach A) | Simplest pattern, bookmarkable URLs, fast at MVP scale. Upgrade to hybrid (server initial + client subsequent) when filter latency >200ms or invoice volume >500/org. | DOC-25 |
 | 2026-03-20 | Both platforms (QBO + Xero) on all tiers | Xero ships with MVP. Platform gating creates confusing edge cases and blocks easiest conversion path (Xero users have zero native AI extraction). | DOC-86 |
-| 2026-03-20 | AI GL inference + one-click nav ungated (all tiers) | Core differentiators, not upsell levers. AI GL inference is what makes $29 Starter objectively better than $31.50 Dext. | DOC-86 |
+| 2026-03-20 | AI GL inference + one-click nav ungated (all tiers) | Core differentiators, not upsell levers. AI GL inference is what makes $19 Starter objectively better than $31.50 Dext. | DOC-86 |
 | 2026-03-20 | Free trial: 10 invoices usage-based, not 14-day time-based | ICP processes invoices in batches, not daily. Usage-based avoids trial expiring during slow week. No Stripe trial_period_days; count check in access layer. Pro features during trial. | DOC-86 |
-| 2026-03-19 | Three-tier pricing: $29 Starter / $59 Pro / $99 Growth | Replaces single $99/mo plan. See `pricing-proposal.md` for full competitive analysis, unit economics, and tier details. **Reference this file on any build that touches pricing, billing, Stripe checkout, or plan gating.** | Business |
+| 2026-03-19 | ~~Three-tier pricing: $29 Starter / $59 Pro / $99 Growth~~ | **SUPERSEDED** by $19/$39/$99 volume-only pricing (2026-03-23). | Business |
 | 2026-03-15 | ~~Single pricing tier for MVP ($99/mo Growth)~~ | **SUPERSEDED** by three-tier model (2026-03-19). | Business |
 | 2026-03-18 | `UNIQUE(org_id, provider)` on `accounting_connections` | delete+insert had a race condition causing duplicate rows. Upsert with `onConflict` is atomic. | DOC-49 |
 | 2026-03-18 | Date-only strings parsed as local time, not UTC | `new Date("2026-03-01")` → UTC midnight → wrong day in US timezones. Append `T00:00:00` for local parsing. | DOC-50 |

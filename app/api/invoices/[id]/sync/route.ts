@@ -2,7 +2,6 @@ import { NextRequest } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { checkInvoiceAccess } from "@/lib/billing/access";
-import { getUserTierFeatures } from "@/lib/billing/tier-context";
 import {
   getAccountingProvider,
   getOrgProvider,
@@ -153,9 +152,6 @@ export async function POST(
       });
     }
 
-    // 2c. Feature gate: bill-to-check requires Pro+
-    const tierInfo = await getUserTierFeatures(user.id);
-
     const adminSupabase = createAdminClient();
 
     // 3. Verify the invoice exists and belongs to this org
@@ -185,21 +181,6 @@ export async function POST(
     const isBill = outputType === "bill";
     const transactionType = outputType;
     const providerEntityType: ProviderEntityType = isBill ? "Bill" : "Purchase";
-
-    // Tier gate: non-bill output types require bill_to_check feature
-    if (!isBill && !tierInfo.features.bill_to_check) {
-      logger.warn("sync_route_tier_gate", {
-        action: "sync",
-        invoiceId,
-        userId: user.id,
-        orgId,
-        outputType,
-        tier: tierInfo.tier,
-      });
-      return validationError(
-        "Check, cash, and credit card output types require a Pro or Growth plan. Please upgrade or change the output type to Bill."
-      );
-    }
 
     // 6. Verify accounting connection and get provider
     const providerType = await getOrgProvider(adminSupabase, orgId);
