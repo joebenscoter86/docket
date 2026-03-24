@@ -13,6 +13,8 @@ function makeInvoice(overrides: Partial<InvoiceListItem> & { id: string }): Invo
     uploaded_at: "2026-03-18T10:00:00Z",
     output_type: null,
     batch_id: null,
+    source: "upload",
+    email_sender: null,
     extracted_data: null,
     ...overrides,
   };

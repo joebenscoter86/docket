@@ -34,6 +34,24 @@ describe("parseInboundEmail", () => {
     expect(result.attachments).toHaveLength(0);
   });
 
+  it("extracts bare email from angle bracket format", () => {
+    const result = parseInboundEmail({
+      from: "Vendor Inc <vendor@example.com>",
+      to: ["<invoices-abc1234567@ingest.dockett.app>"],
+    });
+    expect(result.from).toBe("vendor@example.com");
+    expect(result.to).toEqual(["invoices-abc1234567@ingest.dockett.app"]);
+  });
+
+  it("normalizes email addresses to lowercase", () => {
+    const result = parseInboundEmail({
+      from: "USER@Example.COM",
+      to: ["Invoices-ABC@INGEST.dockett.app"],
+    });
+    expect(result.from).toBe("user@example.com");
+    expect(result.to).toEqual(["invoices-abc@ingest.dockett.app"]);
+  });
+
   it("handles missing fields gracefully", () => {
     const result = parseInboundEmail({});
     expect(result.from).toBe("");
