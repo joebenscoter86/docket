@@ -13,24 +13,13 @@ import { checkInvoiceAccess } from "@/lib/billing/access";
 import { checkUsageLimit } from "@/lib/billing/usage";
 import { trackServerEvent, AnalyticsEvents } from "@/lib/analytics/events";
 import { createAdminClient } from "@/lib/supabase/admin";
-
-/**
- * Rate limit: track recent requests per global window.
- * Simple in-memory counter for MVP. Resets on cold start.
- */
-const rateLimitWindow = { count: 0, windowStart: Date.now() };
-const RATE_LIMIT_MAX = 50; // per minute globally
-const RATE_LIMIT_WINDOW_MS = 60_000;
-
-function checkGlobalRateLimit(): boolean {
-  const now = Date.now();
-  if (now - rateLimitWindow.windowStart > RATE_LIMIT_WINDOW_MS) {
-    rateLimitWindow.count = 0;
-    rateLimitWindow.windowStart = now;
-  }
-  rateLimitWindow.count++;
-  return rateLimitWindow.count <= RATE_LIMIT_MAX;
-}
+import { checkEmailRateLimit } from "@/lib/email/rate-limit";
+import {
+  sendIngestionNoAttachmentEmail,
+  sendIngestionErrorEmail,
+  sendTrialExhaustedEmail,
+} from "@/lib/email/triggers";
+import { TRIAL_INVOICE_LIMIT } from "@/lib/billing/tiers";
 
 /**
  * Verify the Resend/Svix webhook signature.
@@ -68,12 +57,6 @@ function verifyWebhookSignature(
  */
 export async function POST(request: NextRequest) {
   const startTime = Date.now();
-
-  // Rate limit check
-  if (!checkGlobalRateLimit()) {
-    logger.warn("email_inbound_rate_limited", { status: "rate_limited" });
-    return NextResponse.json({ received: true }, { status: 200 });
-  }
 
   let body: string;
   try {
@@ -126,6 +109,30 @@ export async function POST(request: NextRequest) {
   }
 
   const { orgId, ownerId } = orgLookup;
+  const admin = createAdminClient();
+
+  // Per-org rate limit check (DB-backed: 50/hr, 100/day)
+  const rateLimit = await checkEmailRateLimit(orgId);
+  if (!rateLimit.allowed) {
+    void Promise.resolve(
+      admin.from("email_ingestion_log").insert({
+        org_id: orgId,
+        message_id: parsedEmail.messageId || `no-id-${Date.now()}-ratelimited`,
+        sender: parsedEmail.from,
+        subject: parsedEmail.subject,
+        total_attachment_count: parsedEmail.attachmentMetas.length,
+        valid_attachment_count: 0,
+        status: "rate_limited" as const,
+        rejection_reason: `Rate limited: ${rateLimit.reason}`,
+      })
+    ).catch(() => {}); // fire-and-forget audit
+    logger.warn("email_inbound_rate_limited", {
+      orgId,
+      reason: rateLimit.reason,
+      status: "rate_limited",
+    });
+    return NextResponse.json({ received: true }, { status: 200 });
+  }
 
   trackServerEvent(ownerId, AnalyticsEvents.EMAIL_INGESTION_RECEIVED, {
     orgId,
@@ -134,7 +141,6 @@ export async function POST(request: NextRequest) {
   });
 
   // Check for duplicate (same message_id)
-  const admin = createAdminClient();
   if (parsedEmail.messageId) {
     const { data: existing } = await admin
       .from("email_ingestion_log")
@@ -148,6 +154,19 @@ export async function POST(request: NextRequest) {
         messageId: parsedEmail.messageId,
         status: "duplicate",
       });
+      // Audit trail (modified message_id to avoid UNIQUE constraint)
+      void Promise.resolve(
+        admin.from("email_ingestion_log").insert({
+          org_id: orgId,
+          message_id: parsedEmail.messageId + "_dup_" + Date.now(),
+          sender: parsedEmail.from,
+          subject: parsedEmail.subject,
+          total_attachment_count: parsedEmail.attachmentMetas.length,
+          valid_attachment_count: 0,
+          status: "duplicate" as const,
+          rejection_reason: "Duplicate Message-ID: " + parsedEmail.messageId,
+        })
+      ).catch(() => {}); // fire-and-forget
       return NextResponse.json({ received: true }, { status: 200 });
     }
   }
@@ -170,6 +189,7 @@ export async function POST(request: NextRequest) {
       from: parsedEmail.from,
       status: "no_attachments",
     });
+    sendIngestionNoAttachmentEmail(ownerId, parsedEmail.subject);
     return NextResponse.json({ received: true }, { status: 200 });
   }
 
@@ -220,6 +240,11 @@ export async function POST(request: NextRequest) {
       rejectedCount: allRejected.length,
       status: "no_valid_attachments",
     });
+    sendIngestionErrorEmail(ownerId, {
+      type: "invalid_attachments",
+      emailSubject: parsedEmail.subject,
+      message: allRejected.map((r) => `${r.filename}: ${r.reason}`).join("\n"),
+    });
     return NextResponse.json({ received: true }, { status: 200 });
   }
 
@@ -232,6 +257,16 @@ export async function POST(request: NextRequest) {
       reason: access.reason,
       status: "rejected",
     });
+    if (access.trialExhausted) {
+      sendTrialExhaustedEmail(ownerId, TRIAL_INVOICE_LIMIT);
+    } else {
+      sendIngestionErrorEmail(ownerId, {
+        type: "billing",
+        emailSubject: parsedEmail.subject,
+        message:
+          "Your subscription is inactive. Please update your billing to continue processing invoices via email.",
+      });
+    }
     return NextResponse.json({ received: true }, { status: 200 });
   }
 
@@ -243,6 +278,12 @@ export async function POST(request: NextRequest) {
       used: usageCheck.usage.used,
       limit: usageCheck.usage.limit,
       status: "rejected",
+    });
+    sendIngestionErrorEmail(ownerId, {
+      type: "usage_limit",
+      emailSubject: parsedEmail.subject,
+      message:
+        "Monthly invoice limit reached. Upgrade your plan to process more invoices.",
     });
     return NextResponse.json({ received: true }, { status: 200 });
   }
