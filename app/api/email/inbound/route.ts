@@ -2,7 +2,11 @@ import { NextRequest, NextResponse } from "next/server";
 import { Webhook } from "svix";
 import { waitUntil } from "@vercel/functions";
 import { logger } from "@/lib/utils/logger";
-import { parseInboundEmail, validateAttachments } from "@/lib/email/parser";
+import {
+  parseInboundEmail,
+  fetchEmailAttachments,
+  validateAttachments,
+} from "@/lib/email/parser";
 import { getOrgByInboundAddress } from "@/lib/email/address";
 import { ingestEmailAttachment } from "@/lib/email/ingest";
 import { checkInvoiceAccess } from "@/lib/billing/access";
@@ -56,8 +60,8 @@ function verifyWebhookSignature(
  * POST /api/email/inbound
  *
  * Receives inbound emails from Resend via webhook.
- * Verifies signature, parses email, validates attachments,
- * and routes to the correct org.
+ * Verifies signature, parses email metadata, fetches attachments
+ * via Resend API, validates, and routes to the correct org.
  *
  * ALWAYS returns 200 to prevent Resend retry loops.
  * Errors are logged, not surfaced via HTTP status.
@@ -67,9 +71,7 @@ export async function POST(request: NextRequest) {
 
   // Rate limit check
   if (!checkGlobalRateLimit()) {
-    logger.warn("email_inbound_rate_limited", {
-      status: "rate_limited",
-    });
+    logger.warn("email_inbound_rate_limited", { status: "rate_limited" });
     return NextResponse.json({ received: true }, { status: 200 });
   }
 
@@ -91,31 +93,32 @@ export async function POST(request: NextRequest) {
     logger.error("email_inbound_signature_invalid", {
       error: err instanceof Error ? err.message : "Invalid signature",
     });
-    // Return 401 for unsigned/spoofed requests per acceptance criteria
     return NextResponse.json(
       { error: "Invalid webhook signature" },
       { status: 401 }
     );
   }
 
-  // Parse the email
+  // Parse the email metadata (unwraps data from webhook envelope)
   const parsedEmail = parseInboundEmail(payload);
 
   logger.info("email_inbound_received", {
+    emailId: parsedEmail.emailId,
     from: parsedEmail.from,
     subject: parsedEmail.subject,
     messageId: parsedEmail.messageId,
-    attachmentCount: parsedEmail.attachments.length,
+    attachmentCount: parsedEmail.attachmentMetas.length,
     recipients: parsedEmail.to,
   });
 
   // Find the recipient org
-  const recipientAddress = parsedEmail.to[0]; // Primary recipient
+  const recipientAddress = parsedEmail.to[0];
   const orgLookup = await getOrgByInboundAddress(recipientAddress);
 
   if (!orgLookup) {
     logger.warn("email_inbound_unknown_recipient", {
       to: recipientAddress,
+      allTo: parsedEmail.to,
       from: parsedEmail.from,
       status: "ignored",
     });
@@ -124,11 +127,10 @@ export async function POST(request: NextRequest) {
 
   const { orgId, ownerId } = orgLookup;
 
-  // Track analytics
   trackServerEvent(ownerId, AnalyticsEvents.EMAIL_INGESTION_RECEIVED, {
     orgId,
     from: parsedEmail.from,
-    attachmentCount: parsedEmail.attachments.length,
+    attachmentCount: parsedEmail.attachmentMetas.length,
   });
 
   // Check for duplicate (same message_id)
@@ -150,11 +152,39 @@ export async function POST(request: NextRequest) {
     }
   }
 
-  // Validate attachments
-  const { valid, rejected } = validateAttachments(parsedEmail.attachments);
+  // No attachment metadata at all?
+  if (parsedEmail.attachmentMetas.length === 0) {
+    await admin.from("email_ingestion_log").insert({
+      org_id: orgId,
+      message_id: parsedEmail.messageId || `no-id-${Date.now()}`,
+      sender: parsedEmail.from,
+      subject: parsedEmail.subject,
+      total_attachment_count: 0,
+      valid_attachment_count: 0,
+      status: "rejected",
+      rejection_reason: "no_attachments",
+    });
 
-  // Log rejected attachments
-  for (const r of rejected) {
+    logger.info("email_inbound_no_attachments", {
+      orgId,
+      from: parsedEmail.from,
+      status: "no_attachments",
+    });
+    return NextResponse.json({ received: true }, { status: 200 });
+  }
+
+  // Fetch attachment content from Resend API (webhook only has metadata)
+  const { fetched, rejected: fetchRejected } = await fetchEmailAttachments(
+    parsedEmail.emailId,
+    parsedEmail.attachmentMetas
+  );
+
+  // Validate fetched attachments (magic bytes, file size)
+  const { valid, rejected: validateRejected } = validateAttachments(fetched);
+
+  const allRejected = [...fetchRejected, ...validateRejected];
+
+  for (const r of allRejected) {
     logger.info("email_inbound_attachment_rejected", {
       orgId,
       filename: r.filename,
@@ -165,18 +195,18 @@ export async function POST(request: NextRequest) {
   // Log to email_ingestion_log
   const logStatus = valid.length > 0 ? "processed" : "rejected";
   const rejectionReason =
-    valid.length === 0 && parsedEmail.attachments.length === 0
-      ? "no_attachments"
-      : valid.length === 0
+    valid.length === 0
+      ? allRejected.length > 0
         ? "all_attachments_invalid"
-        : null;
+        : "fetch_failed"
+      : null;
 
   await admin.from("email_ingestion_log").insert({
     org_id: orgId,
     message_id: parsedEmail.messageId || `no-id-${Date.now()}`,
     sender: parsedEmail.from,
     subject: parsedEmail.subject,
-    total_attachment_count: parsedEmail.attachments.length,
+    total_attachment_count: parsedEmail.attachmentMetas.length,
     valid_attachment_count: valid.length,
     status: logStatus,
     rejection_reason: rejectionReason,
@@ -186,11 +216,10 @@ export async function POST(request: NextRequest) {
     logger.info("email_inbound_no_valid_attachments", {
       orgId,
       from: parsedEmail.from,
-      totalAttachments: parsedEmail.attachments.length,
-      rejectedCount: rejected.length,
+      totalAttachments: parsedEmail.attachmentMetas.length,
+      rejectedCount: allRejected.length,
       status: "no_valid_attachments",
     });
-    // EML-6 will add user notification here
     return NextResponse.json({ received: true }, { status: 200 });
   }
 
@@ -203,7 +232,6 @@ export async function POST(request: NextRequest) {
       reason: access.reason,
       status: "rejected",
     });
-    // EML-6 will add user notification here
     return NextResponse.json({ received: true }, { status: 200 });
   }
 
@@ -216,7 +244,6 @@ export async function POST(request: NextRequest) {
       limit: usageCheck.usage.limit,
       status: "rejected",
     });
-    // EML-6 will add user notification here
     return NextResponse.json({ received: true }, { status: 200 });
   }
 
@@ -253,7 +280,7 @@ export async function POST(request: NextRequest) {
     orgId,
     from: parsedEmail.from,
     validAttachmentCount: valid.length,
-    rejectedCount: rejected.length,
+    rejectedCount: allRejected.length,
     durationMs: Date.now() - startTime,
     status: "processed",
   });

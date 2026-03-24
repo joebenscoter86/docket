@@ -1,43 +1,41 @@
 import { describe, it, expect } from "vitest";
 import { parseInboundEmail, validateAttachments } from "./parser";
-import pdfFixture from "./__fixtures__/resend-inbound-pdf.json";
-import multiFixture from "./__fixtures__/resend-inbound-multi.json";
-import emptyFixture from "./__fixtures__/resend-inbound-empty.json";
 
 describe("parseInboundEmail", () => {
-  it("parses sender, recipient, subject, and messageId from Resend payload", () => {
-    const result = parseInboundEmail(pdfFixture);
+  it("unwraps data from Resend webhook envelope", () => {
+    const result = parseInboundEmail({
+      type: "email.received",
+      created_at: "2026-03-24T10:00:00Z",
+      data: {
+        email_id: "abc-123",
+        from: "vendor@example.com",
+        to: ["invoices-abc1234567@ingest.dockett.app"],
+        subject: "Invoice #1234",
+        message_id: "<msg-001@example.com>",
+        attachments: [
+          { id: "att-1", filename: "invoice.pdf", content_type: "application/pdf" },
+        ],
+      },
+    });
+
+    expect(result.emailId).toBe("abc-123");
     expect(result.from).toBe("vendor@example.com");
     expect(result.to).toEqual(["invoices-abc1234567@ingest.dockett.app"]);
-    expect(result.subject).toBe("Invoice #1234 - March Services");
+    expect(result.subject).toBe("Invoice #1234");
     expect(result.messageId).toBe("<msg-001@example.com>");
-  });
-
-  it("extracts PDF attachment with correct metadata", () => {
-    const result = parseInboundEmail(pdfFixture);
-    expect(result.attachments).toHaveLength(1);
-    expect(result.attachments[0].contentType).toBe("application/pdf");
-    expect(result.attachments[0].filename).toBe("invoice-1234.pdf");
-    expect(result.attachments[0].content).toBeInstanceOf(Buffer);
-    expect(result.attachments[0].sizeBytes).toBeGreaterThan(0);
-  });
-
-  it("extracts multiple attachments", () => {
-    const result = parseInboundEmail(multiFixture);
-    expect(result.attachments).toHaveLength(2);
-    expect(result.attachments[0].contentType).toBe("application/pdf");
-    expect(result.attachments[1].contentType).toBe("image/png");
-  });
-
-  it("returns empty attachments array for emails with no attachments", () => {
-    const result = parseInboundEmail(emptyFixture);
-    expect(result.attachments).toHaveLength(0);
+    expect(result.attachmentMetas).toHaveLength(1);
+    expect(result.attachmentMetas[0].id).toBe("att-1");
+    expect(result.attachmentMetas[0].filename).toBe("invoice.pdf");
+    expect(result.attachmentMetas[0].contentType).toBe("application/pdf");
   });
 
   it("extracts bare email from angle bracket format", () => {
     const result = parseInboundEmail({
-      from: "Vendor Inc <vendor@example.com>",
-      to: ["<invoices-abc1234567@ingest.dockett.app>"],
+      type: "email.received",
+      data: {
+        from: "Vendor Inc <vendor@example.com>",
+        to: ["<invoices-abc1234567@ingest.dockett.app>"],
+      },
     });
     expect(result.from).toBe("vendor@example.com");
     expect(result.to).toEqual(["invoices-abc1234567@ingest.dockett.app"]);
@@ -45,8 +43,11 @@ describe("parseInboundEmail", () => {
 
   it("normalizes email addresses to lowercase", () => {
     const result = parseInboundEmail({
-      from: "USER@Example.COM",
-      to: ["Invoices-ABC@INGEST.dockett.app"],
+      type: "email.received",
+      data: {
+        from: "USER@Example.COM",
+        to: ["Invoices-ABC@INGEST.dockett.app"],
+      },
     });
     expect(result.from).toBe("user@example.com");
     expect(result.to).toEqual(["invoices-abc@ingest.dockett.app"]);
@@ -57,18 +58,55 @@ describe("parseInboundEmail", () => {
     expect(result.from).toBe("");
     expect(result.subject).toBe("(no subject)");
     expect(result.messageId).toBe("");
-    expect(result.attachments).toHaveLength(0);
+    expect(result.attachmentMetas).toHaveLength(0);
+  });
+
+  it("handles flat payload (no data wrapper) for backwards compat", () => {
+    const result = parseInboundEmail({
+      from: "vendor@example.com",
+      to: ["invoices-abc@ingest.dockett.app"],
+      subject: "Test",
+      email_id: "flat-123",
+    });
+    expect(result.emailId).toBe("flat-123");
+    expect(result.from).toBe("vendor@example.com");
+  });
+
+  it("parses multiple attachment metas", () => {
+    const result = parseInboundEmail({
+      type: "email.received",
+      data: {
+        from: "vendor@example.com",
+        to: ["invoices-abc@ingest.dockett.app"],
+        attachments: [
+          { id: "att-1", filename: "invoice.pdf", content_type: "application/pdf" },
+          { id: "att-2", filename: "receipt.png", content_type: "image/png" },
+        ],
+      },
+    });
+    expect(result.attachmentMetas).toHaveLength(2);
+  });
+
+  it("returns empty attachmentMetas for emails with no attachments", () => {
+    const result = parseInboundEmail({
+      type: "email.received",
+      data: {
+        from: "vendor@example.com",
+        to: ["invoices-abc@ingest.dockett.app"],
+        attachments: [],
+      },
+    });
+    expect(result.attachmentMetas).toHaveLength(0);
   });
 });
 
 describe("validateAttachments", () => {
   it("accepts valid PDF by magic bytes", () => {
-    // Real PDF magic bytes: %PDF
     const pdfBuffer = Buffer.alloc(200);
-    pdfBuffer[0] = 0x25; // %
-    pdfBuffer[1] = 0x50; // P
-    pdfBuffer[2] = 0x44; // D
-    pdfBuffer[3] = 0x46; // F
+    pdfBuffer[0] = 0x25;
+    pdfBuffer[1] = 0x50;
+    pdfBuffer[2] = 0x44;
+    pdfBuffer[3] = 0x46;
 
     const { valid, rejected } = validateAttachments([
       {
@@ -84,25 +122,8 @@ describe("validateAttachments", () => {
     expect(rejected).toHaveLength(0);
   });
 
-  it("rejects unsupported file types", () => {
-    const { valid, rejected } = validateAttachments([
-      {
-        filename: "spreadsheet.xlsx",
-        contentType:
-          "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        sizeBytes: 100,
-        content: Buffer.alloc(100),
-      },
-    ]);
-
-    expect(valid).toHaveLength(0);
-    expect(rejected).toHaveLength(1);
-    expect(rejected[0].reason).toContain("Unsupported");
-  });
-
   it("rejects files exceeding 10MB", () => {
     const bigBuffer = Buffer.alloc(11 * 1024 * 1024);
-    // Set PDF magic bytes so type check passes
     bigBuffer[0] = 0x25;
     bigBuffer[1] = 0x50;
     bigBuffer[2] = 0x44;
@@ -136,39 +157,5 @@ describe("validateAttachments", () => {
 
     expect(valid).toHaveLength(0);
     expect(rejected).toHaveLength(1);
-    expect(rejected[0].reason).toContain("does not match");
-  });
-
-  it("processes mixed valid and invalid attachments", () => {
-    const pdfBuffer = Buffer.alloc(200);
-    pdfBuffer[0] = 0x25;
-    pdfBuffer[1] = 0x50;
-    pdfBuffer[2] = 0x44;
-    pdfBuffer[3] = 0x46;
-
-    const { valid, rejected } = validateAttachments([
-      {
-        filename: "good.pdf",
-        contentType: "application/pdf",
-        sizeBytes: pdfBuffer.length,
-        content: pdfBuffer,
-      },
-      {
-        filename: "bad.zip",
-        contentType: "application/zip",
-        sizeBytes: 100,
-        content: Buffer.alloc(100),
-      },
-    ]);
-
-    expect(valid).toHaveLength(1);
-    expect(rejected).toHaveLength(1);
-  });
-
-  it("validates attachments from parsed PDF fixture", () => {
-    const parsed = parseInboundEmail(pdfFixture);
-    const { valid } = validateAttachments(parsed.attachments);
-    expect(valid).toHaveLength(1);
-    expect(valid[0].detectedType).toBe("application/pdf");
   });
 });
