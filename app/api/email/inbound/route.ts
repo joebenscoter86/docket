@@ -1,8 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { Webhook } from "svix";
+import { waitUntil } from "@vercel/functions";
 import { logger } from "@/lib/utils/logger";
 import { parseInboundEmail, validateAttachments } from "@/lib/email/parser";
 import { getOrgByInboundAddress } from "@/lib/email/address";
+import { ingestEmailAttachment } from "@/lib/email/ingest";
+import { checkInvoiceAccess } from "@/lib/billing/access";
+import { checkUsageLimit } from "@/lib/billing/usage";
 import { trackServerEvent, AnalyticsEvents } from "@/lib/analytics/events";
 import { createAdminClient } from "@/lib/supabase/admin";
 
@@ -190,6 +194,61 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ received: true }, { status: 200 });
   }
 
+  // Billing checks before ingestion
+  const access = await checkInvoiceAccess(ownerId);
+  if (!access.allowed) {
+    logger.warn("email_inbound_billing_blocked", {
+      orgId,
+      userId: ownerId,
+      reason: access.reason,
+      status: "rejected",
+    });
+    // EML-6 will add user notification here
+    return NextResponse.json({ received: true }, { status: 200 });
+  }
+
+  const usageCheck = await checkUsageLimit(orgId, ownerId);
+  if (!usageCheck.allowed) {
+    logger.warn("email_inbound_usage_limit", {
+      orgId,
+      userId: ownerId,
+      used: usageCheck.usage.used,
+      limit: usageCheck.usage.limit,
+      status: "rejected",
+    });
+    // EML-6 will add user notification here
+    return NextResponse.json({ received: true }, { status: 200 });
+  }
+
+  // Ingest each valid attachment as a separate invoice (async via waitUntil)
+  const ingestionPromise = Promise.allSettled(
+    valid.map((attachment) =>
+      ingestEmailAttachment({
+        orgId,
+        userId: ownerId,
+        attachment,
+        emailSender: parsedEmail.from,
+        emailSubject: parsedEmail.subject,
+      })
+    )
+  ).then((results) => {
+    const succeeded = results.filter(
+      (r) => r.status === "fulfilled" && r.value.status === "queued"
+    ).length;
+    const failed = results.length - succeeded;
+
+    logger.info("email_inbound_ingestion_complete", {
+      orgId,
+      from: parsedEmail.from,
+      totalAttachments: valid.length,
+      succeeded,
+      failed,
+      durationMs: Date.now() - startTime,
+    });
+  });
+
+  waitUntil(ingestionPromise);
+
   logger.info("email_inbound_processed", {
     orgId,
     from: parsedEmail.from,
@@ -198,10 +257,6 @@ export async function POST(request: NextRequest) {
     durationMs: Date.now() - startTime,
     status: "processed",
   });
-
-  // EML-4 will wire in the actual ingestion pipeline here.
-  // For now, we log and acknowledge. The attachments are validated
-  // and the org is identified -- ready for the pipeline.
 
   return NextResponse.json({ received: true }, { status: 200 });
 }

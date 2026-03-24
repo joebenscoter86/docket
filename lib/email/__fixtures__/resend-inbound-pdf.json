@@ -1,0 +1,14 @@
+{
+  "from": "vendor@example.com",
+  "to": ["invoices-abc1234567@ingest.dockett.app"],
+  "subject": "Invoice #1234 - March Services",
+  "message_id": "<msg-001@example.com>",
+  "created_at": "2026-03-24T10:00:00.000Z",
+  "attachments": [
+    {
+      "filename": "invoice-1234.pdf",
+      "content_type": "application/pdf",
+      "content": "JVBERi0xLjQKMSAwIG9iago8PCAvVHlwZSAvQ2F0YWxvZyAvUGFnZXMgMiAwIFIgPj4KZW5kb2JqCjIgMCBvYmoKPDwgL1R5cGUgL1BhZ2VzIC9LaWRzIFszIDAgUl0gL0NvdW50IDEgPj4KZW5kb2JqCjMgMCBvYmoKPDwgL1R5cGUgL1BhZ2UgL1BhcmVudCAyIDAgUiAvTWVkaWFCb3ggWzAgMCA2MTIgNzkyXSA+PgplbmRvYmoKeHJlZgowIDQKMDAwMDAwMDAwMCA2NTUzNSBmIAowMDAwMDAwMDA5IDAwMDAwIG4gCjAwMDAwMDAwNTggMDAwMDAgbiAKMDAwMDAwMDExNSAwMDAwMCBuIAp0cmFpbGVyCjw8IC9TaXplIDQgL1Jvb3QgMSAwIFIgPj4Kc3RhcnR4cmVmCjIwNgolJUVPRgo="
+    }
+  ]
+}
