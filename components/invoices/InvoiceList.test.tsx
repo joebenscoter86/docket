@@ -48,6 +48,8 @@ const sampleInvoices: InvoiceListItem[] = [
     uploaded_at: "2026-03-16T12:00:00Z",
     output_type: null,
     batch_id: null,
+    source: "upload",
+    email_sender: null,
     extracted_data: {
       vendor_name: "Acme Corp",
       invoice_number: "INV-001",
@@ -62,6 +64,8 @@ const sampleInvoices: InvoiceListItem[] = [
     uploaded_at: "2026-03-15T10:00:00Z",
     output_type: null,
     batch_id: null,
+    source: "upload",
+    email_sender: null,
     extracted_data: null,
   },
 ];

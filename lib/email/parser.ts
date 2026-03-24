@@ -8,6 +8,21 @@ import type {
   ValidatedAttachment,
 } from "./types";
 
+/**
+ * Extract a bare email address from formats like:
+ * - "user@example.com"
+ * - "<user@example.com>"
+ * - "Display Name <user@example.com>"
+ */
+function extractEmailAddress(raw: string): string {
+  const match = raw.match(/<([^>]+)>/);
+  if (match) return match[1].toLowerCase().trim();
+  // If no angle brackets, try to find an email-like pattern
+  const emailMatch = raw.match(/[\w.+-]+@[\w.-]+\.\w+/);
+  if (emailMatch) return emailMatch[0].toLowerCase().trim();
+  return raw.toLowerCase().trim();
+}
+
 /** MIME types we accept from email attachments */
 const SUPPORTED_TYPES = new Set([
   "application/pdf",
@@ -23,8 +38,10 @@ const SUPPORTED_TYPES = new Set([
  * - attachments: Array<{ filename, content_type, content (base64) }>
  */
 export function parseInboundEmail(payload: Record<string, unknown>): ParsedEmail {
-  const from = String(payload.from ?? "");
-  const to = Array.isArray(payload.to) ? payload.to.map(String) : [String(payload.to ?? "")];
+  const from = extractEmailAddress(String(payload.from ?? ""));
+  const to = (Array.isArray(payload.to) ? payload.to.map(String) : [String(payload.to ?? "")])
+    .map(extractEmailAddress)
+    .filter(Boolean);
   const subject = String(payload.subject ?? "(no subject)");
   const messageId = String(payload.message_id ?? payload.messageId ?? "");
   const receivedAt = String(payload.created_at ?? new Date().toISOString());
