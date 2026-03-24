@@ -9,6 +9,11 @@ export const AnalyticsEvents = {
   BATCH_APPROVED: "batch_approved",
   BATCH_SYNCED: "batch_synced",
   QBO_CONNECTED: "qbo_connected",
+  EMAIL_INGESTION_RECEIVED: "email_ingestion_received",
+  EMAIL_INGESTION_PROCESSED: "email_ingestion_processed",
+  EMAIL_INGESTION_REJECTED: "email_ingestion_rejected",
+  EMAIL_FORWARDING_ENABLED: "email_forwarding_enabled",
+  EMAIL_FORWARDING_DISABLED: "email_forwarding_disabled",
 } as const;
 
 export type AnalyticsEvent = (typeof AnalyticsEvents)[keyof typeof AnalyticsEvents];

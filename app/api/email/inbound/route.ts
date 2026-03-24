@@ -1,0 +1,207 @@
+import { NextRequest, NextResponse } from "next/server";
+import { Webhook } from "svix";
+import { logger } from "@/lib/utils/logger";
+import { parseInboundEmail, validateAttachments } from "@/lib/email/parser";
+import { getOrgByInboundAddress } from "@/lib/email/address";
+import { trackServerEvent, AnalyticsEvents } from "@/lib/analytics/events";
+import { createAdminClient } from "@/lib/supabase/admin";
+
+/**
+ * Rate limit: track recent requests per global window.
+ * Simple in-memory counter for MVP. Resets on cold start.
+ */
+const rateLimitWindow = { count: 0, windowStart: Date.now() };
+const RATE_LIMIT_MAX = 50; // per minute globally
+const RATE_LIMIT_WINDOW_MS = 60_000;
+
+function checkGlobalRateLimit(): boolean {
+  const now = Date.now();
+  if (now - rateLimitWindow.windowStart > RATE_LIMIT_WINDOW_MS) {
+    rateLimitWindow.count = 0;
+    rateLimitWindow.windowStart = now;
+  }
+  rateLimitWindow.count++;
+  return rateLimitWindow.count <= RATE_LIMIT_MAX;
+}
+
+/**
+ * Verify the Resend/Svix webhook signature.
+ */
+function verifyWebhookSignature(
+  body: string,
+  headers: Headers
+): Record<string, unknown> {
+  const secret = process.env.RESEND_INBOUND_WEBHOOK_SECRET;
+  if (!secret) {
+    throw new Error("RESEND_INBOUND_WEBHOOK_SECRET is not configured");
+  }
+
+  const wh = new Webhook(secret);
+  const svixId = headers.get("svix-id") ?? "";
+  const svixTimestamp = headers.get("svix-timestamp") ?? "";
+  const svixSignature = headers.get("svix-signature") ?? "";
+
+  return wh.verify(body, {
+    "svix-id": svixId,
+    "svix-timestamp": svixTimestamp,
+    "svix-signature": svixSignature,
+  }) as Record<string, unknown>;
+}
+
+/**
+ * POST /api/email/inbound
+ *
+ * Receives inbound emails from Resend via webhook.
+ * Verifies signature, parses email, validates attachments,
+ * and routes to the correct org.
+ *
+ * ALWAYS returns 200 to prevent Resend retry loops.
+ * Errors are logged, not surfaced via HTTP status.
+ */
+export async function POST(request: NextRequest) {
+  const startTime = Date.now();
+
+  // Rate limit check
+  if (!checkGlobalRateLimit()) {
+    logger.warn("email_inbound_rate_limited", {
+      status: "rate_limited",
+    });
+    return NextResponse.json({ received: true }, { status: 200 });
+  }
+
+  let body: string;
+  try {
+    body = await request.text();
+  } catch {
+    logger.error("email_inbound_body_read_failed", {
+      error: "Failed to read request body",
+    });
+    return NextResponse.json({ received: true }, { status: 200 });
+  }
+
+  // Verify webhook signature
+  let payload: Record<string, unknown>;
+  try {
+    payload = verifyWebhookSignature(body, request.headers);
+  } catch (err) {
+    logger.error("email_inbound_signature_invalid", {
+      error: err instanceof Error ? err.message : "Invalid signature",
+    });
+    // Return 401 for unsigned/spoofed requests per acceptance criteria
+    return NextResponse.json(
+      { error: "Invalid webhook signature" },
+      { status: 401 }
+    );
+  }
+
+  // Parse the email
+  const parsedEmail = parseInboundEmail(payload);
+
+  logger.info("email_inbound_received", {
+    from: parsedEmail.from,
+    subject: parsedEmail.subject,
+    messageId: parsedEmail.messageId,
+    attachmentCount: parsedEmail.attachments.length,
+    recipients: parsedEmail.to,
+  });
+
+  // Find the recipient org
+  const recipientAddress = parsedEmail.to[0]; // Primary recipient
+  const orgLookup = await getOrgByInboundAddress(recipientAddress);
+
+  if (!orgLookup) {
+    logger.warn("email_inbound_unknown_recipient", {
+      to: recipientAddress,
+      from: parsedEmail.from,
+      status: "ignored",
+    });
+    return NextResponse.json({ received: true }, { status: 200 });
+  }
+
+  const { orgId, ownerId } = orgLookup;
+
+  // Track analytics
+  trackServerEvent(ownerId, AnalyticsEvents.EMAIL_INGESTION_RECEIVED, {
+    orgId,
+    from: parsedEmail.from,
+    attachmentCount: parsedEmail.attachments.length,
+  });
+
+  // Check for duplicate (same message_id)
+  const admin = createAdminClient();
+  if (parsedEmail.messageId) {
+    const { data: existing } = await admin
+      .from("email_ingestion_log")
+      .select("id")
+      .eq("message_id", parsedEmail.messageId)
+      .single();
+
+    if (existing) {
+      logger.info("email_inbound_duplicate", {
+        orgId,
+        messageId: parsedEmail.messageId,
+        status: "duplicate",
+      });
+      return NextResponse.json({ received: true }, { status: 200 });
+    }
+  }
+
+  // Validate attachments
+  const { valid, rejected } = validateAttachments(parsedEmail.attachments);
+
+  // Log rejected attachments
+  for (const r of rejected) {
+    logger.info("email_inbound_attachment_rejected", {
+      orgId,
+      filename: r.filename,
+      reason: r.reason,
+    });
+  }
+
+  // Log to email_ingestion_log
+  const logStatus = valid.length > 0 ? "processed" : "rejected";
+  const rejectionReason =
+    valid.length === 0 && parsedEmail.attachments.length === 0
+      ? "no_attachments"
+      : valid.length === 0
+        ? "all_attachments_invalid"
+        : null;
+
+  await admin.from("email_ingestion_log").insert({
+    org_id: orgId,
+    message_id: parsedEmail.messageId || `no-id-${Date.now()}`,
+    sender: parsedEmail.from,
+    subject: parsedEmail.subject,
+    total_attachment_count: parsedEmail.attachments.length,
+    valid_attachment_count: valid.length,
+    status: logStatus,
+    rejection_reason: rejectionReason,
+  });
+
+  if (valid.length === 0) {
+    logger.info("email_inbound_no_valid_attachments", {
+      orgId,
+      from: parsedEmail.from,
+      totalAttachments: parsedEmail.attachments.length,
+      rejectedCount: rejected.length,
+      status: "no_valid_attachments",
+    });
+    // EML-6 will add user notification here
+    return NextResponse.json({ received: true }, { status: 200 });
+  }
+
+  logger.info("email_inbound_processed", {
+    orgId,
+    from: parsedEmail.from,
+    validAttachmentCount: valid.length,
+    rejectedCount: rejected.length,
+    durationMs: Date.now() - startTime,
+    status: "processed",
+  });
+
+  // EML-4 will wire in the actual ingestion pipeline here.
+  // For now, we log and acknowledge. The attachments are validated
+  // and the org is identified -- ready for the pipeline.
+
+  return NextResponse.json({ received: true }, { status: 200 });
+}
