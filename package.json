@@ -24,6 +24,7 @@
     "@vercel/functions": "^3.4.3",
     "framer-motion": "^12.38.0",
     "lucide-react": "^0.577.0",
+    "nanoid": "^5.1.7",
     "next": "14.2.35",
     "posthog-js": "^1.362.0",
     "posthog-node": "^5.28.4",
@@ -31,7 +32,8 @@
     "react-dom": "^18",
     "react-pdf": "^9.2.1",
     "resend": "^6.9.4",
-    "stripe": "^20.4.1"
+    "stripe": "^20.4.1",
+    "svix": "^1.89.0"
   },
   "devDependencies": {
     "@playwright/test": "^1.58.2",

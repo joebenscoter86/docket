@@ -13,7 +13,9 @@ export const config = {
      * - _next/image (image optimization)
      * - favicon.ico (favicon)
      * - public folder assets
+     * - api/email/inbound (Resend webhook — uses its own signature verification)
+     * - api/stripe/webhook (Stripe webhook — uses its own signature verification)
      */
-    '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
+    '/((?!_next/static|_next/image|favicon.ico|api/email/inbound|api/stripe/webhook|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
   ],
 }
