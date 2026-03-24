@@ -114,10 +114,6 @@ export default function OnboardingSidebar({ isOpen, onClose, completedSteps }: O
       {/* Progress badge */}
       <div className="border-t border-border px-4 py-4">
         <div className="rounded-brand-md bg-background p-3">
-          <div className="flex items-center gap-2 mb-2">
-            <span className="h-2 w-2 rounded-full bg-primary" />
-            <p className="text-[11px] font-bold uppercase tracking-wider text-muted">Precision Flow</p>
-          </div>
           <p className="text-xs font-body text-muted mb-2">Step {currentStep} of 3</p>
           <div className="flex gap-1">
             {[1, 2, 3].map((step) => (

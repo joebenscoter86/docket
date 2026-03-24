@@ -65,9 +65,9 @@ function ConnectContent() {
                 href="/api/quickbooks/connect?returnTo=/onboarding/connect"
                 className="inline-flex items-center gap-2 rounded-brand-md bg-[#2CA01C] px-6 py-3 text-sm font-bold text-white hover:bg-[#238a15] transition-colors"
               >
-                <svg viewBox="0 0 24 24" className="h-5 w-5 fill-current">
-                  <rect width="24" height="24" rx="4" fill="white" />
-                  <path d="M12 4C7.58 4 4 7.58 4 12s3.58 8 8 8 8-3.58 8-8-3.58-8-8-8zm3.5 10.5h-2v2c0 .83-.67 1.5-1.5 1.5s-1.5-.67-1.5-1.5v-2h-2c-.83 0-1.5-.67-1.5-1.5S7.67 9 8.5 9h2V7c0-.83.67-1.5 1.5-1.5s1.5.67 1.5 1.5v2h2c.83 0 1.5.67 1.5 1.5s-.67 1.5-1.5 1.5z" fill="#2CA01C" />
+                <svg viewBox="0 0 40 40" className="h-5 w-5" fill="none">
+                  <circle cx="20" cy="20" r="20" fill="white" />
+                  <path d="M20 6C12.268 6 6 12.268 6 20s6.268 14 14 14 14-6.268 14-14S27.732 6 20 6zm6 15.5h-4.5V26a1.5 1.5 0 0 1-3 0v-4.5H14a1.5 1.5 0 0 1 0-3h4.5V14a1.5 1.5 0 0 1 3 0v4.5H26a1.5 1.5 0 0 1 0 3z" fill="#2CA01C" />
                 </svg>
                 Connect QuickBooks
               </a>
@@ -75,8 +75,11 @@ function ConnectContent() {
                 href="/api/xero/connect?returnTo=/onboarding/connect"
                 className="inline-flex items-center gap-2 rounded-brand-md bg-[#13B5EA] px-6 py-3 text-sm font-bold text-white hover:bg-[#0fa3d4] transition-colors"
               >
-                <svg viewBox="0 0 24 24" className="h-5 w-5" fill="white">
-                  <path d="M4.21 11.97l3.75-3.75a.75.75 0 000-1.06L4.21 3.41M8.54 11.97l-3.75 3.75a.75.75 0 010-1.06l3.75-3.75M10.5 7.5l1.5 4.5 1.5-4.5M16.5 7.5v9M19.79 11.97l-3.75-3.75a.75.75 0 010-1.06l3.75 3.75" />
+                <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="white" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                  <line x1="3.5" y1="5" x2="8.5" y2="12" /><line x1="8.5" y1="5" x2="3.5" y2="12" />
+                  <line x1="10" y1="5" x2="12" y2="12" /><line x1="14" y1="5" x2="12" y2="12" />
+                  <line x1="15.5" y1="5" x2="15.5" y2="12" /><line x1="14" y1="8.5" x2="17" y2="8.5" />
+                  <line x1="18.5" y1="5" x2="20.5" y2="8.5" /><line x1="20.5" y1="8.5" x2="18.5" y2="12" />
                 </svg>
                 Connect Xero
               </a>
