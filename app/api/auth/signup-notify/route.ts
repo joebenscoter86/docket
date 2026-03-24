@@ -15,31 +15,35 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Email required' }, { status: 400 })
   }
 
-  // Verify the user actually exists in auth (prevents abuse)
+  // Verify the user actually exists (prevents abuse)
   const admin = createAdminClient()
-  const { data: { users } } = await admin.auth.admin.listUsers()
-  const user = users?.find((u) => u.email === email)
+  const { data: user } = await admin
+    .from('users')
+    .select('id')
+    .eq('email', email)
+    .single()
 
   if (!user) {
     logger.warn('signup_notify_user_not_found', { email })
     return NextResponse.json({ error: 'User not found' }, { status: 404 })
   }
 
-  // Send both emails (fire-and-forget within the route)
-  sendEmail({
-    to: email,
-    subject: 'Welcome to Docket',
-    react: WelcomeEmail({ email }),
-  })
-
-  sendEmail({
-    to: ADMIN_EMAIL,
-    subject: `New signup: ${email}`,
-    react: AdminNewSignupEmail({
-      userEmail: email,
-      signupDate: new Date().toLocaleString('en-US', { timeZone: 'America/Los_Angeles' }),
+  // Await both emails so Vercel doesn't kill the function before they send
+  await Promise.all([
+    sendEmail({
+      to: email,
+      subject: 'Welcome to Docket',
+      react: WelcomeEmail({ email }),
     }),
-  })
+    sendEmail({
+      to: ADMIN_EMAIL,
+      subject: `New signup: ${email}`,
+      react: AdminNewSignupEmail({
+        userEmail: email,
+        signupDate: new Date().toLocaleString('en-US', { timeZone: 'America/Los_Angeles' }),
+      }),
+    }),
+  ])
 
   logger.info('signup_notify_sent', { userId: user.id, email })
 
