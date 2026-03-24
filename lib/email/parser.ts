@@ -83,33 +83,51 @@ export async function fetchAttachmentContent(
   }
 
   try {
-    const response = await fetch(
+    // Step 1: Get attachment metadata (includes a signed download URL)
+    const metaResponse = await fetch(
       `https://api.resend.com/emails/${emailId}/attachments/${attachmentId}`,
       {
         headers: { Authorization: `Bearer ${apiKey}` },
       }
     );
 
-    if (!response.ok) {
-      logger.error("email_fetch_attachment_failed", {
+    if (!metaResponse.ok) {
+      logger.error("email_fetch_attachment_meta_failed", {
         emailId,
         attachmentId,
-        status: response.status,
-        error: await response.text(),
+        status: metaResponse.status,
+        error: await metaResponse.text(),
       });
       return null;
     }
 
-    const data = await response.json();
-    // Resend returns { data: base64_content } or { content: base64 }
-    const base64Content = (data as Record<string, unknown>).data ??
-      (data as Record<string, unknown>).content ?? "";
-    if (!base64Content) {
-      logger.error("email_fetch_attachment_empty", { emailId, attachmentId });
+    const meta = (await metaResponse.json()) as Record<string, unknown>;
+    // Resend returns { data: { id, filename, url, ... } }
+    const metaData = (meta.data as Record<string, unknown>) ?? meta;
+    const downloadUrl = String(metaData.url ?? metaData.download_url ?? "");
+
+    if (!downloadUrl) {
+      logger.error("email_fetch_attachment_no_url", {
+        emailId,
+        attachmentId,
+        metaKeys: Object.keys(metaData),
+      });
       return null;
     }
 
-    return Buffer.from(String(base64Content), "base64");
+    // Step 2: Download the actual file binary from the signed URL
+    const fileResponse = await fetch(downloadUrl);
+    if (!fileResponse.ok) {
+      logger.error("email_fetch_attachment_download_failed", {
+        emailId,
+        attachmentId,
+        status: fileResponse.status,
+      });
+      return null;
+    }
+
+    const arrayBuffer = await fileResponse.arrayBuffer();
+    return Buffer.from(arrayBuffer);
   } catch (err) {
     logger.error("email_fetch_attachment_error", {
       emailId,
