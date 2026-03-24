@@ -91,20 +91,23 @@ export async function ingestEmailAttachment(params: {
       };
     }
 
-    // 4. Enqueue extraction (fire-and-forget via waitUntil in the webhook)
-    enqueueExtraction({
-      invoiceId,
-      orgId,
-      userId,
-      filePath: storagePath,
-      fileType: attachment.detectedType,
-    }).catch((err) => {
+    // 4. Run extraction (awaited -- caller wraps in waitUntil)
+    try {
+      await enqueueExtraction({
+        invoiceId,
+        orgId,
+        userId,
+        filePath: storagePath,
+        fileType: attachment.detectedType,
+      });
+    } catch (err) {
       logger.error("email_ingest_extraction_failed", {
         orgId,
         invoiceId,
         error: err instanceof Error ? err.message : String(err),
       });
-    });
+      // Extraction failed but invoice was created -- user can retry from UI
+    }
 
     trackServerEvent(userId, AnalyticsEvents.EMAIL_INGESTION_PROCESSED, {
       orgId,
