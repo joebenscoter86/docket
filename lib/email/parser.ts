@@ -85,7 +85,7 @@ export async function fetchAttachmentContent(
   try {
     // Step 1: Get attachment metadata (includes a signed download URL)
     const metaResponse = await fetch(
-      `https://api.resend.com/emails/${emailId}/attachments/${attachmentId}`,
+      `https://api.resend.com/emails/receiving/${emailId}/attachments/${attachmentId}`,
       {
         headers: { Authorization: `Bearer ${apiKey}` },
       }
@@ -104,7 +104,7 @@ export async function fetchAttachmentContent(
     const meta = (await metaResponse.json()) as Record<string, unknown>;
     // Resend returns { data: { id, filename, url, ... } }
     const metaData = (meta.data as Record<string, unknown>) ?? meta;
-    const downloadUrl = String(metaData.url ?? metaData.download_url ?? "");
+    const downloadUrl = String(metaData.download_url ?? metaData.url ?? "");
 
     if (!downloadUrl) {
       logger.error("email_fetch_attachment_no_url", {
