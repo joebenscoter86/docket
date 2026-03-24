@@ -12,6 +12,8 @@ import { PostTrialFollowupEmail } from "./templates/post-trial-followup";
 import { SubscriptionActivatedEmail } from "./templates/subscription-activated";
 import { SubscriptionCancelledEmail } from "./templates/subscription-cancelled";
 import { ConnectionExpiringEmail } from "./templates/connection-expiring";
+import { IngestionNoAttachmentEmail } from "./templates/ingestion-no-attachment";
+import { IngestionErrorEmail } from "./templates/ingestion-error";
 import { logger } from "@/lib/utils/logger";
 
 /**
@@ -398,6 +400,68 @@ export async function sendConnectionExpiringEmail(
     logger.error("email_trigger_connection_expiring_failed", {
       userId,
       provider,
+      error: String(err),
+    });
+  }
+}
+
+export async function sendIngestionNoAttachmentEmail(
+  userId: string,
+  emailSubject: string
+): Promise<void> {
+  try {
+    if (!(await checkPreference(userId, "extraction_notifications"))) return;
+    const email = await getUserEmail(userId);
+    if (!email) return;
+    const subject = "No invoice attachment found in your email";
+    await sendEmail({
+      to: email,
+      subject,
+      react: IngestionNoAttachmentEmail({ emailSubject }),
+    });
+    await logEmail({
+      userId,
+      emailAddress: email,
+      emailType: "ingestion_no_attachment",
+      subject,
+      metadata: { emailSubject },
+    });
+  } catch (err) {
+    logger.error("email_trigger_ingestion_no_attachment_failed", {
+      userId,
+      error: String(err),
+    });
+  }
+}
+
+export async function sendIngestionErrorEmail(
+  userId: string,
+  details: {
+    type: "invalid_attachments" | "billing" | "usage_limit" | "extraction_failed";
+    emailSubject: string;
+    message: string;
+  }
+): Promise<void> {
+  try {
+    if (!(await checkPreference(userId, "extraction_notifications"))) return;
+    const email = await getUserEmail(userId);
+    if (!email) return;
+    const subject = "Issue processing your forwarded invoice";
+    await sendEmail({
+      to: email,
+      subject,
+      react: IngestionErrorEmail(details),
+    });
+    await logEmail({
+      userId,
+      emailAddress: email,
+      emailType: "ingestion_error",
+      subject,
+      metadata: { type: details.type, emailSubject: details.emailSubject },
+    });
+  } catch (err) {
+    logger.error("email_trigger_ingestion_error_failed", {
+      userId,
       error: String(err),
     });
   }
