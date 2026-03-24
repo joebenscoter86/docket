@@ -57,23 +57,26 @@ export async function GET(request: NextRequest) {
   }
 
   // Send welcome email on signup confirmation only (not recovery or email change)
+  // Note: with email confirmation disabled, this path is unused --
+  // signup-notify route handles it instead. Kept for future use.
   if (type === 'signup') {
     const { data: { user } } = await supabase.auth.getUser()
     if (user?.email) {
-      // Fire-and-forget: don't await, don't block redirect
-      sendEmail({
-        to: user.email,
-        subject: 'Welcome to Docket',
-        react: WelcomeEmail({ email: user.email }),
-      })
-      sendEmail({
-        to: ADMIN_EMAIL,
-        subject: `New signup: ${user.email}`,
-        react: AdminNewSignupEmail({
-          userEmail: user.email,
-          signupDate: new Date().toLocaleString('en-US', { timeZone: 'America/Los_Angeles' }),
+      await Promise.all([
+        sendEmail({
+          to: user.email,
+          subject: 'Welcome to Docket',
+          react: WelcomeEmail({ email: user.email }),
         }),
-      })
+        sendEmail({
+          to: ADMIN_EMAIL,
+          subject: `New signup: ${user.email}`,
+          react: AdminNewSignupEmail({
+            userEmail: user.email,
+            signupDate: new Date().toLocaleString('en-US', { timeZone: 'America/Los_Angeles' }),
+          }),
+        }),
+      ])
     }
   }
 
