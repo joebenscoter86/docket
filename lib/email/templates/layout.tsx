@@ -29,9 +29,9 @@ export function EmailLayout({ preview, children }: EmailLayoutProps) {
           {/* Logo */}
           <Section style={logoSection}>
             <Img
-              src={`${BASE_URL}/dockett_logo.png`}
-              width="140"
-              height="140"
+              src={`${BASE_URL}/images/docket-icon-128.png`}
+              width="48"
+              height="48"
               alt="Docket"
               style={logo}
             />
