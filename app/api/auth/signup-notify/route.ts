@@ -1,11 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/admin'
-import { sendEmail } from '@/lib/email/send'
+import { getResend } from '@/lib/email/resend'
 import { WelcomeEmail } from '@/lib/email/templates/welcome'
 import { AdminNewSignupEmail } from '@/lib/email/templates/admin-new-signup'
 import { logger } from '@/lib/utils/logger'
 
 const ADMIN_EMAIL = 'joebenscoter@gmail.com'
+const DEFAULT_FROM = 'Docket <no-reply@dockett.app>'
 
 export async function POST(request: NextRequest) {
   const body = await request.json().catch(() => ({}))
@@ -28,24 +29,43 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'User not found' }, { status: 404 })
   }
 
-  // Await both emails so Vercel doesn't kill the function before they send
-  await Promise.all([
-    sendEmail({
-      to: email,
-      subject: 'Welcome to Docket',
-      react: WelcomeEmail({ email }),
+  const resend = getResend()
+  const errors: string[] = []
+
+  // Send welcome email
+  const { error: welcomeErr } = await resend.emails.send({
+    from: DEFAULT_FROM,
+    to: email,
+    subject: 'Welcome to Docket',
+    replyTo: 'support@dockett.app',
+    react: WelcomeEmail({ email }),
+  })
+  if (welcomeErr) {
+    logger.error('signup_welcome_email_failed', { to: email, error: welcomeErr.message })
+    errors.push(`welcome: ${welcomeErr.message}`)
+  }
+
+  // Send admin notification
+  const { error: adminErr } = await resend.emails.send({
+    from: DEFAULT_FROM,
+    to: ADMIN_EMAIL,
+    subject: `New signup: ${email}`,
+    replyTo: 'support@dockett.app',
+    react: AdminNewSignupEmail({
+      userEmail: email,
+      signupDate: new Date().toLocaleString('en-US', { timeZone: 'America/Los_Angeles' }),
     }),
-    sendEmail({
-      to: ADMIN_EMAIL,
-      subject: `New signup: ${email}`,
-      react: AdminNewSignupEmail({
-        userEmail: email,
-        signupDate: new Date().toLocaleString('en-US', { timeZone: 'America/Los_Angeles' }),
-      }),
-    }),
-  ])
+  })
+  if (adminErr) {
+    logger.error('signup_admin_email_failed', { to: ADMIN_EMAIL, error: adminErr.message })
+    errors.push(`admin: ${adminErr.message}`)
+  }
+
+  if (errors.length > 0) {
+    logger.error('signup_notify_partial_failure', { userId: user.id, email, errors })
+    return NextResponse.json({ error: 'Email send failed', details: errors }, { status: 500 })
+  }
 
   logger.info('signup_notify_sent', { userId: user.id, email })
-
   return NextResponse.json({ data: { sent: true } })
 }
