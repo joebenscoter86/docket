@@ -15,13 +15,13 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Email required' }, { status: 400 })
   }
 
-  // Verify the user actually exists (prevents abuse)
+  // Verify the user actually exists in Supabase Auth (prevents abuse).
+  // IMPORTANT: Must query auth.users via the admin API, NOT the public.users
+  // table. The on_auth_user_created trigger that populates public.users may
+  // not have completed yet when this route is called immediately after signUp().
   const admin = createAdminClient()
-  const { data: user } = await admin
-    .from('users')
-    .select('id')
-    .eq('email', email)
-    .single()
+  const { data: { users } } = await admin.auth.admin.listUsers()
+  const user = users?.find((u) => u.email === email)
 
   if (!user) {
     logger.warn('signup_notify_user_not_found', { email })
