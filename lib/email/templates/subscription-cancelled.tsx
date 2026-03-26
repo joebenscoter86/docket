@@ -11,7 +11,7 @@ export function SubscriptionCancelledEmail({
   tierName,
 }: SubscriptionCancelledEmailProps) {
   return (
-    <EmailLayout preview="Your Docket subscription has been cancelled">
+    <EmailLayout preview="Your Dockett subscription has been cancelled">
       <Text style={styles.heading}>Subscription Cancelled</Text>
       <Text style={styles.paragraph}>
         Your {tierName} plan has been cancelled. Your data will remain

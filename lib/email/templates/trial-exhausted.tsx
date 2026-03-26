@@ -11,7 +11,7 @@ export function TrialExhaustedEmail({
   invoicesProcessed,
 }: TrialExhaustedEmailProps) {
   return (
-    <EmailLayout preview="Your Docket trial has ended - choose a plan to continue">
+    <EmailLayout preview="Your Dockett trial has ended - choose a plan to continue">
       <Text style={styles.heading}>Your Trial Has Ended</Text>
       <Text style={styles.paragraph}>
         You&apos;ve processed {invoicesProcessed} invoices during your trial.

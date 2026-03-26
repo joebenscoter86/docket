@@ -9,7 +9,7 @@ interface AdminNewSignupProps {
 export function AdminNewSignupEmail({ userEmail, signupDate }: AdminNewSignupProps) {
   return (
     <EmailLayout preview={`New signup: ${userEmail}`}>
-      <Text style={styles.heading}>New Docket Signup</Text>
+      <Text style={styles.heading}>New Dockett Signup</Text>
       <Text style={styles.paragraph}>
         <strong>{userEmail}</strong> just confirmed their account.
       </Text>

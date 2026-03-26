@@ -10,10 +10,10 @@ interface IngestionErrorEmailProps {
 }
 
 const nextStepsByType: Record<IngestionErrorEmailProps["type"], string> = {
-  invalid_attachments: "Try uploading the file manually in Docket.",
+  invalid_attachments: "Try uploading the file manually in Dockett.",
   billing: "Update your subscription to continue processing.",
   usage_limit: "Upgrade your plan to process more invoices.",
-  extraction_failed: "Review the invoice manually in Docket.",
+  extraction_failed: "Review the invoice manually in Dockett.",
 };
 
 const buttonDestinationByType: Record<IngestionErrorEmailProps["type"], string> = {
@@ -49,7 +49,7 @@ export function IngestionErrorEmail({ type, emailSubject, message }: IngestionEr
 
       <Text style={styles.paragraph}>{nextStep}</Text>
 
-      <PrimaryButton href={`${BASE_URL}${destination}`}>Go to Docket</PrimaryButton>
+      <PrimaryButton href={`${BASE_URL}${destination}`}>Go to Dockett</PrimaryButton>
 
       <Text style={styles.mutedText}>
         You can manage email notifications in your{" "}

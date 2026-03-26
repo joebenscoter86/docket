@@ -10,7 +10,7 @@ interface SendEmailOptions {
   replyTo?: string;
 }
 
-const DEFAULT_FROM = "Docket <no-reply@dockett.app>";
+const DEFAULT_FROM = "Dockett <no-reply@dockett.app>";
 const DEFAULT_REPLY_TO = "support@dockett.app";
 
 /**

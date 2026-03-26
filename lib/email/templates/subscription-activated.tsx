@@ -15,7 +15,7 @@ export function SubscriptionActivatedEmail({
   invoiceCap,
 }: SubscriptionActivatedEmailProps) {
   return (
-    <EmailLayout preview={`Your Docket ${tierName} plan is active`}>
+    <EmailLayout preview={`Your Dockett ${tierName} plan is active`}>
       <Text style={styles.heading}>Subscription Activated</Text>
       <Text style={styles.paragraph}>
         Your {tierName} plan is now active. Here are your plan details:

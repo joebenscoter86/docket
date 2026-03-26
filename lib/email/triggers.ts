@@ -286,7 +286,7 @@ export async function sendTrialExhaustedEmail(
     const email = await getUserEmail(userId);
     if (!email) return;
 
-    const subject = "Your Docket trial has ended";
+    const subject = "Your Dockett trial has ended";
     await sendEmail({
       to: email,
       subject,
@@ -317,7 +317,7 @@ export async function sendSubscriptionActivatedEmail(
     const email = await getUserEmail(userId);
     if (!email) return;
 
-    const subject = `Your Docket ${tierName} plan is active`;
+    const subject = `Your Dockett ${tierName} plan is active`;
     await sendEmail({
       to: email,
       subject,
@@ -347,7 +347,7 @@ export async function sendSubscriptionCancelledEmail(
     const email = await getUserEmail(userId);
     if (!email) return;
 
-    const subject = "Your Docket subscription has been cancelled";
+    const subject = "Your Dockett subscription has been cancelled";
     await sendEmail({
       to: email,
       subject,
@@ -591,7 +591,7 @@ export async function sendPostTrialFollowupEmail(
     const subjects: Record<number, string> = {
       1: "Your extracted data is still here. Pick up where you left off.",
       2: "Still entering invoices by hand? There's a faster way.",
-      3: "Last chance: your Docket trial data will be archived soon.",
+      3: "Last chance: your Dockett trial data will be archived soon.",
     };
 
     const subject = subjects[sequenceNumber];

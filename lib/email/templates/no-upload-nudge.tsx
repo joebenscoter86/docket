@@ -8,12 +8,12 @@ export function NoUploadNudgeEmail() {
     <EmailLayout preview="Ready to try your first invoice? Just drag a PDF in.">
       <Text style={styles.heading}>Your First Invoice Is Waiting</Text>
       <Text style={styles.paragraph}>
-        You signed up for Docket a few days ago, but you haven&apos;t uploaded
+        You signed up for Dockett a few days ago, but you haven&apos;t uploaded
         an invoice yet. Here&apos;s how fast it works:
       </Text>
 
       <Text style={styles.paragraph}>
-        <strong>Drop a PDF, JPG, or PNG</strong> into Docket. Our AI reads the
+        <strong>Drop a PDF, JPG, or PNG</strong> into Dockett. Our AI reads the
         vendor, line items, totals, and due date in seconds. You review,
         correct anything if needed, and sync it to QuickBooks or Xero with
         one click.
