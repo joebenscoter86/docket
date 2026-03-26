@@ -9,8 +9,8 @@ const BASE_URL = "https://dockett.app";
 
 export function WelcomeEmail({ email }: WelcomeEmailProps) {
   return (
-    <EmailLayout preview="Welcome to Docket - upload your first invoice to see the magic">
-      <Text style={styles.heading}>Welcome to Docket</Text>
+    <EmailLayout preview="Welcome to Dockett - upload your first invoice to see the magic">
+      <Text style={styles.heading}>Welcome to Dockett</Text>
       <Text style={styles.paragraph}>
         You&apos;re all set, {email}. Upload your first invoice and see the
         magic. Most users finish in under 60 seconds.

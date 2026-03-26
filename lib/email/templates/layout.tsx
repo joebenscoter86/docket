@@ -4,7 +4,6 @@ import {
   Head,
   Hr,
   Html,
-  Img,
   Link,
   Preview,
   Section,
@@ -12,7 +11,6 @@ import {
 } from "@react-email/components";
 import type { ReactNode } from "react";
 
-const BASE_URL = "https://dockett.app";
 
 interface EmailLayoutProps {
   preview: string;
@@ -26,17 +24,6 @@ export function EmailLayout({ preview, children }: EmailLayoutProps) {
       <Preview>{preview}</Preview>
       <Body style={body}>
         <Container style={container}>
-          {/* Logo */}
-          <Section style={logoSection}>
-            <Img
-              src={`${BASE_URL}/images/docket-icon-128.png`}
-              width="48"
-              height="48"
-              alt="Docket"
-              style={logo}
-            />
-          </Section>
-
           {/* Content */}
           {children}
 
@@ -44,7 +31,7 @@ export function EmailLayout({ preview, children }: EmailLayoutProps) {
           <Hr style={hr} />
           <Section style={footer}>
             <Text style={footerText}>
-              Docket by JB Technologies LLC
+              Dockett by JB Technologies LLC
             </Text>
             <Text style={footerText}>
               Need help?{" "}
@@ -92,14 +79,6 @@ const container = {
   padding: "40px 32px",
 };
 
-const logoSection = {
-  textAlign: "center" as const,
-  marginBottom: "24px",
-};
-
-const logo = {
-  margin: "0 auto",
-};
 
 const hr = {
   borderColor: "#e5e7eb",

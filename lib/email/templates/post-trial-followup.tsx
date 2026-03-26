@@ -40,7 +40,7 @@ export function PostTrialFollowupEmail({
         <Text style={styles.heading}>Still Entering Invoices by Hand?</Text>
         <Text style={styles.paragraph}>
           Every invoice you type manually is time you could spend running your
-          business. Docket extracts vendor details, line items, and totals in
+          business. Dockett extracts vendor details, line items, and totals in
           seconds, then syncs to QuickBooks or Xero with one click.
         </Text>
 
@@ -58,7 +58,7 @@ export function PostTrialFollowupEmail({
 
   // sequenceNumber === 3
   return (
-    <EmailLayout preview="Last chance: your Docket trial data will be archived soon.">
+    <EmailLayout preview="Last chance: your Dockett trial data will be archived soon.">
       <Text style={styles.heading}>Last Chance to Keep Your Data Active</Text>
       <Text style={styles.paragraph}>
         Your {invoicesProcessed} extracted invoices are still saved, but
