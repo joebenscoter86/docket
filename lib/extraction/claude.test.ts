@@ -449,6 +449,26 @@ describe("ClaudeExtractionProvider", () => {
 
       expect(result.data.dueDate).toBe("2026-03-25");
     });
+
+    it.each([
+      "Due on receipt",
+      "Paid in full",
+      "COD",
+      "Cash on delivery",
+      "Prepaid",
+    ])("sets due_date for receipt-like payment_terms: '%s'", async (terms) => {
+      const receiptResponse = {
+        ...SAMPLE_AI_RESPONSE,
+        due_date: null,
+        payment_terms: terms,
+        invoice_date: "2026-03-25",
+      };
+      mockSuccessResponse(JSON.stringify(receiptResponse));
+
+      const result = await provider.extractInvoiceData(pdfBuffer, "application/pdf");
+
+      expect(result.data.dueDate).toBe("2026-03-25");
+    });
   });
 
   describe("GL account suggestions", () => {
