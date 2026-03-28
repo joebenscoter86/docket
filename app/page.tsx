@@ -12,6 +12,7 @@ import HowItWorksSection from '@/components/landing/HowItWorksSection'
 import WhoItsForSection from '@/components/landing/WhoItsForSection'
 import PricingSection from '@/components/landing/PricingSection'
 import FAQSection from '@/components/landing/FAQSection'
+import CompareSection from '@/components/landing/CompareSection'
 import BottomCTA from '@/components/landing/BottomCTA'
 import Footer from '@/components/layout/Footer'
 
@@ -161,6 +162,7 @@ export default async function Home() {
             <WhoItsForSection />
             <PricingSection tiers={getAllTiers()} />
             <FAQSection />
+            <CompareSection />
             <BottomCTA />
           </div>
         </div>
