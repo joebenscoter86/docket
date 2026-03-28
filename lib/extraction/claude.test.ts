@@ -13,6 +13,14 @@ vi.mock("@anthropic-ai/sdk", () => {
   return { default: MockAnthropic };
 });
 
+vi.mock("@/lib/utils/logger", () => ({
+  logger: {
+    info: vi.fn(),
+    warn: vi.fn(),
+    error: vi.fn(),
+  },
+}));
+
 // Sample AI response matching the FND-11 prompt output format
 const SAMPLE_AI_RESPONSE = {
   vendor_name: "Acme Corp",
@@ -42,7 +50,7 @@ const SAMPLE_AI_RESPONSE = {
   confidence: "high",
 };
 
-function mockSuccessResponse(jsonStr?: string) {
+function mockSuccessResponse(jsonStr?: string, stopReason = "end_turn") {
   mockCreate.mockResolvedValue({
     content: [
       {
@@ -52,7 +60,7 @@ function mockSuccessResponse(jsonStr?: string) {
     ],
     model: "claude-sonnet-4-20250514",
     usage: { input_tokens: 2000, output_tokens: 300 },
-    stop_reason: "end_turn",
+    stop_reason: stopReason,
   });
 }
 
@@ -220,6 +228,143 @@ describe("ClaudeExtractionProvider", () => {
     await expect(
       provider.extractInvoiceData(pdfBuffer, "application/pdf")
     ).rejects.toThrow("Extraction service is busy");
+  });
+
+  describe("prompt content", () => {
+    it("includes vendor address guidance about company vs store address", async () => {
+      mockSuccessResponse();
+
+      await provider.extractInvoiceData(pdfBuffer, "application/pdf");
+
+      const callArgs = mockCreate.mock.calls[0][0];
+      const textBlock = callArgs.messages[0].content[1];
+      expect(textBlock.text).toContain("company/headquarters/mailing address");
+      expect(textBlock.text).toContain("NOT a store location");
+    });
+
+    it("includes shipping/freight extraction rule", async () => {
+      mockSuccessResponse();
+
+      await provider.extractInvoiceData(pdfBuffer, "application/pdf");
+
+      const callArgs = mockCreate.mock.calls[0][0];
+      const textBlock = callArgs.messages[0].content[1];
+      expect(textBlock.text).toContain("shipping, freight, handling");
+    });
+
+    it("includes line item completeness rule", async () => {
+      mockSuccessResponse();
+
+      await provider.extractInvoiceData(pdfBuffer, "application/pdf");
+
+      const callArgs = mockCreate.mock.calls[0][0];
+      const textBlock = callArgs.messages[0].content[1];
+      expect(textBlock.text).toContain("MUST extract ALL line items");
+      expect(textBlock.text).toContain("Count the line items to verify");
+    });
+  });
+
+  describe("truncation detection", () => {
+    it("sets confidence to low when response is truncated", async () => {
+      mockSuccessResponse(JSON.stringify(SAMPLE_AI_RESPONSE), "max_tokens");
+
+      const result = await provider.extractInvoiceData(
+        pdfBuffer,
+        "application/pdf"
+      );
+
+      expect(result.data.confidenceScore).toBe("low");
+    });
+
+    it("throws clear error when truncated response cannot be parsed", async () => {
+      mockCreate.mockResolvedValue({
+        content: [{ type: "text", text: '{"vendor_name": "Acme", "line_items": [' }],
+        model: "claude-sonnet-4-20250514",
+        usage: { input_tokens: 2000, output_tokens: 2048 },
+        stop_reason: "max_tokens",
+      });
+
+      await expect(
+        provider.extractInvoiceData(pdfBuffer, "application/pdf")
+      ).rejects.toThrow("too complex to extract");
+    });
+  });
+
+  describe("subtotal/total mismatch detection", () => {
+    it("downgrades confidence when total exceeds subtotal + tax", async () => {
+      const mismatchResponse = {
+        ...SAMPLE_AI_RESPONSE,
+        subtotal: 253.0,
+        tax_amount: 0,
+        total_amount: 299.48,
+        confidence: "high",
+      };
+      mockSuccessResponse(JSON.stringify(mismatchResponse));
+
+      const result = await provider.extractInvoiceData(
+        pdfBuffer,
+        "application/pdf"
+      );
+
+      expect(result.data.confidenceScore).toBe("medium");
+    });
+
+    it("keeps confidence high when subtotal + tax matches total", async () => {
+      mockSuccessResponse();
+
+      const result = await provider.extractInvoiceData(
+        pdfBuffer,
+        "application/pdf"
+      );
+
+      // 500 + 40 = 540 = total, so no mismatch
+      expect(result.data.confidenceScore).toBe("high");
+    });
+
+    it("downgrades confidence when total is less than subtotal + tax (missing discount)", async () => {
+      const discountMismatch = {
+        ...SAMPLE_AI_RESPONSE,
+        subtotal: 500.0,
+        tax_amount: 40.0,
+        total_amount: 490.0,
+        confidence: "high",
+      };
+      mockSuccessResponse(JSON.stringify(discountMismatch));
+
+      const result = await provider.extractInvoiceData(
+        pdfBuffer,
+        "application/pdf"
+      );
+
+      expect(result.data.confidenceScore).toBe("medium");
+    });
+  });
+
+  it("preserves shipping/freight as line items", async () => {
+    const responseWithShipping = {
+      ...SAMPLE_AI_RESPONSE,
+      line_items: [
+        ...SAMPLE_AI_RESPONSE.line_items,
+        {
+          description: "Shipping & Handling",
+          quantity: 1,
+          unit_price: 15.0,
+          amount: 15.0,
+        },
+      ],
+      subtotal: 515.0,
+      total_amount: 555.0,
+    };
+    mockSuccessResponse(JSON.stringify(responseWithShipping));
+
+    const result = await provider.extractInvoiceData(
+      pdfBuffer,
+      "application/pdf"
+    );
+
+    expect(result.data.lineItems).toHaveLength(3);
+    expect(result.data.lineItems[2].description).toBe("Shipping & Handling");
+    expect(result.data.lineItems[2].amount).toBe(15.0);
   });
 
   describe("GL account suggestions", () => {
