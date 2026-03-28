@@ -6,6 +6,14 @@ export const metadata: Metadata = {
   metadataBase: new URL('https://dockett.app'),
   title: "Dockett",
   description: "AI-powered invoice processing for small businesses. Upload, extract, and sync to QuickBooks or Xero.",
+  icons: {
+    icon: [
+      { url: '/favicon.ico', sizes: '32x32' },
+      { url: '/images/docket-icon-96.png', sizes: '96x96', type: 'image/png' },
+      { url: '/images/docket-icon-256.png', sizes: '256x256', type: 'image/png' },
+    ],
+    apple: '/apple-icon.png',
+  },
 };
 
 const organizationSchema = {
