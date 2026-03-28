@@ -286,7 +286,7 @@ describe("ClaudeExtractionProvider", () => {
 
       await expect(
         provider.extractInvoiceData(pdfBuffer, "application/pdf")
-      ).rejects.toThrow("truncated");
+      ).rejects.toThrow("too complex to extract");
     });
   });
 
@@ -319,6 +319,24 @@ describe("ClaudeExtractionProvider", () => {
 
       // 500 + 40 = 540 = total, so no mismatch
       expect(result.data.confidenceScore).toBe("high");
+    });
+
+    it("downgrades confidence when total is less than subtotal + tax (missing discount)", async () => {
+      const discountMismatch = {
+        ...SAMPLE_AI_RESPONSE,
+        subtotal: 500.0,
+        tax_amount: 40.0,
+        total_amount: 490.0,
+        confidence: "high",
+      };
+      mockSuccessResponse(JSON.stringify(discountMismatch));
+
+      const result = await provider.extractInvoiceData(
+        pdfBuffer,
+        "application/pdf"
+      );
+
+      expect(result.data.confidenceScore).toBe("medium");
     });
   });
 

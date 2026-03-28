@@ -289,7 +289,7 @@ export class ClaudeExtractionProvider implements ExtractionProvider {
       // If truncated AND parse fails, give a clearer error
       if (response.stop_reason === "max_tokens") {
         throw new Error(
-          "Extraction response was truncated and could not be parsed. The invoice may have too many line items."
+          "This invoice is too complex to extract automatically. Please retry or enter the data manually."
         );
       }
       throw parseError;
@@ -302,22 +302,21 @@ export class ClaudeExtractionProvider implements ExtractionProvider {
       data.confidenceScore = "low";
     }
 
-    // Subtotal/total mismatch detection: likely missing shipping/handling charges
-    if (
-      data.subtotal != null &&
-      data.totalAmount != null &&
-      data.totalAmount > data.subtotal + (data.taxAmount ?? 0) + 0.01
-    ) {
-      const gap = data.totalAmount - data.subtotal - (data.taxAmount ?? 0);
-      logger.warn("extraction_subtotal_total_mismatch", {
-        action: "extract_invoice",
-        subtotal: data.subtotal,
-        taxAmount: data.taxAmount,
-        totalAmount: data.totalAmount,
-        gap: Math.round(gap * 100) / 100,
-      });
-      if (data.confidenceScore === "high") {
-        data.confidenceScore = "medium";
+    // Subtotal/total mismatch detection: likely missing shipping/handling or discount charges
+    if (data.subtotal != null && data.totalAmount != null) {
+      const expected = Math.round((data.subtotal + (data.taxAmount ?? 0)) * 100) / 100;
+      const actual = Math.round(data.totalAmount * 100) / 100;
+      if (Math.abs(actual - expected) > 0.01) {
+        logger.warn("extraction_subtotal_total_mismatch", {
+          action: "extract_invoice",
+          subtotal: data.subtotal,
+          taxAmount: data.taxAmount,
+          totalAmount: data.totalAmount,
+          gap: Math.round((actual - expected) * 100) / 100,
+        });
+        if (data.confidenceScore === "high") {
+          data.confidenceScore = "medium";
+        }
       }
     }
 
