@@ -32,6 +32,7 @@ export default function LandingNav() {
           alt="Docket"
           width={150}
           height={40}
+          sizes="150px"
           style={{ width: 'auto', height: '40px' }}
           priority
         />
