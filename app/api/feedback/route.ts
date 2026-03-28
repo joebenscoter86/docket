@@ -3,7 +3,7 @@ import { logger } from "@/lib/utils/logger";
 import { authError, validationError, apiSuccess, internalError } from "@/lib/utils/errors";
 import { getResend } from "@/lib/email/resend";
 
-const FEEDBACK_RECIPIENT = "joe@dockett.app";
+const FEEDBACK_RECIPIENT = "support@dockett.app";
 const MAX_MESSAGE_LENGTH = 5000;
 
 export async function POST(request: Request) {
