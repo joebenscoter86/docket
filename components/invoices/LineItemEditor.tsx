@@ -52,6 +52,16 @@ export default function LineItemEditor({
   const [focusedCell, setFocusedCell] = useState<string | null>(null);
   const [adding, setAdding] = useState(false);
   const [addError, setAddError] = useState<string | null>(null);
+  const [expandedTracking, setExpandedTracking] = useState<Set<string>>(() => {
+    // Auto-expand line items that already have tracking assigned
+    const expanded = new Set<string>();
+    for (const li of lineItems) {
+      if (li.tracking && li.tracking.length > 0) {
+        expanded.add(li.id);
+      }
+    }
+    return expanded;
+  });
   const [confirmRemoveId, setConfirmRemoveId] = useState<string | null>(null);
   const [acceptingAll, setAcceptingAll] = useState(false);
   const descriptionRefs = useRef<Record<string, HTMLInputElement | null>>({});
@@ -405,8 +415,11 @@ export default function LineItemEditor({
 
       {/* Rows */}
       <div className="space-y-1">
-        {state.items.map((item) => (
-          <div key={item.id}>
+        {state.items.map((item) => {
+          const hasTracking = (item.values.tracking as TrackingAssignment[] | null)?.length;
+          const isTrackingExpanded = expandedTracking.has(item.id);
+          return (
+          <div key={item.id} className={isTrackingExpanded || hasTracking ? "bg-background/60 rounded-md px-2 py-1.5 -mx-2" : ""}>
           <div
             className="grid grid-cols-[1fr_70px_100px_100px_140px_32px] gap-x-2 items-center"
           >
@@ -547,7 +560,17 @@ export default function LineItemEditor({
           </div>
 
           {/* Tracking categories sub-row */}
-          {trackingCategories.length > 0 && (
+          {trackingCategories.length > 0 && !isTrackingExpanded && !hasTracking && (
+            <button
+              type="button"
+              onClick={() => setExpandedTracking((prev) => new Set(prev).add(item.id))}
+              disabled={disabled}
+              className="text-xs text-muted hover:text-primary pl-2 pt-1 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              + Add tracking category
+            </button>
+          )}
+          {trackingCategories.length > 0 && (isTrackingExpanded || !!hasTracking) && (
             <div className="flex items-center gap-4 pl-2 pt-1">
               {trackingCategories.map((cat) => {
                 const currentTracking = (item.values.tracking as TrackingAssignment[] | null) ?? [];
@@ -584,7 +607,8 @@ export default function LineItemEditor({
             </div>
           )}
           </div>
-        ))}
+        );
+        })}
       </div>
 
       {/* Add button */}
