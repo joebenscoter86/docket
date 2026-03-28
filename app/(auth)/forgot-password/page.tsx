@@ -48,7 +48,7 @@ export default function ForgotPasswordPage() {
         <div className="mb-8 flex justify-center">
           <Image
             src="/dockett_logo.png"
-            alt="Docket logo"
+            alt="Dockett logo"
             width={240}
             height={240}
             sizes="240px"

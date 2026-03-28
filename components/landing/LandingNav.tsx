@@ -29,7 +29,7 @@ export default function LandingNav() {
       <Link href="/">
         <Image
           src="/dockett_logo.png"
-          alt="Docket"
+          alt="Dockett"
           width={150}
           height={40}
           sizes="150px"

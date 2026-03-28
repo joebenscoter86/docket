@@ -32,7 +32,7 @@ export async function POST(request: NextRequest) {
   await Promise.all([
     sendEmail({
       to: email,
-      subject: 'Welcome to Docket',
+      subject: 'Welcome to Dockett',
       react: WelcomeEmail({ email }),
     }),
     sendEmail({

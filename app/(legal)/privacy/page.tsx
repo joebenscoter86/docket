@@ -2,8 +2,8 @@
 import type { Metadata } from 'next'
 
 export const metadata: Metadata = {
-  title: 'Privacy Policy | Docket',
-  description: 'How Docket collects, uses, and protects your data.',
+  title: 'Privacy Policy | Dockett',
+  description: 'How Dockett collects, uses, and protects your data.',
   alternates: {
     canonical: '/privacy',
   },
@@ -20,7 +20,7 @@ export default function PrivacyPolicyPage() {
       <section className="space-y-3">
         <h2 className="font-headings text-lg font-semibold text-text">1. Introduction</h2>
         <p className="text-sm leading-relaxed text-text">
-          JB Technologies LLC (&ldquo;we,&rdquo; &ldquo;us,&rdquo; or &ldquo;our&rdquo;) operates Docket, an
+          JB Technologies LLC (&ldquo;we,&rdquo; &ldquo;us,&rdquo; or &ldquo;our&rdquo;) operates Dockett, an
           invoice processing service available at dockett.app. This Privacy Policy explains how we collect,
           use, disclose, and safeguard your information when you use our service.
         </p>
@@ -51,7 +51,7 @@ export default function PrivacyPolicyPage() {
 
       <section className="space-y-3">
         <h2 className="font-headings text-lg font-semibold text-text">4. Third-Party Services</h2>
-        <p className="text-sm leading-relaxed text-text">We use the following third-party services to operate Docket:</p>
+        <p className="text-sm leading-relaxed text-text">We use the following third-party services to operate Dockett:</p>
         <ul className="list-disc space-y-2 pl-5 text-sm leading-relaxed text-text">
           <li><strong>Supabase:</strong> Database, file storage, and authentication.</li>
           <li><strong>Anthropic (Claude):</strong> AI invoice extraction. Invoice content is sent for processing only and is not used to train AI models, per Anthropic&rsquo;s API data usage policy.</li>
@@ -123,7 +123,7 @@ export default function PrivacyPolicyPage() {
       <section className="space-y-3">
         <h2 className="font-headings text-lg font-semibold text-text">10. Children&rsquo;s Privacy</h2>
         <p className="text-sm leading-relaxed text-text">
-          Docket is not directed at children under 18. We do not knowingly collect personal information from minors.
+          Dockett is not directed at children under 18. We do not knowingly collect personal information from minors.
           If you believe a minor has provided us with personal information, please contact us and we will delete it.
         </p>
       </section>
@@ -131,7 +131,7 @@ export default function PrivacyPolicyPage() {
       <section className="space-y-3">
         <h2 className="font-headings text-lg font-semibold text-text">11. Cookies</h2>
         <p className="text-sm leading-relaxed text-text">
-          Docket uses authentication session cookies only. These are functional cookies required for you to stay
+          Dockett uses authentication session cookies only. These are functional cookies required for you to stay
           signed in and are not used for tracking or advertising. If we add analytics in the future, we will
           update this section and notify you.
         </p>
@@ -141,7 +141,7 @@ export default function PrivacyPolicyPage() {
         <h2 className="font-headings text-lg font-semibold text-text">12. Changes to This Policy</h2>
         <p className="text-sm leading-relaxed text-text">
           We may update this Privacy Policy from time to time. We will notify you of material changes by sending
-          an email to the address associated with your account. Your continued use of Docket after such changes
+          an email to the address associated with your account. Your continued use of Dockett after such changes
           constitutes acceptance of the updated policy.
         </p>
       </section>

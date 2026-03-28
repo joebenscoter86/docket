@@ -5,7 +5,7 @@ import LandingNav from './LandingNav'
 describe('LandingNav', () => {
   it('renders logo linking to home', () => {
     render(<LandingNav />)
-    const logo = screen.getByAltText('Docket')
+    const logo = screen.getByAltText('Dockett')
     expect(logo.closest('a')).toHaveAttribute('href', '/')
   })
 

@@ -11,7 +11,7 @@ const faqs = [
   {
     question: 'What file formats do you support?',
     answer:
-      'Docket accepts PDF, JPG, and PNG files. Most invoices arrive as PDFs, and our AI handles both digital PDFs and scanned documents. Maximum file size is 10MB per file.',
+      'Dockett accepts PDF, JPG, and PNG files. Most invoices arrive as PDFs, and our AI handles both digital PDFs and scanned documents. Maximum file size is 10MB per file.',
   },
   {
     question: 'How accurate is the AI extraction?',
@@ -72,7 +72,7 @@ export default function FAQSection() {
           Frequently Asked Questions
         </h2>
         <p className="text-center mx-auto mt-4 max-w-2xl text-lg text-[#475569]">
-          Everything you need to know about Docket.
+          Everything you need to know about Dockett.
         </p>
 
         <div className="mt-12 space-y-3">

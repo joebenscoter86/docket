@@ -2,7 +2,7 @@
  * Xero Sandbox Validation Script (DOC-53)
  *
  * Throwaway exploration script — NOT production code.
- * Tests Xero API endpoints we'll need for the Docket integration:
+ * Tests Xero API endpoints we'll need for the Dockett integration:
  *   1. Query contacts (vendors)
  *   1b. Create a contact
  *   2. Query accounts (chart of accounts)
@@ -107,7 +107,7 @@ async function testCreateContact() {
   logSection("1b. CREATE A CONTACT");
 
   const contactPayload = {
-    Name: "Docket Test Vendor (DOC-53)",
+    Name: "Dockett Test Vendor (DOC-53)",
     EmailAddress: "test@docket-sandbox.example",
     IsSupplier: true,
   };
@@ -173,13 +173,13 @@ async function testCreateBill(
     DueDate: "2026-04-19",
     LineItems: [
       {
-        Description: "Docket test line item 1 — office supplies",
+        Description: "Dockett test line item 1 — office supplies",
         Quantity: 1,
         UnitAmount: 150.0,
         AccountCode: accountCode,
       },
       {
-        Description: "Docket test line item 2 — shipping",
+        Description: "Dockett test line item 2 — shipping",
         Quantity: 1,
         UnitAmount: 75.5,
         AccountCode: accountCode,

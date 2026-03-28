@@ -6,7 +6,7 @@ interface StepIndicatorProps {
 }
 
 const stepLabels = ['Welcome', 'Connect', 'Upload']
-const stepSubtitles = ['Introduction to Docket tools', 'Sync your accounting software', 'Your first invoice analysis']
+const stepSubtitles = ['Introduction to Dockett tools', 'Sync your accounting software', 'Your first invoice analysis']
 
 export default function StepIndicator({ currentStep, variant }: StepIndicatorProps) {
   if (variant === 'bar') {

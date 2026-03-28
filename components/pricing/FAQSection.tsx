@@ -15,14 +15,14 @@ const faqs: FAQItem[] = [
       "You get 10 invoices to process completely free, no credit card required. Upload, extract, review, and sync -- the full workflow. When you've used your 10 invoices, choose a plan to continue.",
   },
   {
-    question: "Does Docket work with Xero?",
+    question: "Does Dockett work with Xero?",
     answer:
-      "Yes. Docket integrates with both QuickBooks Online and Xero on all plans, at no extra cost. Connect whichever accounting platform you use.",
+      "Yes. Dockett integrates with both QuickBooks Online and Xero on all plans, at no extra cost. Connect whichever accounting platform you use.",
   },
   {
-    question: "What file types does Docket support?",
+    question: "What file types does Dockett support?",
     answer:
-      "Docket accepts PDF, JPEG, and PNG files. Most invoices arrive as PDFs, which give the best extraction accuracy. Photos of printed invoices work too.",
+      "Dockett accepts PDF, JPEG, and PNG files. Most invoices arrive as PDFs, which give the best extraction accuracy. Photos of printed invoices work too.",
   },
   {
     question: "How accurate is the AI extraction?",

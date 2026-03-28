@@ -65,7 +65,7 @@ export async function GET(request: NextRequest) {
       await Promise.all([
         sendEmail({
           to: user.email,
-          subject: 'Welcome to Docket',
+          subject: 'Welcome to Dockett',
           react: WelcomeEmail({ email: user.email }),
         }),
         sendEmail({

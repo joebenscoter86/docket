@@ -2,5 +2,5 @@ import { test, expect } from '@playwright/test'
 
 test('landing page loads', async ({ page }) => {
   await page.goto('/')
-  await expect(page).toHaveTitle(/Docket/i)
+  await expect(page).toHaveTitle(/Dockett/i)
 })

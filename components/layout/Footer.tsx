@@ -8,9 +8,9 @@ export default function Footer() {
         <span>·</span>
         <Link href="/terms" className="hover:text-text hover:underline">Terms of Service</Link>
         <span>·</span>
-        <Link href="/compare/dext" className="hover:text-text hover:underline">Docket vs Dext</Link>
+        <Link href="/compare/dext" className="hover:text-text hover:underline">Dockett vs Dext</Link>
         <span>·</span>
-        <Link href="/compare/bill-com" className="hover:text-text hover:underline">Docket vs Bill.com</Link>
+        <Link href="/compare/bill-com" className="hover:text-text hover:underline">Dockett vs Bill.com</Link>
       </div>
       <p className="mt-2">&copy; {new Date().getFullYear()} JB Technologies LLC</p>
     </footer>

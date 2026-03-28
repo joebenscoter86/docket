@@ -2,7 +2,7 @@ const reasons = [
   {
     title: 'AI that learns from your corrections',
     description:
-      'Every edit teaches Docket\'s AI to be more accurate next time.',
+      'Every edit teaches Dockett\'s AI to be more accurate next time.',
   },
   {
     title: 'QuickBooks + Xero, both included',
@@ -26,7 +26,7 @@ export default function WhyDocketSection() {
     <section className="bg-[#FAFAFA] py-20 sm:py-24">
       <div className="mx-auto max-w-7xl px-8">
         <h2 className="font-headings text-center text-4xl font-extrabold tracking-tight text-[#0F172A] sm:text-5xl">
-          Why Docket
+          Why Dockett
         </h2>
 
         <div className="mt-16 grid gap-8 sm:grid-cols-2">

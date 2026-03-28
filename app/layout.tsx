@@ -4,7 +4,7 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   metadataBase: new URL('https://dockett.app'),
-  title: "Docket",
+  title: "Dockett",
   description: "AI-powered invoice processing for small businesses. Upload, extract, and sync to QuickBooks or Xero.",
 };
 
@@ -14,7 +14,7 @@ const organizationSchema = {
     {
       '@type': 'Organization',
       '@id': 'https://dockett.app/#organization',
-      name: 'Docket',
+      name: 'Dockett',
       legalName: 'JB Technologies LLC',
       url: 'https://dockett.app',
       logo: {
@@ -33,7 +33,7 @@ const organizationSchema = {
     {
       '@type': 'WebSite',
       '@id': 'https://dockett.app/#website',
-      name: 'Docket',
+      name: 'Dockett',
       url: 'https://dockett.app',
       publisher: { '@id': 'https://dockett.app/#organization' },
     },

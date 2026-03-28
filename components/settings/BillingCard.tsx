@@ -67,7 +67,7 @@ export function BillingCard({ user, usage }: BillingCardProps) {
           </span>
         </div>
         <p className="font-body text-sm text-muted">
-          Thank you for being a Docket design partner. You have free access to
+          Thank you for being a Dockett design partner. You have free access to
           all features, with up to 150 invoices per month.
         </p>
         <div className="mt-3">
@@ -209,7 +209,7 @@ export function BillingCard({ user, usage }: BillingCardProps) {
           </span>
         </div>
         <p className="font-body text-sm text-muted mb-5">
-          Your subscription has been cancelled. Choose a plan to continue using Docket.
+          Your subscription has been cancelled. Choose a plan to continue using Dockett.
         </p>
         {error && (
           <p className="text-sm text-error mb-3">{error}</p>

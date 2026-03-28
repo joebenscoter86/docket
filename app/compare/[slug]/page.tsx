@@ -32,7 +32,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
       title: data.meta.title,
       description: data.meta.description,
       url: `https://dockett.app/compare/${slug}`,
-      siteName: 'Docket',
+      siteName: 'Dockett',
       type: 'website',
       images: [
         {
@@ -63,7 +63,7 @@ export default async function ComparePage({ params }: PageProps) {
     itemListElement: [
       { '@type': 'ListItem', position: 1, name: 'Home', item: 'https://dockett.app' },
       { '@type': 'ListItem', position: 2, name: 'Compare', item: 'https://dockett.app/compare' },
-      { '@type': 'ListItem', position: 3, name: `Docket vs ${data.competitorName}`, item: `https://dockett.app/compare/${slug}` },
+      { '@type': 'ListItem', position: 3, name: `Dockett vs ${data.competitorName}`, item: `https://dockett.app/compare/${slug}` },
     ],
   }
 

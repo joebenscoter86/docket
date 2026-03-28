@@ -4,7 +4,7 @@ export default function ExtractionDemo() {
       <div className="mx-auto max-w-6xl px-8">
         <div className="text-center mb-16">
           <h2 className="font-headings text-4xl font-extrabold tracking-tight text-[#0F172A] sm:text-5xl">
-            See What Docket Extracts
+            See What Dockett Extracts
           </h2>
           <p className="mx-auto mt-4 max-w-2xl text-lg text-[#475569]">
             AI reads your invoices and pulls out every detail with high accuracy.

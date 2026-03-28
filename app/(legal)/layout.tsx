@@ -11,7 +11,7 @@ export default function LegalLayout({
       <header className="border-b border-border bg-surface">
         <div className="mx-auto max-w-3xl px-6 py-4">
           <Link href="/" className="font-headings text-lg font-bold text-text hover:text-accent">
-            Docket
+            Dockett
           </Link>
         </div>
       </header>

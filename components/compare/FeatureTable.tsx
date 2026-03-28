@@ -40,7 +40,7 @@ export default function FeatureTable({ features, competitorName }: FeatureTableP
           <thead>
             <tr className="border-b-2 border-[#E2E8F0]">
               <th className="py-3 pr-4 text-left text-sm font-semibold text-[#94A3B8] uppercase tracking-wide">Feature</th>
-              <th className="py-3 px-4 text-center text-sm font-semibold text-[#0F172A] uppercase tracking-wide">Docket</th>
+              <th className="py-3 px-4 text-center text-sm font-semibold text-[#0F172A] uppercase tracking-wide">Dockett</th>
               <th className="py-3 pl-4 text-center text-sm font-semibold text-[#94A3B8] uppercase tracking-wide">{competitorName}</th>
             </tr>
           </thead>
@@ -67,7 +67,7 @@ export default function FeatureTable({ features, competitorName }: FeatureTableP
             <p className="text-sm font-semibold text-[#0F172A] mb-3">{row.feature}</p>
             <div className="grid grid-cols-2 gap-3">
               <div className="text-center">
-                <p className="text-xs font-semibold text-[#94A3B8] uppercase mb-1">Docket</p>
+                <p className="text-xs font-semibold text-[#94A3B8] uppercase mb-1">Dockett</p>
                 <CellValue value={row.docket} />
               </div>
               <div className="text-center">

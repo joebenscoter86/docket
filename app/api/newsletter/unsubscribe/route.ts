@@ -51,7 +51,7 @@ export async function GET(request: NextRequest) {
   logger.info("newsletter_unsubscribed", { email });
 
   return new NextResponse(
-    unsubscribePage("You have been unsubscribed. You will no longer receive marketing emails from Docket."),
+    unsubscribePage("You have been unsubscribed. You will no longer receive marketing emails from Dockett."),
     { status: 200, headers: { "Content-Type": "text/html" } }
   );
 }
@@ -59,9 +59,9 @@ export async function GET(request: NextRequest) {
 function unsubscribePage(message: string): string {
   return `<!DOCTYPE html>
 <html>
-<head><title>Docket - Unsubscribe</title></head>
+<head><title>Dockett - Unsubscribe</title></head>
 <body style="font-family: -apple-system, sans-serif; max-width: 500px; margin: 80px auto; text-align: center; padding: 0 20px;">
-  <h1 style="font-size: 20px; color: #1e293b;">Docket</h1>
+  <h1 style="font-size: 20px; color: #1e293b;">Dockett</h1>
   <p style="color: #374151; font-size: 15px; line-height: 1.6;">${message}</p>
 </body>
 </html>`;

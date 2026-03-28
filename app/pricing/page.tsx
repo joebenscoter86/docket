@@ -11,31 +11,31 @@ import Footer from "@/components/layout/Footer";
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "Pricing - AI Invoice Processing from $19/mo | Docket",
+  title: "Pricing - AI Invoice Processing from $19/mo | Dockett",
   description:
     "Simple, transparent pricing for AI invoice processing. QuickBooks + Xero sync included on all plans. Start free with 10 invoices, no credit card required.",
   alternates: {
     canonical: "/pricing",
   },
   openGraph: {
-    title: "Pricing - AI Invoice Processing from $19/mo | Docket",
+    title: "Pricing - AI Invoice Processing from $19/mo | Dockett",
     description:
       "Simple, transparent pricing for AI invoice processing. QuickBooks + Xero sync included on all plans. Start free with 10 invoices, no credit card required.",
     url: "https://dockett.app/pricing",
-    siteName: "Docket",
+    siteName: "Dockett",
     type: "website",
     images: [
       {
         url: "https://dockett.app/images/og-image.png",
         width: 1200,
         height: 630,
-        alt: "Docket - AI-powered invoice processing",
+        alt: "Dockett - AI-powered invoice processing",
       },
     ],
   },
   twitter: {
     card: "summary_large_image",
-    title: "Pricing - AI Invoice Processing from $19/mo | Docket",
+    title: "Pricing - AI Invoice Processing from $19/mo | Dockett",
     description:
       "Simple, transparent pricing for AI invoice processing. QuickBooks + Xero sync included on all plans. Start free with 10 invoices, no credit card required.",
     images: ["https://dockett.app/images/og-image.png"],
@@ -115,7 +115,7 @@ export default async function PricingPage() {
                 d="M15.75 19.5L8.25 12l7.5-7.5"
               />
             </svg>
-            Back to Docket
+            Back to Dockett
           </a>
         </div>
       )}

@@ -19,7 +19,7 @@ export default function OnboardingWelcomePage() {
             <span className="text-xs font-bold uppercase tracking-wider text-primary">Getting Started</span>
           </div>
           <h1 className="font-headings text-3xl font-bold leading-tight text-text lg:text-4xl">
-            Welcome to Docket. Let AI handle the paperwork while you focus on your business.
+            Welcome to Dockett. Let AI handle the paperwork while you focus on your business.
           </h1>
           <p className="mt-4 font-body text-base text-muted">
             Automatically extract data from invoices and sync to your accounting software in seconds. Save hours every week.

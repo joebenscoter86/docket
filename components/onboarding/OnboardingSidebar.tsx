@@ -66,7 +66,7 @@ export default function OnboardingSidebar({ isOpen, onClose, completedSteps }: O
       <div className="flex items-center px-4 pt-6 pb-2">
         <Image
           src="/dockett_logo.png"
-          alt="Docket"
+          alt="Dockett"
           width={210}
           height={56}
           sizes="210px"

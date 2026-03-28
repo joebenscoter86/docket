@@ -43,7 +43,7 @@ export default function OnboardingUploadPage() {
       <div className="text-center">
         <h1 className="font-headings text-3xl font-bold text-text">Ready for the magic?</h1>
         <p className="mt-3 font-body text-base text-muted">
-          Upload your first invoice to see how Docket automatically extracts everything for you.
+          Upload your first invoice to see how Dockett automatically extracts everything for you.
         </p>
       </div>
 

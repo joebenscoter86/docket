@@ -35,7 +35,7 @@ export default function AppShell({ userEmail, userName, orgName, isDesignPartner
               <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" />
             </svg>
           </button>
-          <span className="ml-3 font-headings text-lg font-bold text-text">Docket</span>
+          <span className="ml-3 font-headings text-lg font-bold text-text">Dockett</span>
         </header>
         <main className="flex-1 overflow-y-auto p-6 md:p-8 lg:p-10">
           {children}

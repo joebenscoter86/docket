@@ -1,8 +1,8 @@
 import type { Metadata } from 'next'
 
 export const metadata: Metadata = {
-  title: 'Terms of Service | Docket',
-  description: 'Terms and conditions for using Docket.',
+  title: 'Terms of Service | Dockett',
+  description: 'Terms and conditions for using Dockett.',
   alternates: {
     canonical: '/terms',
   },
@@ -19,7 +19,7 @@ export default function TermsOfServicePage() {
       <section className="space-y-3">
         <h2 className="font-headings text-lg font-semibold text-text">1. Acceptance of Terms</h2>
         <p className="text-sm leading-relaxed text-text">
-          By creating an account or using Docket (operated by JB Technologies LLC), you agree to be bound by
+          By creating an account or using Dockett (operated by JB Technologies LLC), you agree to be bound by
           these Terms of Service and our{' '}
           <a href="/privacy" className="text-accent hover:underline">Privacy Policy</a>.
           If you do not agree, do not use the service.
@@ -29,7 +29,7 @@ export default function TermsOfServicePage() {
       <section className="space-y-3">
         <h2 className="font-headings text-lg font-semibold text-text">2. Service Description</h2>
         <p className="text-sm leading-relaxed text-text">
-          Docket is an AI-powered invoice processing service. You upload invoices, our AI extracts structured
+          Dockett is an AI-powered invoice processing service. You upload invoices, our AI extracts structured
           data, you review and correct the extracted data, and then sync approved invoices as bills to your
           connected QuickBooks Online account.
         </p>
@@ -38,7 +38,7 @@ export default function TermsOfServicePage() {
       <section className="space-y-3">
         <h2 className="font-headings text-lg font-semibold text-text">3. Accounts</h2>
         <ul className="list-disc space-y-2 pl-5 text-sm leading-relaxed text-text">
-          <li>You must be at least 18 years old or authorized to act on behalf of a business to use Docket.</li>
+          <li>You must be at least 18 years old or authorized to act on behalf of a business to use Dockett.</li>
           <li>One account per person. You are responsible for maintaining the security of your login credentials.</li>
           <li>You must provide accurate and complete information when creating your account.</li>
           <li>You are responsible for all activity that occurs under your account.</li>
@@ -47,7 +47,7 @@ export default function TermsOfServicePage() {
 
       <section className="space-y-3">
         <h2 className="font-headings text-lg font-semibold text-text">4. Acceptable Use</h2>
-        <p className="text-sm leading-relaxed text-text">You agree to use Docket only for:</p>
+        <p className="text-sm leading-relaxed text-text">You agree to use Dockett only for:</p>
         <ul className="list-disc space-y-2 pl-5 text-sm leading-relaxed text-text">
           <li>Processing legitimate business invoices</li>
           <li>Lawful purposes in compliance with all applicable laws</li>
@@ -63,7 +63,7 @@ export default function TermsOfServicePage() {
       <section className="space-y-3">
         <h2 className="font-headings text-lg font-semibold text-text">5. Your Content</h2>
         <ul className="list-disc space-y-2 pl-5 text-sm leading-relaxed text-text">
-          <li>You retain full ownership of all invoices and business data you upload to Docket.</li>
+          <li>You retain full ownership of all invoices and business data you upload to Dockett.</li>
           <li>
             You grant JB Technologies LLC a limited, non-exclusive license to process your content solely for
             the purpose of providing the service (AI extraction, storage, and sync to your accounting system).
@@ -83,7 +83,7 @@ export default function TermsOfServicePage() {
             You are responsible for reviewing all extracted data before approving and syncing it to QuickBooks.
           </li>
           <li>
-            Docket is a tool to assist your invoice processing workflow. It is not a substitute for professional
+            Dockett is a tool to assist your invoice processing workflow. It is not a substitute for professional
             accounting judgment.
           </li>
         </ul>
@@ -119,13 +119,13 @@ export default function TermsOfServicePage() {
       <section className="space-y-3">
         <h2 className="font-headings text-lg font-semibold text-text">9. Limitation of Liability</h2>
         <ul className="list-disc space-y-2 pl-5 text-sm leading-relaxed text-text">
-          <li>Docket is provided &ldquo;as is&rdquo; and &ldquo;as available&rdquo; without warranties of any kind.</li>
+          <li>Dockett is provided &ldquo;as is&rdquo; and &ldquo;as available&rdquo; without warranties of any kind.</li>
           <li>
             JB Technologies LLC is not liable for errors in AI extraction, QuickBooks sync failures, or
             accounting decisions made based on extracted data.
           </li>
           <li>
-            Our total liability to you for any claims arising from your use of Docket is limited to the
+            Our total liability to you for any claims arising from your use of Dockett is limited to the
             fees you paid us in the 12 months preceding the claim.
           </li>
         </ul>
@@ -153,7 +153,7 @@ export default function TermsOfServicePage() {
         <h2 className="font-headings text-lg font-semibold text-text">12. Dispute Resolution</h2>
         <ul className="list-disc space-y-2 pl-5 text-sm leading-relaxed text-text">
           <li>
-            Any disputes arising from these terms or your use of Docket will be resolved by binding
+            Any disputes arising from these terms or your use of Dockett will be resolved by binding
             arbitration on an individual basis (not as a class action), with a carve-out for claims that
             qualify for small claims court.
           </li>
@@ -165,7 +165,7 @@ export default function TermsOfServicePage() {
         <h2 className="font-headings text-lg font-semibold text-text">13. Changes to Terms</h2>
         <p className="text-sm leading-relaxed text-text">
           We may update these Terms of Service from time to time. We will notify you of material changes by
-          sending an email to the address associated with your account. Your continued use of Docket after
+          sending an email to the address associated with your account. Your continued use of Dockett after
           such changes constitutes acceptance of the updated terms.
         </p>
       </section>

@@ -1,8 +1,8 @@
 import type { Metadata } from 'next'
 
 export const metadata: Metadata = {
-  title: 'Sign Up Free | Docket',
-  description: 'Create your Docket account and process your first 10 invoices free. AI extraction with QuickBooks and Xero sync.',
+  title: 'Sign Up Free | Dockett',
+  description: 'Create your Dockett account and process your first 10 invoices free. AI extraction with QuickBooks and Xero sync.',
   alternates: {
     canonical: '/signup',
   },

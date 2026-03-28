@@ -16,31 +16,31 @@ import BottomCTA from '@/components/landing/BottomCTA'
 import Footer from '@/components/layout/Footer'
 
 export const metadata: Metadata = {
-  title: 'Docket - AI Invoice Processing for QuickBooks & Xero',
+  title: 'Dockett - AI Invoice Processing for QuickBooks & Xero',
   description:
     'Upload invoices, AI extracts the data, sync to QuickBooks or Xero with one click. Start free with 10 invoices. Built for small businesses and bookkeepers.',
   alternates: {
     canonical: '/',
   },
   openGraph: {
-    title: 'Docket - AI Invoice Processing for QuickBooks & Xero',
+    title: 'Dockett - AI Invoice Processing for QuickBooks & Xero',
     description:
       'Upload invoices, AI extracts the data, sync to QuickBooks or Xero with one click. Start free with 10 invoices. Built for small businesses and bookkeepers.',
     url: 'https://dockett.app',
-    siteName: 'Docket',
+    siteName: 'Dockett',
     type: 'website',
     images: [
       {
         url: 'https://dockett.app/images/og-image.png',
         width: 1200,
         height: 630,
-        alt: 'Docket - AI Invoice Processing for QuickBooks & Xero',
+        alt: 'Dockett - AI Invoice Processing for QuickBooks & Xero',
       },
     ],
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'Docket - AI Invoice Processing for QuickBooks & Xero',
+    title: 'Dockett - AI Invoice Processing for QuickBooks & Xero',
     description:
       'Upload invoices, AI extracts the data, sync to QuickBooks or Xero with one click. Start free with 10 invoices. Built for small businesses and bookkeepers.',
     images: ['https://dockett.app/images/og-image.png'],
@@ -51,12 +51,12 @@ const softwareSchema = {
   '@context': 'https://schema.org',
   '@type': 'SoftwareApplication',
   '@id': 'https://dockett.app/#application',
-  name: 'Docket',
+  name: 'Dockett',
   url: 'https://dockett.app',
   applicationCategory: 'BusinessApplication',
   operatingSystem: 'Web',
   description:
-    'Docket is AI-powered invoice processing software that extracts data from PDFs and syncs directly to QuickBooks Online and Xero. Built for small businesses and bookkeepers.',
+    'Dockett is AI-powered invoice processing software that extracts data from PDFs and syncs directly to QuickBooks Online and Xero. Built for small businesses and bookkeepers.',
   provider: { '@id': 'https://dockett.app/#organization' },
   offers: [
     {

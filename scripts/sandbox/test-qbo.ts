@@ -2,7 +2,7 @@
  * QBO Sandbox Validation Script (DOC-9 / FND-9)
  *
  * Throwaway exploration script — NOT production code.
- * Tests QBO API endpoints we'll need for the Docket integration:
+ * Tests QBO API endpoints we'll need for the Dockett integration:
  *   1. Query vendors
  *   2. Query chart of accounts
  *   3. Create a bill
@@ -143,7 +143,7 @@ async function testCreateBill(
             value: accountId,
           },
         },
-        Description: "Docket test line item 1 — office supplies",
+        Description: "Dockett test line item 1 — office supplies",
       },
       {
         DetailType: "AccountBasedExpenseLineDetail",
@@ -153,12 +153,12 @@ async function testCreateBill(
             value: accountId,
           },
         },
-        Description: "Docket test line item 2 — shipping",
+        Description: "Dockett test line item 2 — shipping",
       },
     ],
     TxnDate: "2026-03-15",
     DueDate: "2026-04-15",
-    PrivateNote: "Created by Docket sandbox test script",
+    PrivateNote: "Created by Dockett sandbox test script",
   };
 
   log("Bill Request Payload", billPayload);
