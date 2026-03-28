@@ -1,6 +1,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { readFileSync } from "fs";
 import { join } from "path";
+import { logger } from "@/lib/utils/logger";
 import type {
   ExtractionProvider,
   ExtractionResult,
@@ -10,7 +11,7 @@ import type {
 } from "./types";
 
 const MODEL = "claude-sonnet-4-20250514";
-const MAX_TOKENS = 2048;
+const MAX_TOKENS = 4096;
 const TIMEOUT_MS = 60_000;
 const MAX_RETRIES = 3;
 
@@ -74,7 +75,10 @@ Rules:
 - Dates must be ISO format YYYY-MM-DD
 - Numbers must be plain numbers (no currency symbols, no commas)
 - If a field is not visible or cannot be determined, use null
-- For line items, extract every line item visible in the invoice
+- For vendor_address, use the vendor's company/headquarters/mailing address, NOT a store location, branch, or warehouse address. If the invoice shows both a store address and a company letterhead/remit-to address, use the letterhead or remit-to address.
+- For line items, you MUST extract ALL line items visible in the invoice. Do not truncate or summarize. Count the line items to verify you have captured every one.
+- Include shipping, freight, handling, and delivery charges as separate line items. Do not omit non-product charges.
+- Include discount lines as line items with negative amounts.
 - The confidence field reflects your overall confidence: "high" if the document is clear and all fields are readable, "medium" if some fields are ambiguous, "low" if the document is poor quality or heavily obscured
 - Do not infer or calculate values — extract only what is explicitly shown
 - Return raw JSON only — no wrapping, no explanation`;
@@ -269,8 +273,53 @@ export class ClaudeExtractionProvider implements ExtractionProvider {
       );
     }
 
-    const aiResponse = parseAIResponse(textBlock.text);
+    // Truncation detection: if Claude hit max_tokens, the JSON is likely incomplete
+    if (response.stop_reason === "max_tokens") {
+      logger.warn("extraction_response_truncated", {
+        action: "extract_invoice",
+        stop_reason: response.stop_reason,
+        max_tokens: MAX_TOKENS,
+      });
+    }
+
+    let aiResponse: AIResponse;
+    try {
+      aiResponse = parseAIResponse(textBlock.text);
+    } catch (parseError) {
+      // If truncated AND parse fails, give a clearer error
+      if (response.stop_reason === "max_tokens") {
+        throw new Error(
+          "Extraction response was truncated and could not be parsed. The invoice may have too many line items."
+        );
+      }
+      throw parseError;
+    }
+
     const data = mapToExtractedInvoice(aiResponse);
+
+    // Override confidence if response was truncated
+    if (response.stop_reason === "max_tokens") {
+      data.confidenceScore = "low";
+    }
+
+    // Subtotal/total mismatch detection: likely missing shipping/handling charges
+    if (
+      data.subtotal != null &&
+      data.totalAmount != null &&
+      data.totalAmount > data.subtotal + (data.taxAmount ?? 0) + 0.01
+    ) {
+      const gap = data.totalAmount - data.subtotal - (data.taxAmount ?? 0);
+      logger.warn("extraction_subtotal_total_mismatch", {
+        action: "extract_invoice",
+        subtotal: data.subtotal,
+        taxAmount: data.taxAmount,
+        totalAmount: data.totalAmount,
+        gap: Math.round(gap * 100) / 100,
+      });
+      if (data.confidenceScore === "high") {
+        data.confidenceScore = "medium";
+      }
+    }
 
     return {
       data,
