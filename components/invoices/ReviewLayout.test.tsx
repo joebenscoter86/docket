@@ -72,6 +72,7 @@ const defaultProps = {
         suggested_gl_account_id: null,
         gl_suggestion_source: null,
         is_user_confirmed: false,
+        tracking: null,
       },
     ],
   },

@@ -18,6 +18,7 @@ import {
   type VendorOption,
   type AccountOption,
   type PaymentAccount,
+  type TrackingCategory,
   type CreateBillInput,
   type CreatePurchaseInput,
   type TransactionResult,
@@ -110,6 +111,12 @@ export class QuickBooksAccountingAdapter implements AccountingProvider {
     } catch (err) {
       wrapQBOError(err);
     }
+  }
+
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  async fetchTrackingCategories(supabase: SupabaseAdminClient, orgId: string): Promise<TrackingCategory[]> {
+    // QBO classes/locations support will be added in DOC-125
+    return [];
   }
 
   async createBill(

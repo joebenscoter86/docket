@@ -1,3 +1,5 @@
+import type { TrackingAssignment } from "@/lib/accounting/types";
+
 export type InvoiceStatus =
   | "uploading"
   | "uploaded"
@@ -70,6 +72,7 @@ export interface ExtractedLineItemRow {
   suggested_gl_account_id: string | null;
   gl_suggestion_source: string | null;
   is_user_confirmed: boolean;
+  tracking: TrackingAssignment[] | null;
 }
 
 // ─── Duplicate Detection ───

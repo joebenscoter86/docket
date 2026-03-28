@@ -62,7 +62,7 @@ export async function PATCH(
   // 4. Fetch current line item value for correction tracking
   const { data: currentItem } = await client
     .from("extracted_line_items")
-    .select("id, description, quantity, unit_price, amount, extracted_data_id")
+    .select("id, description, quantity, unit_price, amount, extracted_data_id, tracking")
     .eq("id", itemId)
     .single();
 
@@ -78,7 +78,9 @@ export async function PATCH(
   });
 
   // 5. Update
-  const castValue = value as string | number | null;
+  const castValue = field === "tracking"
+    ? (value as Record<string, unknown>[] | null)
+    : (value as string | number | null);
   const updated = await updateLineItemField(itemId, field, castValue);
   if (!updated) {
     logger.error("update_line_item_failed", {
