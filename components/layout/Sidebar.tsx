@@ -1,5 +1,6 @@
 'use client'
 
+import { useState } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
@@ -58,6 +59,35 @@ export default function Sidebar({ isOpen, onClose, userName, userEmail, isDesign
   const pathname = usePathname()
   const router = useRouter()
 
+  const [showFeedback, setShowFeedback] = useState(false)
+  const [feedbackType, setFeedbackType] = useState<'feature' | 'bug'>('feature')
+  const [feedbackMessage, setFeedbackMessage] = useState('')
+  const [feedbackStatus, setFeedbackStatus] = useState<'idle' | 'sending' | 'sent' | 'error'>('idle')
+
+  async function handleSubmitFeedback() {
+    if (!feedbackMessage.trim()) return
+    setFeedbackStatus('sending')
+    try {
+      const res = await fetch('/api/feedback', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: feedbackMessage, type: feedbackType }),
+      })
+      if (res.ok) {
+        setFeedbackStatus('sent')
+        setFeedbackMessage('')
+        setTimeout(() => {
+          setShowFeedback(false)
+          setFeedbackStatus('idle')
+        }, 2000)
+      } else {
+        setFeedbackStatus('error')
+      }
+    } catch {
+      setFeedbackStatus('error')
+    }
+  }
+
   async function handleSignOut() {
     const supabase = createClient()
     await supabase.auth.signOut()
@@ -113,6 +143,19 @@ export default function Sidebar({ isOpen, onClose, userName, userEmail, isDesign
           })}
         </div>
       </nav>
+
+      {/* Feedback button */}
+      <div className="px-3 pb-2">
+        <button
+          onClick={() => setShowFeedback(true)}
+          className="flex w-full items-center gap-3 rounded-brand-md px-3 py-2.5 text-sm font-body text-muted hover:bg-background hover:text-text transition-all duration-150 ease-in-out"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="h-5 w-5">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M7.5 8.25h9m-9 3H12m-9.75 1.51c0 1.6 1.123 2.994 2.707 3.227 1.129.166 2.27.293 3.423.379.35.026.67.21.865.501L12 21l2.755-4.133a1.14 1.14 0 0 1 .865-.501 48.172 48.172 0 0 0 3.423-.379c1.584-.233 2.707-1.626 2.707-3.228V6.741c0-1.602-1.123-2.995-2.707-3.228A48.394 48.394 0 0 0 12 3c-2.392 0-4.744.175-7.043.513C3.373 3.746 2.25 5.14 2.25 6.741v6.018Z" />
+          </svg>
+          Feedback
+        </button>
+      </div>
 
       {/* User badge + sign out */}
       <div className="border-t border-border px-4 py-4">
@@ -171,6 +214,82 @@ export default function Sidebar({ isOpen, onClose, userName, userEmail, isDesign
           {sidebarContent}
         </aside>
       </div>
+
+      {/* Feedback modal */}
+      {showFeedback && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div className="fixed inset-0 bg-black/50" onClick={() => feedbackStatus !== 'sending' && setShowFeedback(false)} />
+          <div className="relative bg-surface rounded-brand-lg shadow-xl p-6 max-w-md w-full mx-4">
+            <h3 className="font-headings font-bold text-lg text-text mb-1">Send Feedback</h3>
+            <p className="text-sm text-muted mb-4">We read every message. Thanks for helping us improve!</p>
+
+            {feedbackStatus === 'sent' ? (
+              <div className="py-8 text-center">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="h-10 w-10 text-success mx-auto mb-3">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
+                </svg>
+                <p className="font-body font-semibold text-text">Thanks for your feedback!</p>
+              </div>
+            ) : (
+              <>
+                {/* Type toggle */}
+                <div className="flex gap-2 mb-4">
+                  <button
+                    onClick={() => setFeedbackType('feature')}
+                    className={`flex-1 py-2 px-3 rounded-brand-md text-sm font-body font-medium transition-all duration-150 ${
+                      feedbackType === 'feature'
+                        ? 'bg-primary text-white'
+                        : 'bg-background text-muted hover:text-text'
+                    }`}
+                  >
+                    Feature Request
+                  </button>
+                  <button
+                    onClick={() => setFeedbackType('bug')}
+                    className={`flex-1 py-2 px-3 rounded-brand-md text-sm font-body font-medium transition-all duration-150 ${
+                      feedbackType === 'bug'
+                        ? 'bg-error text-white'
+                        : 'bg-background text-muted hover:text-text'
+                    }`}
+                  >
+                    Bug Report
+                  </button>
+                </div>
+
+                {/* Message */}
+                <textarea
+                  value={feedbackMessage}
+                  onChange={(e) => setFeedbackMessage(e.target.value)}
+                  placeholder={feedbackType === 'bug' ? 'Describe the issue...' : 'What would make Dockett better?'}
+                  className="w-full h-32 rounded-brand-md border border-border px-3.5 py-3 font-body text-sm text-text resize-none transition-all duration-150 ease-in-out placeholder:text-muted focus:outline-none focus:ring-[3px] focus:ring-[#BFDBFE] focus:border-primary"
+                  maxLength={5000}
+                />
+
+                {feedbackStatus === 'error' && (
+                  <p className="text-sm text-error mt-2">Something went wrong. Please try again.</p>
+                )}
+
+                <div className="flex justify-end gap-3 mt-4">
+                  <button
+                    onClick={() => { setShowFeedback(false); setFeedbackStatus('idle'); }}
+                    disabled={feedbackStatus === 'sending'}
+                    className="inline-flex items-center justify-center h-11 px-5 rounded-brand-md font-body font-bold text-[15px] border border-border bg-transparent text-text hover:bg-background transition-all duration-150 ease-in-out disabled:opacity-50"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={handleSubmitFeedback}
+                    disabled={feedbackStatus === 'sending' || !feedbackMessage.trim()}
+                    className="inline-flex items-center justify-center h-11 px-5 rounded-brand-md font-body font-bold text-[15px] bg-primary text-white hover:bg-primary-hover transition-all duration-150 ease-in-out disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {feedbackStatus === 'sending' ? 'Sending...' : 'Send Feedback'}
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      )}
     </>
   )
 }
