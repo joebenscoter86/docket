@@ -290,25 +290,32 @@ describe("ClaudeExtractionProvider", () => {
     });
   });
 
-  describe("subtotal/total mismatch detection", () => {
-    it("downgrades confidence when total exceeds subtotal + tax", async () => {
-      const mismatchResponse = {
+  describe("subtotal recalculation", () => {
+    it("recalculates subtotal from line items when shipping is included", async () => {
+      const birttaniStyle = {
         ...SAMPLE_AI_RESPONSE,
-        subtotal: 253.0,
+        line_items: [
+          { description: "Product A", quantity: 1, unit_price: 138, amount: 138 },
+          { description: "Product B", quantity: 1, unit_price: 115, amount: 115 },
+          { description: "Shipping Cost", quantity: null, unit_price: null, amount: 46.48 },
+        ],
+        subtotal: 253.0, // invoice says 253 (products only)
         tax_amount: 0,
         total_amount: 299.48,
         confidence: "high",
       };
-      mockSuccessResponse(JSON.stringify(mismatchResponse));
+      mockSuccessResponse(JSON.stringify(birttaniStyle));
 
-      const result = await provider.extractInvoiceData(
-        pdfBuffer,
-        "application/pdf"
-      );
+      const result = await provider.extractInvoiceData(pdfBuffer, "application/pdf");
 
-      expect(result.data.confidenceScore).toBe("medium");
+      // Subtotal recalculated to include shipping line item
+      expect(result.data.subtotal).toBe(299.48);
+      // No mismatch warning since recalculated subtotal + tax = total
+      expect(result.data.confidenceScore).toBe("high");
     });
+  });
 
+  describe("subtotal/total mismatch detection", () => {
     it("keeps confidence high when subtotal + tax matches total", async () => {
       mockSuccessResponse();
 
@@ -317,8 +324,26 @@ describe("ClaudeExtractionProvider", () => {
         "application/pdf"
       );
 
-      // 500 + 40 = 540 = total, so no mismatch
+      // line items sum to 500, tax 40, total 540 — all match
       expect(result.data.confidenceScore).toBe("high");
+    });
+
+    it("downgrades confidence when total still mismatches after recalculation", async () => {
+      const mismatch = {
+        ...SAMPLE_AI_RESPONSE,
+        line_items: [
+          { description: "Product", quantity: 1, unit_price: 100, amount: 100 },
+        ],
+        subtotal: 100.0,
+        tax_amount: 10.0,
+        total_amount: 150.0, // $40 unaccounted for even after recalc
+        confidence: "high",
+      };
+      mockSuccessResponse(JSON.stringify(mismatch));
+
+      const result = await provider.extractInvoiceData(pdfBuffer, "application/pdf");
+
+      expect(result.data.confidenceScore).toBe("medium");
     });
 
     it("downgrades confidence when total is less than subtotal + tax (missing discount)", async () => {

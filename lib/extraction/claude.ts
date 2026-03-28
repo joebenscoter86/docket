@@ -297,6 +297,19 @@ export class ClaudeExtractionProvider implements ExtractionProvider {
 
     const data = mapToExtractedInvoice(aiResponse);
 
+    // Recalculate subtotal as sum of all line item amounts (including shipping/freight)
+    // The invoice's "Subtotal" often excludes shipping, but our line items include it
+    if (data.lineItems.length > 0) {
+      const lineItemSum = data.lineItems.reduce(
+        (sum, item) => sum + (item.amount ?? 0),
+        0
+      );
+      const rounded = Math.round(lineItemSum * 100) / 100;
+      if (rounded !== data.subtotal && rounded > 0) {
+        data.subtotal = rounded;
+      }
+    }
+
     // Override confidence if response was truncated
     if (response.stop_reason === "max_tokens") {
       data.confidenceScore = "low";
