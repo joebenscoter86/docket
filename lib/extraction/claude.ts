@@ -80,8 +80,9 @@ Rules:
 - Include shipping, freight, handling, and delivery charges as separate line items. Do not omit non-product charges.
 - Include discount lines as line items with negative amounts.
 - The confidence field reflects your overall confidence: "high" if the document is clear and all fields are readable, "medium" if some fields are ambiguous, "low" if the document is poor quality or heavily obscured
-- If the document is a receipt (paid at point of sale, e.g., retail store receipt, register receipt, POS receipt), set due_date equal to the invoice_date. Set payment_terms to "Paid" if no other payment terms are shown.
-- If the document is an invoice with no explicit due date, leave due_date as null so the user can enter it manually. Do NOT infer a due date from payment terms.
+- Detect whether this document is a RECEIPT or an INVOICE. A receipt is any document showing a completed purchase: it says "receipt", shows a payment method (credit card, cash, check), has a transaction date, or comes from a retail store. An invoice is a request for future payment with terms like "Net 30" or "Due by [date]".
+- If it is a RECEIPT: you MUST set payment_terms to "Paid" and you MUST set due_date equal to the invoice_date. Do not leave these null for receipts.
+- If it is an INVOICE with no explicit due date: leave due_date as null so the user can enter it manually. Do NOT infer a due date from payment terms.
 - Do not infer or calculate values — extract only what is explicitly shown
 - Return raw JSON only — no wrapping, no explanation`;
 
@@ -201,15 +202,21 @@ function mapToExtractedInvoice(ai: AIResponse): ExtractedInvoice {
     lineItems,
   };
 
-  // Auto-populate due_date for receipts: if payment_terms indicates paid
-  // and due_date is null, copy invoice_date
-  if (
-    !result.dueDate &&
-    result.invoiceDate &&
-    result.paymentTerms &&
-    /^paid$/i.test(result.paymentTerms.trim())
-  ) {
-    result.dueDate = result.invoiceDate;
+  // Auto-populate due_date for receipts: if payment_terms indicates already
+  // paid and due_date is null, copy invoice_date. Matches common receipt
+  // patterns the AI might return even if it doesn't follow the prompt exactly.
+  if (!result.dueDate && result.invoiceDate && result.paymentTerms) {
+    const terms = result.paymentTerms.trim().toLowerCase();
+    if (
+      terms === "paid" ||
+      terms === "paid in full" ||
+      terms === "due on receipt" ||
+      terms === "cod" ||
+      terms === "cash on delivery" ||
+      terms === "prepaid"
+    ) {
+      result.dueDate = result.invoiceDate;
+    }
   }
 
   return result;
