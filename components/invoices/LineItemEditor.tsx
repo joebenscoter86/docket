@@ -419,7 +419,7 @@ export default function LineItemEditor({
           const hasTracking = (item.values.tracking as TrackingAssignment[] | null)?.length;
           const isTrackingExpanded = expandedTracking.has(item.id);
           return (
-          <div key={item.id} className={isTrackingExpanded || hasTracking ? "bg-background/60 rounded-md px-2 py-1.5 -mx-2" : ""}>
+          <div key={item.id} className={isTrackingExpanded || hasTracking ? "bg-gray-50 border border-gray-100 rounded-md px-2 py-1.5 -mx-2" : ""}>
           <div
             className="grid grid-cols-[1fr_70px_100px_100px_140px_32px] gap-x-2 items-center"
           >
@@ -585,6 +585,20 @@ export default function LineItemEditor({
                   />
                 );
               })}
+              {!hasTracking && !disabled && (
+                <button
+                  type="button"
+                  onClick={() => setExpandedTracking((prev) => {
+                    const next = new Set(prev);
+                    next.delete(item.id);
+                    return next;
+                  })}
+                  className="text-xs text-muted hover:text-error ml-auto"
+                  aria-label="Hide tracking"
+                >
+                  Cancel
+                </button>
+              )}
             </div>
           )}
 
