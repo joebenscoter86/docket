@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
+import Image from 'next/image'
 import { usePathname, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 
@@ -102,11 +103,13 @@ export default function Sidebar({ isOpen, onClose, userName, userEmail, isDesign
     <div className="flex h-full flex-col bg-surface border-r border-border">
       {/* Logo */}
       <div className="flex items-center px-4 pt-6 pb-8">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
+        <Image
           src="/dockett_logo.png"
           alt="Docket"
-          className="w-[75%]"
+          width={210}
+          height={56}
+          sizes="210px"
+          className="w-[75%] h-auto"
         />
         {/* Close button - mobile only */}
         <button

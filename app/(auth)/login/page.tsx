@@ -52,6 +52,7 @@ export default function LoginPage() {
             alt="Docket logo"
             width={240}
             height={240}
+            sizes="240px"
             priority
           />
         </div>

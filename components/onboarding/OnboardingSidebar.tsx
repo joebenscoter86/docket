@@ -1,6 +1,7 @@
 'use client'
 
 import Link from 'next/link'
+import Image from 'next/image'
 import { usePathname } from 'next/navigation'
 
 interface OnboardingSidebarProps {
@@ -63,8 +64,14 @@ export default function OnboardingSidebar({ isOpen, onClose, completedSteps }: O
     <div className="flex h-full flex-col bg-surface border-r border-border">
       {/* Logo */}
       <div className="flex items-center px-4 pt-6 pb-2">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src="/dockett_logo.png" alt="Docket" className="w-[75%]" />
+        <Image
+          src="/dockett_logo.png"
+          alt="Docket"
+          width={210}
+          height={56}
+          sizes="210px"
+          className="w-[75%] h-auto"
+        />
         <button
           onClick={onClose}
           className="ml-auto rounded-md p-1.5 text-muted hover:text-text hover:bg-background md:hidden"
