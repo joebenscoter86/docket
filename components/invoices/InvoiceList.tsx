@@ -192,6 +192,41 @@ export default function InvoiceList({
     });
   }
 
+  // Delete confirmation state
+  const [deleteTarget, setDeleteTarget] = useState<{ id: string; fileName: string } | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [deleteWarning, setDeleteWarning] = useState<string | null>(null);
+
+  async function handleDelete(invoiceId: string) {
+    setIsDeleting(true);
+    setDeleteWarning(null);
+    try {
+      const res = await fetch(`/api/invoices/${invoiceId}/delete`, { method: "POST" });
+      const json = await res.json();
+      if (!res.ok) {
+        setDeleteWarning(json.error || "Failed to delete invoice.");
+        setIsDeleting(false);
+        return;
+      }
+      if (json.data?.warning) {
+        setDeleteWarning(json.data.warning);
+        // Still deleted successfully, just show warning briefly
+        setTimeout(() => {
+          setDeleteTarget(null);
+          setDeleteWarning(null);
+          router.refresh();
+        }, 4000);
+      } else {
+        setDeleteTarget(null);
+        router.refresh();
+      }
+    } catch {
+      setDeleteWarning("An unexpected error occurred.");
+    } finally {
+      setIsDeleting(false);
+    }
+  }
+
   // Empty state: no invoices at all
   if (counts.all === 0) {
     return (
@@ -261,6 +296,20 @@ export default function InvoiceList({
         </td>
         <td className="py-3.5 px-3 text-[14px] text-muted">
           {formatRelativeTime(invoice.uploaded_at)}
+        </td>
+        <td className="py-3.5 px-3 text-right">
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              setDeleteTarget({ id: invoice.id, fileName: invoice.file_name });
+            }}
+            className="p-1.5 rounded-md text-muted hover:text-error hover:bg-red-50 opacity-0 group-hover:opacity-100 transition-all duration-150"
+            title="Delete invoice"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="h-4 w-4">
+              <path strokeLinecap="round" strokeLinejoin="round" d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0" />
+            </svg>
+          </button>
         </td>
       </tr>
     );
@@ -352,7 +401,7 @@ export default function InvoiceList({
     const isExpanded = expandedBatches.has(row.batchId);
     return (
       <tr key={`batch-${row.batchId}`}>
-        <td colSpan={7} className="p-0">
+        <td colSpan={8} className="p-0">
           <BatchHeader
             batchId={row.batchId}
             invoices={row.invoices}
@@ -544,6 +593,7 @@ export default function InvoiceList({
                   <th className="text-right text-[11px] font-bold uppercase tracking-wider text-muted py-2.5 px-3">Amount</th>
                   <th className="text-left text-[11px] font-bold uppercase tracking-wider text-muted py-2.5 px-3">Status</th>
                   <th className="text-left text-[11px] font-bold uppercase tracking-wider text-muted py-2.5 px-3">Uploaded</th>
+                  <th className="w-12"></th>
                 </tr>
               </thead>
               <tbody>
@@ -581,6 +631,40 @@ export default function InvoiceList({
             </div>
           </div>
         </>
+      )}
+
+      {/* Delete confirmation dialog */}
+      {deleteTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div className="fixed inset-0 bg-black/50" onClick={() => !isDeleting && setDeleteTarget(null)} />
+          <div className="relative bg-surface rounded-brand-lg shadow-xl p-6 max-w-md w-full mx-4">
+            <h3 className="font-headings font-bold text-lg text-text mb-2">Delete Invoice</h3>
+            <p className="text-sm text-muted mb-6">
+              Are you sure you want to delete <span className="font-semibold text-text">{deleteTarget.fileName}</span>? This action will archive the invoice and remove it from your list.
+            </p>
+            {deleteWarning && (
+              <div className="mb-4 p-3 rounded-brand-md bg-amber-50 border border-amber-200 text-sm text-amber-800">
+                {deleteWarning}
+              </div>
+            )}
+            <div className="flex justify-end gap-3">
+              <Button
+                variant="outline"
+                onClick={() => { setDeleteTarget(null); setDeleteWarning(null); }}
+                disabled={isDeleting}
+              >
+                Cancel
+              </Button>
+              <Button
+                variant="danger"
+                onClick={() => handleDelete(deleteTarget.id)}
+                disabled={isDeleting}
+              >
+                {isDeleting ? "Deleting..." : "Delete"}
+              </Button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
