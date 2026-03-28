@@ -129,6 +129,7 @@ export const LINE_ITEM_EDITABLE_FIELDS = new Set([
   "unit_price",
   "amount",
   "gl_account_id",
+  "tracking",
 ]);
 
 export async function createLineItem(extractedDataId: string) {
@@ -176,7 +177,7 @@ export async function createLineItem(extractedDataId: string) {
 export async function updateLineItemField(
   itemId: string,
   field: string,
-  value: string | number | null
+  value: string | number | null | Record<string, unknown>[] | null
 ) {
   if (!LINE_ITEM_EDITABLE_FIELDS.has(field)) {
     throw new Error(`Field '${field}' is not editable on line items`);

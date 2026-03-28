@@ -39,6 +39,29 @@ export interface PaymentAccount {
   currentBalance?: number;
 }
 
+// ─── Tracking Types ───
+
+/** A tracking dimension (e.g., "Region", "Project"). Provider-agnostic. */
+export interface TrackingCategory {
+  id: string;
+  name: string;
+  options: TrackingOption[];
+}
+
+/** A single option within a tracking dimension. */
+export interface TrackingOption {
+  id: string;
+  name: string;
+}
+
+/** A tracking assignment saved per line item (up to 2 entries). */
+export interface TrackingAssignment {
+  categoryId: string;
+  categoryName: string;
+  optionId: string;
+  optionName: string;
+}
+
 // ─── Transaction Input Types ───
 
 /** A single line item on a bill or purchase. */
@@ -46,6 +69,7 @@ export interface SyncLineItem {
   amount: number;
   glAccountId: string;
   description: string | null;
+  tracking?: TrackingAssignment[];
 }
 
 /** Provider-agnostic input for creating a Bill (accounts payable). */

@@ -139,6 +139,10 @@ export interface XeroLineItem {
   Quantity: number;
   UnitAmount: number;
   AccountCode: string;
+  Tracking?: Array<{
+    TrackingCategoryID: string;
+    TrackingOptionID: string;
+  }>;
 }
 
 /**
@@ -186,6 +190,10 @@ export interface XeroBankTransactionLineItem {
   Quantity: number;
   UnitAmount: number;
   AccountCode: string;
+  Tracking?: Array<{
+    TrackingCategoryID: string;
+    TrackingOptionID: string;
+  }>;
 }
 
 /**
@@ -233,4 +241,26 @@ export interface XeroAttachmentResponse {
     MimeType: string;
     ContentLength: number;
   }>;
+}
+
+// ─── Xero Tracking Category Types ───
+
+/** A single option within a Xero tracking category. */
+export interface XeroTrackingOption {
+  TrackingOptionID: string;
+  Name: string;
+  Status: "ACTIVE" | "ARCHIVED" | "DELETED";
+}
+
+/** A tracking category (dimension) from Xero. Max 2 per org. */
+export interface XeroTrackingCategory {
+  TrackingCategoryID: string;
+  Name: string;
+  Status: "ACTIVE" | "ARCHIVED" | "DELETED";
+  Options: XeroTrackingOption[];
+}
+
+/** Response from GET /api.xro/2.0/TrackingCategories. */
+export interface XeroTrackingCategoriesResponse {
+  TrackingCategories: XeroTrackingCategory[];
 }

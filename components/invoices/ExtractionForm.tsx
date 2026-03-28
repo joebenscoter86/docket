@@ -537,6 +537,7 @@ export default function ExtractionForm({
         accountsLoading={accountingOptions.loading}
         accountingConnected={accountingOptions.connected}
         disabled={currentStatus === "synced"}
+        trackingCategories={accountingOptions.trackingCategories}
       />
 
       <div className="border-t border-border" />

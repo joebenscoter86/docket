@@ -2,6 +2,7 @@ import type {
   VendorOption,
   AccountOption,
   PaymentAccount,
+  TrackingCategory,
   CreateBillInput,
   CreatePurchaseInput,
   TransactionResult,
@@ -78,6 +79,19 @@ export interface AccountingProvider {
     orgId: string,
     accountType: "Bank" | "CreditCard"
   ): Promise<PaymentAccount[]>;
+
+  /**
+   * Fetch tracking categories (dimensions) from the accounting system.
+   * Xero: up to 2 tracking categories. QBO: classes/locations (future).
+   * Returns empty array if provider doesn't support tracking.
+   *
+   * @param supabase - Supabase admin client
+   * @param orgId - The organisation whose connection to use
+   */
+  fetchTrackingCategories(
+    supabase: SupabaseAdminClient,
+    orgId: string
+  ): Promise<TrackingCategory[]>;
 
   /**
    * Create a Bill (accounts payable) in the accounting system.

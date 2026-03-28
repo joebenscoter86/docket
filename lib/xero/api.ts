@@ -15,8 +15,9 @@ import type {
   XeroBankTransactionPayload,
   XeroBankTransactionResponse,
   XeroAttachmentResponse,
+  XeroTrackingCategoriesResponse,
 } from "./types";
-import type { VendorOption, AccountOption, PaymentAccount } from "@/lib/accounting/types";
+import type { VendorOption, AccountOption, PaymentAccount, TrackingCategory } from "@/lib/accounting/types";
 
 // ─── Configuration ───
 
@@ -384,6 +385,48 @@ export async function fetchPaymentAccounts(
   });
 
   return accounts;
+}
+
+// ─── Tracking Category Operations ───
+
+/**
+ * Fetch tracking categories from Xero.
+ * Xero supports max 2 tracking categories per org.
+ * Filters to ACTIVE categories and ACTIVE options only.
+ * Requires `accounting.settings` scope (already in XERO_SCOPES).
+ */
+export async function fetchTrackingCategories(
+  supabase: SupabaseAdminClient,
+  orgId: string
+): Promise<TrackingCategory[]> {
+  const startTime = Date.now();
+
+  const response = await xeroFetch<XeroTrackingCategoriesResponse>(
+    supabase,
+    orgId,
+    "/TrackingCategories"
+  );
+
+  const categories = (response.TrackingCategories ?? [])
+    .filter((c) => c.Status === "ACTIVE")
+    .map((c) => ({
+      id: c.TrackingCategoryID,
+      name: c.Name,
+      options: (c.Options ?? [])
+        .filter((o) => o.Status === "ACTIVE")
+        .map((o) => ({
+          id: o.TrackingOptionID,
+          name: o.Name,
+        })),
+    }));
+
+  logger.info("xero.tracking_categories_fetched", {
+    orgId,
+    count: String(categories.length),
+    durationMs: Date.now() - startTime,
+  });
+
+  return categories;
 }
 
 // ─── Invoice (Bill) Creation ───

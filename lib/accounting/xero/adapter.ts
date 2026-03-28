@@ -3,6 +3,7 @@ import {
   createContact,
   fetchAccounts as xeroFetchAccounts,
   fetchPaymentAccounts as xeroFetchPaymentAccounts,
+  fetchTrackingCategories as xeroFetchTrackingCategories,
   createInvoice,
   createBankTransaction,
   attachDocumentToInvoice,
@@ -21,6 +22,7 @@ import {
   type VendorOption,
   type AccountOption,
   type PaymentAccount,
+  type TrackingCategory,
   type CreateBillInput,
   type CreatePurchaseInput,
   type TransactionResult,
@@ -102,6 +104,17 @@ export class XeroAccountingAdapter implements AccountingProvider {
     }
   }
 
+  async fetchTrackingCategories(
+    supabase: SupabaseAdminClient,
+    orgId: string
+  ): Promise<TrackingCategory[]> {
+    try {
+      return await xeroFetchTrackingCategories(supabase, orgId);
+    } catch (err) {
+      wrapXeroError(err);
+    }
+  }
+
   async createBill(
     supabase: SupabaseAdminClient,
     orgId: string,
@@ -112,6 +125,14 @@ export class XeroAccountingAdapter implements AccountingProvider {
       Quantity: 1,
       UnitAmount: item.amount,
       AccountCode: item.glAccountId,
+      ...(item.tracking?.length
+        ? {
+            Tracking: item.tracking.map((t) => ({
+              TrackingCategoryID: t.categoryId,
+              TrackingOptionID: t.optionId,
+            })),
+          }
+        : {}),
     }));
 
     const payload: XeroInvoicePayload = {
@@ -151,6 +172,14 @@ export class XeroAccountingAdapter implements AccountingProvider {
       Quantity: 1,
       UnitAmount: item.amount,
       AccountCode: item.glAccountId,
+      ...(item.tracking?.length
+        ? {
+            Tracking: item.tracking.map((t) => ({
+              TrackingCategoryID: t.categoryId,
+              TrackingOptionID: t.optionId,
+            })),
+          }
+        : {}),
     }));
 
     const payload: XeroBankTransactionPayload = {

@@ -1,4 +1,5 @@
 import type { ExtractedLineItemRow } from "@/lib/types/invoice";
+import type { TrackingAssignment } from "@/lib/accounting/types";
 
 // --- Types ---
 
@@ -11,6 +12,7 @@ export interface LineItemValues {
   suggested_gl_account_id: string | null;
   gl_suggestion_source: string | null;
   is_user_confirmed: boolean;
+  tracking: TrackingAssignment[] | null;
 }
 
 export interface LineItemState {
@@ -43,6 +45,7 @@ function extractValues(item: ExtractedLineItemRow): LineItemValues {
     suggested_gl_account_id: item.suggested_gl_account_id,
     gl_suggestion_source: item.gl_suggestion_source,
     is_user_confirmed: item.is_user_confirmed,
+    tracking: item.tracking,
   };
 }
 
@@ -139,6 +142,7 @@ export function lineItemsReducer(
         suggested_gl_account_id: null,
         gl_suggestion_source: null,
         is_user_confirmed: false,
+        tracking: null,
       };
       const newItem: LineItemState = {
         id: action.item.id,

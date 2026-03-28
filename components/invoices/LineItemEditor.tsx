@@ -9,8 +9,9 @@ import {
 } from "./line-items-reducer";
 import { formatCurrency, parseCurrencyInput } from "@/lib/utils/currency";
 import type { ExtractedLineItemRow } from "@/lib/types/invoice";
-import type { AccountOption } from "@/lib/accounting";
+import type { AccountOption, TrackingCategory, TrackingAssignment } from "@/lib/accounting";
 import GlAccountSelect from "./GlAccountSelect";
+import TrackingCategorySelect from "./TrackingCategorySelect";
 
 interface LineItemEditorProps {
   lineItems: ExtractedLineItemRow[];
@@ -23,6 +24,7 @@ interface LineItemEditorProps {
   accountsLoading: boolean;
   accountingConnected: boolean;
   disabled?: boolean;
+  trackingCategories: TrackingCategory[];
 }
 
 const STATUS_BORDER: Record<string, string> = {
@@ -43,6 +45,7 @@ export default function LineItemEditor({
   accountsLoading,
   accountingConnected,
   disabled = false,
+  trackingCategories,
 }: LineItemEditorProps) {
   const [state, dispatch] = useReducer(lineItemsReducer, lineItems, initLineItemsState);
   const savedTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
@@ -283,6 +286,53 @@ export default function LineItemEditor({
     setAcceptingAll(false);
   }, [state.items, handleGlAccountSelect, onMissingGlCountChange]);
 
+  const handleTrackingChange = useCallback(
+    async (itemId: string, assignment: TrackingAssignment | null, categoryId: string) => {
+      const item = state.items.find((i) => i.id === itemId);
+      if (!item) return;
+
+      const currentTracking = (item.values.tracking as TrackingAssignment[] | null) ?? [];
+
+      let newTracking: TrackingAssignment[];
+      if (assignment) {
+        const filtered = currentTracking.filter((t) => t.categoryId !== categoryId);
+        newTracking = [...filtered, assignment];
+      } else {
+        newTracking = currentTracking.filter((t) => t.categoryId !== categoryId);
+      }
+
+      const trackingValue = newTracking.length > 0 ? newTracking : null;
+
+      dispatch({ type: "SET_ITEM_VALUE", itemId, field: "tracking", value: trackingValue as unknown as string | number | null });
+      dispatch({ type: "SET_ITEM_STATUS", itemId, field: "tracking", status: "saving" });
+
+      try {
+        const res = await fetch(`/api/invoices/${invoiceId}/line-items/${itemId}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ field: "tracking", value: trackingValue }),
+        });
+
+        if (!res.ok) {
+          dispatch({ type: "SET_ITEM_STATUS", itemId, field: "tracking", status: "error" });
+          return;
+        }
+
+        dispatch({ type: "SET_ITEM_STATUS", itemId, field: "tracking", status: "saved" });
+        dispatch({ type: "MARK_ITEM_SAVED", itemId, field: "tracking", value: trackingValue as unknown as string | number | null });
+
+        const timerKey = `${itemId}.tracking`;
+        if (savedTimers.current[timerKey]) clearTimeout(savedTimers.current[timerKey]);
+        savedTimers.current[timerKey] = setTimeout(() => {
+          dispatch({ type: "SET_ITEM_STATUS", itemId, field: "tracking", status: "idle" });
+        }, 2000);
+      } catch {
+        dispatch({ type: "SET_ITEM_STATUS", itemId, field: "tracking", status: "error" });
+      }
+    },
+    [invoiceId, state.items]
+  );
+
   const inputBase =
     "w-full border border-border rounded-md px-2 py-1.5 text-sm focus:outline-none focus-visible:ring-[3px] focus-visible:ring-[#BFDBFE] focus:border-primary";
 
@@ -495,6 +545,25 @@ export default function LineItemEditor({
               </button>
             </div>
           </div>
+
+          {/* Tracking categories sub-row */}
+          {trackingCategories.length > 0 && (
+            <div className="flex items-center gap-4 pl-2 pt-1">
+              {trackingCategories.map((cat) => {
+                const currentTracking = (item.values.tracking as TrackingAssignment[] | null) ?? [];
+                const assignment = currentTracking.find((t) => t.categoryId === cat.id) ?? null;
+                return (
+                  <TrackingCategorySelect
+                    key={cat.id}
+                    category={cat}
+                    currentAssignment={assignment}
+                    onSelect={(a) => handleTrackingChange(item.id, a, cat.id)}
+                    disabled={disabled}
+                  />
+                );
+              })}
+            </div>
+          )}
 
           {/* Confirmation bar — full width below the row */}
           {confirmRemoveId === item.id && (

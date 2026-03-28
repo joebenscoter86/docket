@@ -7,7 +7,7 @@ import {
   getOrgProvider,
   AccountingApiError,
 } from "@/lib/accounting";
-import type { CreateBillInput, CreatePurchaseInput, SyncLineItem, TransactionResult } from "@/lib/accounting";
+import type { CreateBillInput, CreatePurchaseInput, SyncLineItem, TransactionResult, TrackingAssignment } from "@/lib/accounting";
 import { logger } from "@/lib/utils/logger";
 import { trackServerEvent, AnalyticsEvents } from "@/lib/analytics/events";
 import {
@@ -289,10 +289,11 @@ export async function POST(
 
     // 9. Create transaction via provider abstraction
     const syncLineItems: SyncLineItem[] = lineItems.map(
-      (li: { amount: number; gl_account_id: string; description: string | null }) => ({
+      (li: { amount: number; gl_account_id: string; description: string | null; tracking: TrackingAssignment[] | null }) => ({
         amount: Number(li.amount),
         glAccountId: li.gl_account_id,
         description: li.description,
+        ...(li.tracking?.length ? { tracking: li.tracking } : {}),
       })
     );
 

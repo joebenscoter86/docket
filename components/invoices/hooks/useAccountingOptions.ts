@@ -1,11 +1,12 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import type { VendorOption, AccountOption } from "@/lib/accounting";
+import type { VendorOption, AccountOption, TrackingCategory } from "@/lib/accounting";
 
 interface AccountingOptionsState {
   vendors: VendorOption[];
   accounts: AccountOption[];
+  trackingCategories: TrackingCategory[];
   loading: boolean;
   connected: boolean;
   error: string | null;
@@ -15,6 +16,7 @@ export function useAccountingOptions(): AccountingOptionsState & { addVendor: (v
   const [state, setState] = useState<AccountingOptionsState>({
     vendors: [],
     accounts: [],
+    trackingCategories: [],
     loading: true,
     connected: true,
     error: null,
@@ -25,9 +27,10 @@ export function useAccountingOptions(): AccountingOptionsState & { addVendor: (v
 
     async function fetchOptions() {
       try {
-        const [vendorRes, accountRes] = await Promise.all([
+        const [vendorRes, accountRes, trackingRes] = await Promise.all([
           fetch("/api/accounting/vendors"),
           fetch("/api/accounting/accounts"),
+          fetch("/api/accounting/tracking-categories"),
         ]);
 
         if (cancelled) return;
@@ -37,6 +40,7 @@ export function useAccountingOptions(): AccountingOptionsState & { addVendor: (v
           setState({
             vendors: [],
             accounts: [],
+            trackingCategories: [],
             loading: false,
             connected: false,
             error: "Accounting connection expired. Reconnect in Settings.",
@@ -48,6 +52,7 @@ export function useAccountingOptions(): AccountingOptionsState & { addVendor: (v
           setState({
             vendors: [],
             accounts: [],
+            trackingCategories: [],
             loading: false,
             connected: false,
             error: null,
@@ -57,17 +62,20 @@ export function useAccountingOptions(): AccountingOptionsState & { addVendor: (v
 
         const vendorBody = await vendorRes.json();
         const accountBody = await accountRes.json();
+        const trackingBody = trackingRes.ok ? await trackingRes.json() : { data: [] };
 
         if (cancelled) return;
 
         const vendors: VendorOption[] = vendorBody.data ?? [];
         const accounts: AccountOption[] = accountBody.data ?? [];
+        const trackingCategories: TrackingCategory[] = trackingBody.data ?? [];
 
         const connected = vendorRes.ok && accountRes.ok;
 
         setState({
           vendors,
           accounts,
+          trackingCategories,
           loading: false,
           connected,
           error: null,
@@ -77,6 +85,7 @@ export function useAccountingOptions(): AccountingOptionsState & { addVendor: (v
         setState({
           vendors: [],
           accounts: [],
+          trackingCategories: [],
           loading: false,
           connected: false,
           error: "Failed to load accounting data.",
