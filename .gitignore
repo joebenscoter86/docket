@@ -50,6 +50,9 @@ scripts/sandbox/fixtures/*.pdf
 scripts/sandbox/fixtures/extraction-results.json
 .worktrees/
 
+# remotion (local video generation, not part of Next.js app)
+/remotion/
+
 # playwright
 /test-results/
 /playwright-report/
