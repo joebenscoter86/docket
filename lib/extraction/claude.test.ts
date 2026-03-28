@@ -392,6 +392,65 @@ describe("ClaudeExtractionProvider", () => {
     expect(result.data.lineItems[2].amount).toBe(15.0);
   });
 
+  describe("receipt due-date auto-population", () => {
+    it("sets due_date to invoice_date when payment_terms is 'Paid' and due_date is null", async () => {
+      const receiptResponse = {
+        ...SAMPLE_AI_RESPONSE,
+        due_date: null,
+        payment_terms: "Paid",
+        invoice_date: "2026-03-25",
+      };
+      mockSuccessResponse(JSON.stringify(receiptResponse));
+
+      const result = await provider.extractInvoiceData(pdfBuffer, "application/pdf");
+
+      expect(result.data.dueDate).toBe("2026-03-25");
+      expect(result.data.paymentTerms).toBe("Paid");
+    });
+
+    it("does not override due_date when AI already set it", async () => {
+      const invoiceResponse = {
+        ...SAMPLE_AI_RESPONSE,
+        due_date: "2026-04-25",
+        payment_terms: "Paid",
+        invoice_date: "2026-03-25",
+      };
+      mockSuccessResponse(JSON.stringify(invoiceResponse));
+
+      const result = await provider.extractInvoiceData(pdfBuffer, "application/pdf");
+
+      expect(result.data.dueDate).toBe("2026-04-25");
+    });
+
+    it("does not set due_date when payment_terms is not 'Paid'", async () => {
+      const netTermsResponse = {
+        ...SAMPLE_AI_RESPONSE,
+        due_date: null,
+        payment_terms: "Net 30",
+        invoice_date: "2026-03-25",
+      };
+      mockSuccessResponse(JSON.stringify(netTermsResponse));
+
+      const result = await provider.extractInvoiceData(pdfBuffer, "application/pdf");
+
+      expect(result.data.dueDate).toBeNull();
+    });
+
+    it("handles case-insensitive 'paid' in payment_terms", async () => {
+      const receiptResponse = {
+        ...SAMPLE_AI_RESPONSE,
+        due_date: null,
+        payment_terms: "paid",
+        invoice_date: "2026-03-25",
+      };
+      mockSuccessResponse(JSON.stringify(receiptResponse));
+
+      const result = await provider.extractInvoiceData(pdfBuffer, "application/pdf");
+
+      expect(result.data.dueDate).toBe("2026-03-25");
+    });
+  });
+
   describe("GL account suggestions", () => {
     const sampleAccounts = [
       { id: "123", name: "Office Supplies" },
