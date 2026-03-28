@@ -80,6 +80,8 @@ Rules:
 - Include shipping, freight, handling, and delivery charges as separate line items. Do not omit non-product charges.
 - Include discount lines as line items with negative amounts.
 - The confidence field reflects your overall confidence: "high" if the document is clear and all fields are readable, "medium" if some fields are ambiguous, "low" if the document is poor quality or heavily obscured
+- If the document is a receipt (paid at point of sale, e.g., retail store receipt, register receipt, POS receipt), set due_date equal to the invoice_date. Set payment_terms to "Paid" if no other payment terms are shown.
+- If the document is an invoice with no explicit due date, leave due_date as null so the user can enter it manually. Do NOT infer a due date from payment terms.
 - Do not infer or calculate values — extract only what is explicitly shown
 - Return raw JSON only — no wrapping, no explanation`;
 
@@ -184,7 +186,7 @@ function mapToExtractedInvoice(ai: AIResponse): ExtractedInvoice {
     })
   );
 
-  return {
+  const result: ExtractedInvoice = {
     vendorName: ai.vendor_name,
     vendorAddress: ai.vendor_address,
     invoiceNumber: ai.invoice_number,
@@ -198,6 +200,19 @@ function mapToExtractedInvoice(ai: AIResponse): ExtractedInvoice {
     confidenceScore: ai.confidence,
     lineItems,
   };
+
+  // Auto-populate due_date for receipts: if payment_terms indicates paid
+  // and due_date is null, copy invoice_date
+  if (
+    !result.dueDate &&
+    result.invoiceDate &&
+    result.paymentTerms &&
+    /^paid$/i.test(result.paymentTerms.trim())
+  ) {
+    result.dueDate = result.invoiceDate;
+  }
+
+  return result;
 }
 
 export class ClaudeExtractionProvider implements ExtractionProvider {
