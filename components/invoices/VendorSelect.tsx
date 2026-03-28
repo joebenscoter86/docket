@@ -3,6 +3,16 @@
 import { useState, useMemo, useRef, useEffect, useCallback } from "react";
 import type { VendorOption } from "@/lib/accounting";
 
+/** Strip common suffixes and punctuation for fuzzy vendor matching */
+function normalizeVendorName(name: string): string {
+  return name
+    .toLowerCase()
+    .replace(/\b(inc|llc|ltd|corp|co|corporation|incorporated|limited|company|pty|plc)\b\.?/g, "")
+    .replace(/[.,;:!'"()\-]/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
 interface VendorSelectProps {
   vendors: VendorOption[];
   loading: boolean;
@@ -39,11 +49,12 @@ export default function VendorSelect({
   const inputRef = useRef<HTMLInputElement>(null);
   const savedTimer = useRef<ReturnType<typeof setTimeout>>();
   const autoMatchedRef = useRef(false);
+  const [wasAutoMatched, setWasAutoMatched] = useState(false);
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
   const createErrorTimer = useRef<ReturnType<typeof setTimeout>>();
 
-  // Auto-match on first load: if no vendor_ref but vendor_name matches an accounting vendor
+  // Auto-match on first load using fuzzy normalized matching
   useEffect(() => {
     if (
       autoMatchedRef.current ||
@@ -55,14 +66,28 @@ export default function VendorSelect({
     }
     autoMatchedRef.current = true;
 
-    const normalizedName = vendorName.toLowerCase().trim();
-    const match = vendors.find(
-      (v) => v.label.toLowerCase().trim() === normalizedName
-    );
+    const normalizedName = normalizeVendorName(vendorName);
 
-    if (match) {
-      setSelectedRef(match.value);
-      onSelect(match.value);
+    // Pass 1: exact normalized match
+    const exactMatches = vendors.filter(
+      (v) => normalizeVendorName(v.label) === normalizedName
+    );
+    if (exactMatches.length === 1) {
+      setSelectedRef(exactMatches[0].value);
+      setWasAutoMatched(true);
+      onSelect(exactMatches[0].value);
+      return;
+    }
+
+    // Pass 2: one side starts with the other (only if unambiguous)
+    const startsWithMatches = vendors.filter((v) => {
+      const norm = normalizeVendorName(v.label);
+      return norm.startsWith(normalizedName) || normalizedName.startsWith(norm);
+    });
+    if (startsWithMatches.length === 1) {
+      setSelectedRef(startsWithMatches[0].value);
+      setWasAutoMatched(true);
+      onSelect(startsWithMatches[0].value);
     }
   }, [vendors, vendorName, selectedRef, onSelect]);
 
@@ -92,6 +117,7 @@ export default function VendorSelect({
   const handleSelect = useCallback(
     async (vendorRef: string) => {
       setSelectedRef(vendorRef);
+      setWasAutoMatched(false);
       setIsOpen(false);
       setSearch("");
       setSaving(true);
@@ -112,6 +138,7 @@ export default function VendorSelect({
 
   const handleClear = useCallback(async () => {
     setSelectedRef(null);
+    setWasAutoMatched(false);
     setSaving(true);
     const ok = await onSelect(null);
     setSaving(false);
@@ -169,9 +196,9 @@ export default function VendorSelect({
   // Not connected state
   if (!connected && !loading) {
     return (
-      <div className="mt-2">
+      <div>
         <label className="flex items-center gap-2 text-sm font-medium text-text mb-1">
-          {providerLabel} Vendor
+          Sync as
         </label>
         <p className="text-sm text-warning">
           {error ?? `Connect ${providerLabel} in Settings to map vendors.`}
@@ -183,9 +210,9 @@ export default function VendorSelect({
   // Loading state
   if (loading) {
     return (
-      <div className="mt-2">
+      <div>
         <label className="flex items-center gap-2 text-sm font-medium text-text mb-1">
-          {providerLabel} Vendor
+          Sync as
         </label>
         <div className="flex items-center gap-2 text-sm text-muted">
           <svg className="h-3.5 w-3.5 animate-spin" viewBox="0 0 24 24" fill="none">
@@ -199,9 +226,9 @@ export default function VendorSelect({
   }
 
   return (
-    <div className="mt-2" ref={containerRef}>
+    <div ref={containerRef}>
       <label className="flex items-center gap-2 text-sm font-medium text-text mb-1">
-        {providerLabel} Vendor
+        Sync as
         {saving && (
           <svg className="h-3.5 w-3.5 animate-spin text-muted" viewBox="0 0 24 24" fill="none">
             <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
@@ -217,6 +244,11 @@ export default function VendorSelect({
           <svg className="h-3.5 w-3.5 text-error" viewBox="0 0 20 20" fill="currentColor">
             <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
           </svg>
+        )}
+        {wasAutoMatched && selectedRef && (
+          <span className="inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] font-medium rounded-full bg-accent/10 text-accent">
+            Auto-matched
+          </span>
         )}
       </label>
 
@@ -283,9 +315,14 @@ export default function VendorSelect({
                       Creating...
                     </>
                   ) : (
-                    <>+ Create &quot;{vendorName.trim()}&quot; in {providerLabel}</>
+                    <>+ Create &quot;{vendorName.trim()}&quot; as a new vendor in {providerLabel}</>
                   )}
                 </button>
+                {!creating && !createError && (
+                  <p className="mt-0.5 text-[11px] text-muted">
+                    This will add a new vendor to your accounting system.
+                  </p>
+                )}
                 {createError && (
                   <p className="mt-1 text-xs text-error">{createError}</p>
                 )}
@@ -312,9 +349,9 @@ export default function VendorSelect({
         )}
       </div>
 
-      {!selectedRef && vendors.length > 0 && !isOpen && (
-        <p className="mt-1 text-xs text-warning">
-          Select a vendor before syncing.
+      {!selectedRef && !isOpen && (
+        <p className="mt-1 text-xs text-muted">
+          Select which vendor in {providerLabel} this invoice should be filed under.
         </p>
       )}
     </div>

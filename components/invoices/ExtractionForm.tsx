@@ -490,26 +490,53 @@ export default function ExtractionForm({
         </div>
       )}
 
+      {/* Vendor Mapping */}
+      <div className="bg-background border border-border rounded-lg p-4 space-y-3">
+        <h3 className="text-xs font-semibold uppercase tracking-wide text-muted">
+          Vendor Mapping
+        </h3>
+
+        {/* AI-extracted vendor name (editable -- users may need to correct extraction errors) */}
+        <div>
+          <div className="flex items-center gap-2 mb-1">
+            <span className="inline-flex items-center px-1.5 py-0.5 text-[10px] font-medium rounded bg-primary/10 text-primary">
+              AI Extracted
+            </span>
+            <span className="text-xs text-muted">What the AI found on the invoice</span>
+          </div>
+          {renderField("vendor_name")}
+        </div>
+
+        {/* Arrow indicator */}
+        <div className="flex items-center gap-2 text-muted">
+          <svg className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+            <path fillRule="evenodd" d="M10 3a.75.75 0 01.75.75v10.638l3.96-4.158a.75.75 0 111.08 1.04l-5.25 5.5a.75.75 0 01-1.08 0l-5.25-5.5a.75.75 0 111.08-1.04l3.96 4.158V3.75A.75.75 0 0110 3z" clipRule="evenodd" />
+          </svg>
+          <span className="text-xs">maps to</span>
+        </div>
+
+        {/* Vendor dropdown (what actually syncs) */}
+        <VendorSelect
+          vendors={accountingOptions.vendors}
+          loading={accountingOptions.loading}
+          connected={accountingOptions.connected}
+          error={accountingOptions.error}
+          currentVendorRef={vendorRef}
+          vendorName={state.values.vendor_name as string | null}
+          onSelect={handleVendorSelect}
+          disabled={currentStatus === "synced"}
+          vendorAddress={state.values.vendor_address as string | null}
+          onVendorCreated={accountingOptions.addVendor}
+          providerLabel={providerLabel}
+        />
+      </div>
+
       {/* Section 1: Invoice Details */}
       <div>
         <h3 className="text-xs font-semibold uppercase tracking-wide text-muted mb-4">
           Invoice Details
         </h3>
         <div className="space-y-4">
-          {renderField("vendor_name")}
-          <VendorSelect
-            vendors={accountingOptions.vendors}
-            loading={accountingOptions.loading}
-            connected={accountingOptions.connected}
-            error={accountingOptions.error}
-            currentVendorRef={vendorRef}
-            vendorName={state.values.vendor_name as string | null}
-            onSelect={handleVendorSelect}
-            disabled={currentStatus === "synced"}
-            vendorAddress={state.values.vendor_address as string | null}
-            onVendorCreated={accountingOptions.addVendor}
-            providerLabel={providerLabel}
-          />
           {renderField("vendor_address")}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {renderField("invoice_number")}
