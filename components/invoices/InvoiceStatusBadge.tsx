@@ -49,6 +49,11 @@ const statusConfig: Record<InvoiceStatus, {
     textColor: 'text-[#991B1B]',
     bgColor: 'bg-[#FEE2E2]',
   },
+  archived: {
+    label: 'Archived',
+    textColor: 'text-[#6B7280]',
+    bgColor: 'bg-[#F3F4F6]',
+  },
 }
 
 export default function InvoiceStatusBadge({ status }: InvoiceStatusBadgeProps) {

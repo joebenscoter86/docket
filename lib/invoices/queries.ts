@@ -198,6 +198,9 @@ export async function fetchInvoiceList(
     query = query.eq("status", status);
   }
 
+  // Always exclude archived invoices from the list
+  query = query.neq("status", "archived");
+
   // Output type filter
   if (output_type !== "all") {
     query = query.eq("output_type", output_type);

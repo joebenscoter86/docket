@@ -5,7 +5,8 @@ export type InvoiceStatus =
   | "pending_review"
   | "approved"
   | "synced"
-  | "error";
+  | "error"
+  | "archived";
 
 // ─── Output Type (Bill-to-Check Toggle) ───
 
