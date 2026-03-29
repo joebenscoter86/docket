@@ -24,7 +24,7 @@ export default async function ReviewPage({
   // Fetch invoice row
   const { data: invoice, error: invoiceError } = await supabase
     .from("invoices")
-    .select("id, status, file_path, file_name, file_type, error_message, output_type, payment_account_id, payment_account_name, batch_id, xero_bill_status")
+    .select("id, status, file_path, file_name, file_type, error_message, output_type, payment_account_id, payment_account_name, batch_id, xero_bill_status, tax_treatment")
     .eq("id", params.id)
     .single();
 
@@ -128,6 +128,9 @@ export default async function ReviewPage({
           batchId: invoice.batch_id ?? null,
           xeroBillStatus: (invoice.xero_bill_status === "DRAFT" || invoice.xero_bill_status === "AUTHORISED")
             ? invoice.xero_bill_status
+            : null,
+          taxTreatment: (invoice.tax_treatment === "exclusive" || invoice.tax_treatment === "inclusive" || invoice.tax_treatment === "no_tax")
+            ? invoice.tax_treatment
             : null,
         }}
         signedUrl={signedUrlResult.data.signedUrl}

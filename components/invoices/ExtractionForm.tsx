@@ -38,6 +38,7 @@ interface ExtractionFormProps {
   batchManifest?: { id: string; status: string }[];
   accountingProvider: AccountingProviderType | null;
   xeroBillStatus?: "DRAFT" | "AUTHORISED" | null;
+  taxTreatment?: "exclusive" | "inclusive" | "no_tax" | null;
 }
 
 const FIELD_CONFIG: Record<
@@ -77,6 +78,7 @@ export default function ExtractionForm({
   batchManifest,
   accountingProvider,
   xeroBillStatus: initialXeroBillStatus,
+  taxTreatment: initialTaxTreatment,
 }: ExtractionFormProps) {
   const router = useRouter();
   const [state, dispatch] = useReducer(
@@ -112,6 +114,14 @@ export default function ExtractionForm({
   );
   const [xeroBillStatusSaving, setXeroBillStatusSaving] = useState(false);
 
+  // Tax treatment (exclusive/inclusive/no_tax). Applies to both Xero and QBO.
+  const [taxTreatment, setTaxTreatment] = useState<"exclusive" | "inclusive" | "no_tax">(
+    initialTaxTreatment === "inclusive" || initialTaxTreatment === "no_tax"
+      ? initialTaxTreatment
+      : "exclusive"
+  );
+  const [taxTreatmentSaving, setTaxTreatmentSaving] = useState(false);
+
   const handleVendorSelect = useCallback(
     async (vendorRefValue: string | null): Promise<boolean> => {
       try {
@@ -142,6 +152,23 @@ export default function ExtractionForm({
         });
       } finally {
         setXeroBillStatusSaving(false);
+      }
+    },
+    [invoiceId]
+  );
+
+  const handleTaxTreatmentChange = useCallback(
+    async (newTreatment: "exclusive" | "inclusive" | "no_tax") => {
+      setTaxTreatment(newTreatment);
+      setTaxTreatmentSaving(true);
+      try {
+        await fetch(`/api/invoices/${invoiceId}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ tax_treatment: newTreatment }),
+        });
+      } finally {
+        setTaxTreatmentSaving(false);
       }
     },
     [invoiceId]
@@ -629,6 +656,33 @@ export default function ExtractionForm({
             >
               <option value="AUTHORISED">Awaiting Payment</option>
               <option value="DRAFT">Draft</option>
+            </select>
+          </div>
+        </div>
+      )}
+
+      {/* Tax treatment selector — all providers, all output types, hidden when synced */}
+      {accountingOptions.connected && currentStatus !== "synced" && (
+        <div className="flex items-center justify-between gap-3 bg-background border border-border rounded-lg px-4 py-3">
+          <div className="min-w-0">
+            <p className="text-sm font-medium text-text">Tax treatment</p>
+            <p className="text-xs text-muted mt-0.5">How line item amounts relate to tax</p>
+          </div>
+          <div className="flex items-center gap-1.5 shrink-0">
+            {taxTreatmentSaving && (
+              <svg className="h-3.5 w-3.5 animate-spin text-muted" viewBox="0 0 24 24" fill="none">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+              </svg>
+            )}
+            <select
+              value={taxTreatment}
+              onChange={(e) => handleTaxTreatmentChange(e.target.value as "exclusive" | "inclusive" | "no_tax")}
+              className="text-sm border border-border rounded-md px-3 py-1.5 bg-white text-text focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
+            >
+              <option value="exclusive">Tax Exclusive</option>
+              <option value="inclusive">Tax Inclusive</option>
+              <option value="no_tax">No Tax</option>
             </select>
           </div>
         </div>
