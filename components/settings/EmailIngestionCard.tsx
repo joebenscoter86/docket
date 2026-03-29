@@ -10,7 +10,6 @@ export function EmailIngestionCard() {
   const [disabling, setDisabling] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
   const [copied, setCopied] = useState(false);
-  const [showInstructions, setShowInstructions] = useState(false);
   const [editing, setEditing] = useState(false);
   const [prefix, setPrefix] = useState("");
   const [prefixError, setPrefixError] = useState<string | null>(null);
@@ -33,7 +32,6 @@ export function EmailIngestionCard() {
       const data = await res.json();
       if (data.data?.address) {
         setAddress(data.data.address);
-        setShowInstructions(true);
       }
     } catch {
       // Fail silently -- user can retry
@@ -231,38 +229,10 @@ export function EmailIngestionCard() {
             Send a test email
           </a>
 
-          {/* Setup instructions (collapsible) */}
-          <button
-            onClick={() => setShowInstructions(!showInstructions)}
-            className="flex items-center gap-1.5 text-[13px] font-medium text-muted hover:text-text transition-colors"
-          >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              viewBox="0 0 16 16"
-              fill="currentColor"
-              className={`w-3.5 h-3.5 transition-transform ${showInstructions ? "rotate-90" : ""}`}
-            >
-              <path fillRule="evenodd" d="M6.22 4.22a.75.75 0 011.06 0l3.25 3.25a.75.75 0 010 1.06l-3.25 3.25a.75.75 0 01-1.06-1.06L8.94 8 6.22 5.28a.75.75 0 010-1.06z" clipRule="evenodd" />
-            </svg>
-            Setup instructions
-          </button>
-
-          {showInstructions && (
-            <div className="bg-gray-50 rounded-brand-md p-4 space-y-3 text-[13px] text-muted">
-              <div>
-                <p className="font-medium text-text mb-1">Gmail</p>
-                <p>Settings &gt; Forwarding and POP/IMAP &gt; Add a forwarding address &gt; paste the address above &gt; confirm.</p>
-              </div>
-              <div>
-                <p className="font-medium text-text mb-1">Outlook</p>
-                <p>Settings &gt; Mail &gt; Forwarding &gt; Enable forwarding &gt; paste the address above.</p>
-              </div>
-              <div>
-                <p className="font-medium text-text mb-1">Other</p>
-                <p>Add the address above as a forwarding rule in your email client. You only need to do this once.</p>
-              </div>
-            </div>
-          )}
+          {/* Setup hint */}
+          <p className="text-[12px] text-muted">
+            Add this address as a forwarding rule in your email client. Invoices sent here are automatically extracted and queued for review.
+          </p>
 
           {/* Disable button */}
           <div className="pt-2 border-t border-border">
