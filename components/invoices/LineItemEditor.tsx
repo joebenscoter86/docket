@@ -404,7 +404,7 @@ export default function LineItemEditor({
       </div>
 
       {/* Table header */}
-      <div className="grid grid-cols-[1fr_70px_100px_100px_140px_32px] gap-x-2 items-center mb-1">
+      <div className="grid grid-cols-[minmax(120px,2fr)_70px_100px_100px_minmax(140px,1.5fr)_32px] gap-x-2 items-center mb-1">
         <span className="text-xs font-medium text-muted uppercase">Description</span>
         <span className="text-xs font-medium text-muted uppercase text-right">Qty</span>
         <span className="text-xs font-medium text-muted uppercase text-right">Unit Price</span>
@@ -421,7 +421,7 @@ export default function LineItemEditor({
           return (
           <div key={item.id} className={isTrackingExpanded || hasTracking ? "bg-gray-50 border border-gray-100 rounded-md px-2 py-1.5 -mx-2" : ""}>
           <div
-            className="grid grid-cols-[1fr_70px_100px_100px_140px_32px] gap-x-2 items-center"
+            className="grid grid-cols-[minmax(120px,2fr)_70px_100px_100px_minmax(140px,1.5fr)_32px] gap-x-2 items-center"
           >
             {/* Description */}
             <div className={STATUS_BORDER[item.fieldStatus.description ?? "idle"]}>
