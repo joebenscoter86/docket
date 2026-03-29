@@ -37,6 +37,7 @@ interface ExtractionFormProps {
   batchId?: string | null;
   batchManifest?: { id: string; status: string }[];
   accountingProvider: AccountingProviderType | null;
+  xeroBillStatus?: "DRAFT" | "AUTHORISED" | null;
 }
 
 const FIELD_CONFIG: Record<
@@ -75,6 +76,7 @@ export default function ExtractionForm({
   batchId,
   batchManifest,
   accountingProvider,
+  xeroBillStatus: initialXeroBillStatus,
 }: ExtractionFormProps) {
   const router = useRouter();
   const [state, dispatch] = useReducer(
@@ -104,6 +106,12 @@ export default function ExtractionForm({
   const [currentPaymentAccountId, setCurrentPaymentAccountId] = useState<string | null>(initialPaymentAccountId);
   const [currentPaymentAccountName, setCurrentPaymentAccountName] = useState<string | null>(initialPaymentAccountName);
 
+  // Xero bill status (DRAFT vs AUTHORISED). Only relevant for Xero + bill output type.
+  const [xeroBillStatus, setXeroBillStatus] = useState<"DRAFT" | "AUTHORISED">(
+    initialXeroBillStatus === "DRAFT" ? "DRAFT" : "AUTHORISED"
+  );
+  const [xeroBillStatusSaving, setXeroBillStatusSaving] = useState(false);
+
   const handleVendorSelect = useCallback(
     async (vendorRefValue: string | null): Promise<boolean> => {
       try {
@@ -117,6 +125,23 @@ export default function ExtractionForm({
         return true;
       } catch {
         return false;
+      }
+    },
+    [invoiceId]
+  );
+
+  const handleXeroBillStatusChange = useCallback(
+    async (newStatus: "DRAFT" | "AUTHORISED") => {
+      setXeroBillStatus(newStatus);
+      setXeroBillStatusSaving(true);
+      try {
+        await fetch(`/api/invoices/${invoiceId}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ xero_bill_status: newStatus }),
+        });
+      } finally {
+        setXeroBillStatusSaving(false);
       }
     },
     [invoiceId]
@@ -582,6 +607,32 @@ export default function ExtractionForm({
           {renderField("total_amount")}
         </div>
       </div>
+
+      {/* Xero bill status selector — only for Xero users syncing as a Bill */}
+      {accountingProvider === "xero" && currentOutputType === "bill" && currentStatus !== "synced" && (
+        <div className="flex items-center justify-between gap-3 bg-background border border-border rounded-lg px-4 py-3">
+          <div className="min-w-0">
+            <p className="text-sm font-medium text-text">Bill status in Xero</p>
+            <p className="text-xs text-muted mt-0.5">How this bill appears after syncing</p>
+          </div>
+          <div className="flex items-center gap-1.5 shrink-0">
+            {xeroBillStatusSaving && (
+              <svg className="h-3.5 w-3.5 animate-spin text-muted" viewBox="0 0 24 24" fill="none">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+              </svg>
+            )}
+            <select
+              value={xeroBillStatus}
+              onChange={(e) => handleXeroBillStatusChange(e.target.value as "DRAFT" | "AUTHORISED")}
+              className="text-sm border border-border rounded-md px-3 py-1.5 bg-white text-text focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
+            >
+              <option value="AUTHORISED">Awaiting Payment</option>
+              <option value="DRAFT">Draft</option>
+            </select>
+          </div>
+        </div>
+      )}
 
       {/* Action bar — shown for pending_review, approved, and synced invoices */}
       {(currentStatus === "pending_review" || currentStatus === "approved" || currentStatus === "synced") && (

@@ -27,6 +27,7 @@ export interface BatchSyncInvoice {
   file_path: string;
   file_name: string;
   retry_count: number;
+  xero_bill_status: string | null;
 }
 
 export interface BatchSyncResult {
@@ -137,12 +138,16 @@ export async function processBatchSync(
       let requestInput: unknown;
 
       if (isBill) {
+        const xeroStatus = (invoice.xero_bill_status === "DRAFT" || invoice.xero_bill_status === "AUTHORISED")
+          ? invoice.xero_bill_status
+          : undefined;
         const input: CreateBillInput = {
           vendorRef: extractedData.vendor_ref,
           lineItems: syncLineItems,
           invoiceDate: extractedData.invoice_date,
           dueDate: extractedData.due_date,
           invoiceNumber: extractedData.invoice_number,
+          xeroStatus,
         };
         requestInput = input;
         result = await provider.createBill(adminSupabase, orgId, input);

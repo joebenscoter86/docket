@@ -24,7 +24,7 @@ export default async function ReviewPage({
   // Fetch invoice row
   const { data: invoice, error: invoiceError } = await supabase
     .from("invoices")
-    .select("id, status, file_path, file_name, file_type, error_message, output_type, payment_account_id, payment_account_name, batch_id")
+    .select("id, status, file_path, file_name, file_type, error_message, output_type, payment_account_id, payment_account_name, batch_id, xero_bill_status")
     .eq("id", params.id)
     .single();
 
@@ -126,6 +126,9 @@ export default async function ReviewPage({
           paymentAccountId: invoice.payment_account_id ?? null,
           paymentAccountName: invoice.payment_account_name ?? null,
           batchId: invoice.batch_id ?? null,
+          xeroBillStatus: (invoice.xero_bill_status === "DRAFT" || invoice.xero_bill_status === "AUTHORISED")
+            ? invoice.xero_bill_status
+            : null,
         }}
         signedUrl={signedUrlResult.data.signedUrl}
         // getExtractedData returns Supabase-inferred types where confidence_score

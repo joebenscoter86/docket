@@ -302,12 +302,16 @@ export async function POST(
 
     try {
       if (isBill) {
+        const xeroStatus = (invoice.xero_bill_status === "DRAFT" || invoice.xero_bill_status === "AUTHORISED")
+          ? invoice.xero_bill_status
+          : undefined;
         const input: CreateBillInput = {
           vendorRef: extractedData.vendor_ref,
           lineItems: syncLineItems,
           invoiceDate: extractedData.invoice_date,
           dueDate: extractedData.due_date,
           invoiceNumber: extractedData.invoice_number,
+          xeroStatus,
         };
         requestInput = input;
         result = await provider.createBill(adminSupabase, orgId, input);

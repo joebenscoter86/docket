@@ -280,6 +280,7 @@ export type Database = {
           retry_count: number | null
           status: string
           uploaded_at: string | null
+          xero_bill_status: string | null
         }
         Insert: {
           error_message?: string | null
@@ -295,6 +296,7 @@ export type Database = {
           retry_count?: number | null
           status?: string
           uploaded_at?: string | null
+          xero_bill_status?: string | null
         }
         Update: {
           error_message?: string | null
@@ -310,6 +312,7 @@ export type Database = {
           retry_count?: number | null
           status?: string
           uploaded_at?: string | null
+          xero_bill_status?: string | null
         }
         Relationships: [
           {
