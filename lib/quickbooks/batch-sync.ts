@@ -28,6 +28,7 @@ export interface BatchSyncInvoice {
   file_name: string;
   retry_count: number;
   xero_bill_status: string | null;
+  tax_treatment: string | null;
 }
 
 export interface BatchSyncResult {
@@ -137,6 +138,10 @@ export async function processBatchSync(
       let result: TransactionResult;
       let requestInput: unknown;
 
+      const taxTreatment = (invoice.tax_treatment === "exclusive" || invoice.tax_treatment === "inclusive" || invoice.tax_treatment === "no_tax")
+        ? invoice.tax_treatment
+        : undefined;
+
       if (isBill) {
         const xeroStatus = (invoice.xero_bill_status === "DRAFT" || invoice.xero_bill_status === "AUTHORISED")
           ? invoice.xero_bill_status
@@ -148,6 +153,7 @@ export async function processBatchSync(
           dueDate: extractedData.due_date,
           invoiceNumber: extractedData.invoice_number,
           xeroStatus,
+          taxTreatment,
         };
         requestInput = input;
         result = await provider.createBill(adminSupabase, orgId, input);
@@ -161,6 +167,7 @@ export async function processBatchSync(
           lineItems: syncLineItems,
           invoiceDate: extractedData.invoice_date,
           invoiceNumber: extractedData.invoice_number,
+          taxTreatment,
         };
         requestInput = input;
         result = await provider.createPurchase(adminSupabase, orgId, input);

@@ -280,6 +280,7 @@ export type Database = {
           retry_count: number | null
           status: string
           uploaded_at: string | null
+          tax_treatment: string | null
           xero_bill_status: string | null
         }
         Insert: {
@@ -295,6 +296,7 @@ export type Database = {
           payment_account_name?: string | null
           retry_count?: number | null
           status?: string
+          tax_treatment?: string | null
           uploaded_at?: string | null
           xero_bill_status?: string | null
         }
@@ -311,6 +313,7 @@ export type Database = {
           payment_account_name?: string | null
           retry_count?: number | null
           status?: string
+          tax_treatment?: string | null
           uploaded_at?: string | null
           xero_bill_status?: string | null
         }

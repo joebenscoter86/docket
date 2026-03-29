@@ -147,6 +147,7 @@ const billInvoice: BatchSyncInvoice = {
   file_name: "invoice1.pdf",
   retry_count: 0,
   xero_bill_status: null,
+  tax_treatment: null,
 };
 
 // ─── Tests ───

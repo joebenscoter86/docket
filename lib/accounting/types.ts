@@ -82,6 +82,8 @@ export interface CreateBillInput {
   invoiceNumber: string | null;
   /** Xero-only: bill status on creation. QBO ignores this. Defaults to AUTHORISED. */
   xeroStatus?: "DRAFT" | "AUTHORISED";
+  /** How line item amounts should be interpreted for tax. Both QBO and Xero support this. */
+  taxTreatment?: "exclusive" | "inclusive" | "no_tax";
 }
 
 /** Provider-agnostic input for creating a Purchase (Check / Cash / CreditCard). */
@@ -94,6 +96,8 @@ export interface CreatePurchaseInput {
   lineItems: SyncLineItem[];
   invoiceDate: string | null;
   invoiceNumber: string | null;
+  /** How line item amounts should be interpreted for tax. Both QBO and Xero support this. */
+  taxTreatment?: "exclusive" | "inclusive" | "no_tax";
 }
 
 // ─── Transaction Result Types ───

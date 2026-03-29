@@ -110,7 +110,7 @@ export async function POST(request: Request) {
   // 6. Fetch all invoices for this batch
   const { data: allInvoices, error: fetchErr } = await admin
     .from("invoices")
-    .select("id, org_id, status, output_type, payment_account_id, file_path, file_name, retry_count, xero_bill_status")
+    .select("id, org_id, status, output_type, payment_account_id, file_path, file_name, retry_count, xero_bill_status, tax_treatment")
     .in("batch_id", [batchId]);
 
   if (fetchErr) {
@@ -279,6 +279,7 @@ export async function POST(request: Request) {
       file_name: inv.file_name,
       retry_count: inv.retry_count ?? 0,
       xero_bill_status: inv.xero_bill_status ?? null,
+      tax_treatment: inv.tax_treatment ?? null,
     });
   }
 

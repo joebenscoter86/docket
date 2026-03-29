@@ -370,6 +370,71 @@ describe("XeroAccountingAdapter", () => {
       expect(payload.Status).toBe("DRAFT");
     });
 
+    it("sends LineAmountTypes when taxTreatment is provided", async () => {
+      mockCreateInvoice.mockResolvedValue({
+        Invoices: [
+          {
+            InvoiceID: "xero-inv-uuid-5",
+            InvoiceNumber: "INV-004",
+            Type: "ACCPAY",
+            Status: "AUTHORISED",
+            Contact: { ContactID: "contact-1", Name: "Acme" },
+            DateString: "2026-03-28",
+            DueDateString: "2026-04-28",
+            Total: 100,
+            AmountDue: 100,
+            CurrencyCode: "USD",
+            LineItems: [],
+          },
+        ],
+      });
+
+      const adapter = await getAdapter();
+      await adapter.createBill(mockSupabase, "org-1", {
+        vendorRef: "contact-1",
+        lineItems: [{ amount: 100, glAccountId: "500", description: null }],
+        invoiceDate: "2026-03-28",
+        dueDate: "2026-04-28",
+        invoiceNumber: "INV-004",
+        taxTreatment: "inclusive",
+      });
+
+      const payload = mockCreateInvoice.mock.calls[0][2];
+      expect(payload.LineAmountTypes).toBe("Inclusive");
+    });
+
+    it("omits LineAmountTypes when taxTreatment is not provided", async () => {
+      mockCreateInvoice.mockResolvedValue({
+        Invoices: [
+          {
+            InvoiceID: "xero-inv-uuid-6",
+            InvoiceNumber: "INV-005",
+            Type: "ACCPAY",
+            Status: "AUTHORISED",
+            Contact: { ContactID: "contact-1", Name: "Acme" },
+            DateString: "2026-03-28",
+            DueDateString: "2026-04-28",
+            Total: 100,
+            AmountDue: 100,
+            CurrencyCode: "USD",
+            LineItems: [],
+          },
+        ],
+      });
+
+      const adapter = await getAdapter();
+      await adapter.createBill(mockSupabase, "org-1", {
+        vendorRef: "contact-1",
+        lineItems: [{ amount: 100, glAccountId: "500", description: null }],
+        invoiceDate: "2026-03-28",
+        dueDate: "2026-04-28",
+        invoiceNumber: "INV-005",
+      });
+
+      const payload = mockCreateInvoice.mock.calls[0][2];
+      expect(payload.LineAmountTypes).toBeUndefined();
+    });
+
     it("wraps XeroApiError into AccountingApiError", async () => {
       mockCreateInvoice.mockRejectedValue(
         new XeroApiError({

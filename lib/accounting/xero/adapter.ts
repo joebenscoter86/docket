@@ -33,6 +33,13 @@ import { logger } from "@/lib/utils/logger";
 /** Xero attachment size limit: 4 MB */
 const XERO_ATTACHMENT_MAX_BYTES = 4 * 1024 * 1024;
 
+/** Map provider-agnostic tax treatment to Xero's LineAmountTypes values. */
+const LINE_AMOUNT_TYPES_MAP = {
+  exclusive: "Exclusive",
+  inclusive: "Inclusive",
+  no_tax: "NoTax",
+} as const;
+
 type SupabaseAdminClient = ReturnType<
   typeof import("@/lib/supabase/admin").createAdminClient
 >;
@@ -145,6 +152,7 @@ export class XeroAccountingAdapter implements AccountingProvider {
       ...(input.invoiceNumber
         ? { InvoiceNumber: input.invoiceNumber, Reference: input.invoiceNumber }
         : {}),
+      ...(input.taxTreatment ? { LineAmountTypes: LINE_AMOUNT_TYPES_MAP[input.taxTreatment] } : {}),
     };
 
     try {
@@ -190,6 +198,7 @@ export class XeroAccountingAdapter implements AccountingProvider {
       LineItems: lineItems,
       ...(input.invoiceDate ? { Date: input.invoiceDate } : {}),
       ...(input.invoiceNumber ? { Reference: input.invoiceNumber } : {}),
+      ...(input.taxTreatment ? { LineAmountTypes: LINE_AMOUNT_TYPES_MAP[input.taxTreatment] } : {}),
     };
 
     try {

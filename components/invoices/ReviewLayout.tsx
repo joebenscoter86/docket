@@ -34,6 +34,7 @@ interface ReviewLayoutProps {
     paymentAccountName: string | null;
     batchId: string | null;
     xeroBillStatus?: "DRAFT" | "AUTHORISED" | null;
+    taxTreatment?: "exclusive" | "inclusive" | "no_tax" | null;
   };
   signedUrl: string;
   extractedData: ExtractedDataRow | null;
@@ -247,6 +248,7 @@ export default function ReviewLayout({
                 batchManifest={batchManifest}
                 accountingProvider={accountingProvider ?? null}
                 xeroBillStatus={invoice.xeroBillStatus ?? null}
+                taxTreatment={invoice.taxTreatment ?? null}
               />
             ) : (
               <div className="flex items-center justify-center h-full text-sm text-muted">

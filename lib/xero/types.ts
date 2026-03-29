@@ -159,6 +159,7 @@ export interface XeroInvoicePayload {
   LineItems: XeroLineItem[];
   CurrencyCode?: string;
   Status?: "DRAFT" | "SUBMITTED" | "AUTHORISED";
+  LineAmountTypes?: "Exclusive" | "Inclusive" | "NoTax";
 }
 
 /** A Xero Invoice as returned by the API. */
@@ -209,6 +210,7 @@ export interface XeroBankTransactionPayload {
   Date?: string;        // YYYY-MM-DD
   Reference?: string;
   Status?: "AUTHORISED" | "DRAFT";
+  LineAmountTypes?: "Exclusive" | "Inclusive" | "NoTax";
 }
 
 /** A Xero Bank Transaction as returned by the API. */

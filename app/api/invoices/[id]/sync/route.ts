@@ -300,6 +300,10 @@ export async function POST(
     let result: TransactionResult;
     let requestInput: unknown;
 
+    const taxTreatment = (invoice.tax_treatment === "exclusive" || invoice.tax_treatment === "inclusive" || invoice.tax_treatment === "no_tax")
+      ? invoice.tax_treatment
+      : undefined;
+
     try {
       if (isBill) {
         const xeroStatus = (invoice.xero_bill_status === "DRAFT" || invoice.xero_bill_status === "AUTHORISED")
@@ -312,6 +316,7 @@ export async function POST(
           dueDate: extractedData.due_date,
           invoiceNumber: extractedData.invoice_number,
           xeroStatus,
+          taxTreatment,
         };
         requestInput = input;
         result = await provider.createBill(adminSupabase, orgId, input);
@@ -323,6 +328,7 @@ export async function POST(
           lineItems: syncLineItems,
           invoiceDate: extractedData.invoice_date,
           invoiceNumber: extractedData.invoice_number,
+          taxTreatment,
         };
         requestInput = input;
         result = await provider.createPurchase(adminSupabase, orgId, input);
