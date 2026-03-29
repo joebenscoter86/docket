@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, useEffect, useId } from "react";
 import Link from "next/link";
 import InvoiceStatusBadge from "./InvoiceStatusBadge";
 import dynamic from "next/dynamic";
@@ -66,10 +66,18 @@ export default function ReviewLayout({
   const [leftPct, setLeftPct] = useState(50);
   const isDragging = useRef(false);
   const containerRef = useRef<HTMLDivElement>(null);
+  const dividerRef = useRef<HTMLDivElement>(null);
+  const scopeId = useId().replace(/:/g, "");
+
+  const stopDragging = useCallback(() => {
+    isDragging.current = false;
+    document.body.style.cursor = "";
+    document.body.style.userSelect = "";
+  }, []);
 
   const handlePointerDown = useCallback((e: React.PointerEvent) => {
     isDragging.current = true;
-    (e.target as HTMLElement).setPointerCapture(e.pointerId);
+    dividerRef.current?.setPointerCapture(e.pointerId);
     document.body.style.cursor = "col-resize";
     document.body.style.userSelect = "none";
   }, []);
@@ -81,11 +89,18 @@ export default function ReviewLayout({
     setLeftPct(Math.min(75, Math.max(25, pct)));
   }, []);
 
-  const handlePointerUp = useCallback(() => {
-    isDragging.current = false;
-    document.body.style.cursor = "";
-    document.body.style.userSelect = "";
-  }, []);
+  // Clean up body styles on unmount and handle pointer-leave-window
+  useEffect(() => {
+    const onPointerUp = () => { if (isDragging.current) stopDragging(); };
+    window.addEventListener("pointerup", onPointerUp);
+    window.addEventListener("pointercancel", onPointerUp);
+    return () => {
+      window.removeEventListener("pointerup", onPointerUp);
+      window.removeEventListener("pointercancel", onPointerUp);
+      document.body.style.cursor = "";
+      document.body.style.userSelect = "";
+    };
+  }, [stopDragging]);
 
   const confidence = extractedData?.confidence_score ?? null;
 
@@ -93,8 +108,8 @@ export default function ReviewLayout({
     <div className="flex flex-col h-full -m-6">
       <style>{`
         @media (min-width: 768px) {
-          .review-panel-left { width: ${leftPct}% !important; flex: none !important; }
-          .review-panel-right { width: ${100 - leftPct}% !important; flex: none !important; }
+          .rp-left-${scopeId} { width: ${leftPct}% !important; flex: none !important; }
+          .rp-right-${scopeId} { width: ${100 - leftPct}% !important; flex: none !important; }
         }
       `}</style>
       {/* Batch navigation bar */}
@@ -187,13 +202,12 @@ export default function ReviewLayout({
         ref={containerRef}
         className="flex flex-1 min-h-0"
         onPointerMove={handlePointerMove}
-        onPointerUp={handlePointerUp}
       >
         {/* Left panel: PDF viewer */}
         <div
           className={`${
             activeTab === "document" ? "flex" : "hidden"
-          } md:flex w-full overflow-y-auto review-panel-left`}
+          } md:flex w-full overflow-y-auto rp-left-${scopeId}`}
         >
           <div className="flex-1">
             <PdfViewer signedUrl={signedUrl} fileType={invoice.fileType} />
@@ -202,7 +216,8 @@ export default function ReviewLayout({
 
         {/* Draggable divider */}
         <div
-          className="hidden md:flex items-center justify-center w-0 relative cursor-col-resize select-none z-10 group"
+          ref={dividerRef}
+          className="hidden md:flex items-center justify-center w-0 relative cursor-col-resize select-none z-10 group touch-none"
           onPointerDown={handlePointerDown}
         >
           {/* Wide hit target */}
@@ -215,7 +230,7 @@ export default function ReviewLayout({
         <div
           className={`${
             activeTab === "details" ? "flex" : "hidden"
-          } md:flex w-full overflow-y-auto review-panel-right`}
+          } md:flex w-full overflow-y-auto rp-right-${scopeId}`}
         >
           <div className="flex-1 p-4 md:p-6">
             {extractedData ? (
