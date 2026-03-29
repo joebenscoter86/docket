@@ -1,5 +1,11 @@
 import { describe, it, expect } from "vitest";
-import { validatePrefix, buildAddress, RESERVED_PREFIXES } from "./prefix-validation";
+import { validatePrefix, buildAddress, RESERVED_PREFIXES, type ValidationResult } from "./prefix-validation";
+
+/** Narrow a ValidationResult to its error branch for test assertions. */
+function expectInvalid(result: ValidationResult): { valid: false; error: string } {
+  expect(result.valid).toBe(false);
+  return result as { valid: false; error: string };
+}
 
 describe("validatePrefix", () => {
   it("accepts a valid lowercase alphanumeric prefix", () => {
@@ -19,14 +25,12 @@ describe("validatePrefix", () => {
   });
 
   it("rejects fewer than 3 characters", () => {
-    const result = validatePrefix("ab");
-    expect(result.valid).toBe(false);
+    const result = expectInvalid(validatePrefix("ab"));
     expect(result.error).toContain("at least 3");
   });
 
   it("rejects more than 20 characters", () => {
-    const result = validatePrefix("a".repeat(21));
-    expect(result.valid).toBe(false);
+    const result = expectInvalid(validatePrefix("a".repeat(21)));
     expect(result.error).toContain("20 characters");
   });
 
@@ -35,50 +39,42 @@ describe("validatePrefix", () => {
   });
 
   it("rejects spaces", () => {
-    const result = validatePrefix("my prefix");
-    expect(result.valid).toBe(false);
+    const result = expectInvalid(validatePrefix("my prefix"));
     expect(result.error).toContain("letters, numbers, and hyphens");
   });
 
   it("rejects dots", () => {
-    const result = validatePrefix("my.prefix");
-    expect(result.valid).toBe(false);
+    const result = expectInvalid(validatePrefix("my.prefix"));
     expect(result.error).toContain("letters, numbers, and hyphens");
   });
 
   it("rejects underscores", () => {
-    const result = validatePrefix("my_prefix");
-    expect(result.valid).toBe(false);
+    const result = expectInvalid(validatePrefix("my_prefix"));
     expect(result.error).toContain("letters, numbers, and hyphens");
   });
 
   it("rejects leading hyphen", () => {
-    const result = validatePrefix("-abc");
-    expect(result.valid).toBe(false);
+    const result = expectInvalid(validatePrefix("-abc"));
     expect(result.error).toContain("start or end with a hyphen");
   });
 
   it("rejects trailing hyphen", () => {
-    const result = validatePrefix("abc-");
-    expect(result.valid).toBe(false);
+    const result = expectInvalid(validatePrefix("abc-"));
     expect(result.error).toContain("start or end with a hyphen");
   });
 
   it("rejects reserved prefix 'admin'", () => {
-    const result = validatePrefix("admin");
-    expect(result.valid).toBe(false);
+    const result = expectInvalid(validatePrefix("admin"));
     expect(result.error).toContain("reserved");
   });
 
   it("rejects reserved prefix 'support' (case-insensitive)", () => {
-    const result = validatePrefix("Support");
-    expect(result.valid).toBe(false);
+    const result = expectInvalid(validatePrefix("Support"));
     expect(result.error).toContain("reserved");
   });
 
   it("rejects empty string", () => {
-    const result = validatePrefix("");
-    expect(result.valid).toBe(false);
+    const result = expectInvalid(validatePrefix(""));
     expect(result.error).toContain("at least 3");
   });
 

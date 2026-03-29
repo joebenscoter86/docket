@@ -49,14 +49,13 @@ vi.mock("@/lib/supabase/admin", () => {
   };
 });
 
-const { setCustomPrefix } = await import("./address");
-
 describe("setCustomPrefix", () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
   it("rejects an invalid prefix (too short)", async () => {
+    const { setCustomPrefix } = await import("./address");
     const result = await setCustomPrefix("org-1", "ab");
     expect(result).toEqual({
       success: false,
@@ -65,6 +64,7 @@ describe("setCustomPrefix", () => {
   });
 
   it("rejects a reserved prefix", async () => {
+    const { setCustomPrefix } = await import("./address");
     const result = await setCustomPrefix("org-1", "admin");
     expect(result).toEqual({
       success: false,
@@ -73,6 +73,7 @@ describe("setCustomPrefix", () => {
   });
 
   it("returns conflict when address is already taken by another org", async () => {
+    const { setCustomPrefix } = await import("./address");
     // select check finds another org with this address
     mockSingle.mockResolvedValueOnce({
       data: { id: "other-org" },
@@ -88,6 +89,7 @@ describe("setCustomPrefix", () => {
   });
 
   it("allows setting prefix that the same org already has", async () => {
+    const { setCustomPrefix } = await import("./address");
     // select check finds the same org (re-setting same prefix)
     mockSingle
       .mockResolvedValueOnce({ data: { id: "org-1" }, error: null })
@@ -104,6 +106,7 @@ describe("setCustomPrefix", () => {
   });
 
   it("updates the org address on success when no conflict", async () => {
+    const { setCustomPrefix } = await import("./address");
     // select check: no existing org with this address
     mockSingle
       .mockResolvedValueOnce({ data: null, error: { code: "PGRST116" } })
@@ -120,6 +123,7 @@ describe("setCustomPrefix", () => {
   });
 
   it("handles unique constraint violation (race condition)", async () => {
+    const { setCustomPrefix } = await import("./address");
     // select check: no existing org
     mockSingle
       .mockResolvedValueOnce({ data: null, error: { code: "PGRST116" } })

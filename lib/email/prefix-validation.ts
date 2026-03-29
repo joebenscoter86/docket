@@ -11,7 +11,7 @@ export const RESERVED_PREFIXES = [
   "test",
 ] as const;
 
-type ValidationResult =
+export type ValidationResult =
   | { valid: true }
   | { valid: false; error: string };
 
