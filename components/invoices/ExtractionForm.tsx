@@ -655,7 +655,10 @@ export default function ExtractionForm({
       {accountingProvider === "xero" && currentOutputType === "bill" && currentStatus !== "synced" && (
         <div className="flex items-center justify-between gap-3 bg-white rounded-brand-md shadow-soft px-5 py-4">
           <div className="min-w-0">
-            <p className="text-sm font-medium text-text">Bill status in Xero</p>
+            <div className="flex items-center gap-1.5">
+              <p className="text-sm font-medium text-text">Bill status in Xero</p>
+              <InfoTooltip text="Awaiting Payment: bill is ready to be paid immediately. Draft: bill needs internal review before it can be paid. Most users choose Awaiting Payment." />
+            </div>
             <p className="text-xs text-muted mt-0.5">How this bill appears after syncing</p>
           </div>
           <div className="flex items-center gap-1.5 shrink-0">
@@ -681,7 +684,10 @@ export default function ExtractionForm({
       {accountingOptions.connected && currentStatus !== "synced" && (
         <div className="flex items-center justify-between gap-3 bg-white rounded-brand-md shadow-soft px-5 py-4">
           <div className="min-w-0">
-            <p className="text-sm font-medium text-text">Tax treatment</p>
+            <div className="flex items-center gap-1.5">
+              <p className="text-sm font-medium text-text">Tax treatment</p>
+              <InfoTooltip text="Tax Exclusive: line item amounts are before tax. Tax is calculated on top. This is standard for US invoices and receipts with a separate tax line. Tax Inclusive: line item amounts already include tax. Common in UK/EU/AU where VAT is baked into prices. No Tax: no tax applies to this invoice." />
+            </div>
             <p className="text-xs text-muted mt-0.5">How line item amounts relate to tax</p>
           </div>
           <div className="flex items-center gap-1.5 shrink-0">
@@ -732,6 +738,32 @@ export default function ExtractionForm({
         </>
       )}
     </div>
+  );
+}
+
+function InfoTooltip({ text }: { text: string }) {
+  const [open, setOpen] = useState(false);
+
+  return (
+    <span className="relative inline-flex">
+      <button
+        type="button"
+        onClick={() => setOpen(!open)}
+        onBlur={() => setOpen(false)}
+        className="text-muted hover:text-text transition-colors"
+        aria-label="More info"
+      >
+        <svg className="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor">
+          <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a.75.75 0 000 1.5h.253a.25.25 0 01.244.304l-.459 2.066A1.75 1.75 0 0010.747 15H11a.75.75 0 000-1.5h-.253a.25.25 0 01-.244-.304l.459-2.066A1.75 1.75 0 009.253 9H9z" clipRule="evenodd" />
+        </svg>
+      </button>
+      {open && (
+        <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-64 rounded-md bg-primary text-white text-xs leading-relaxed p-3 shadow-lg z-50">
+          {text}
+          <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-primary" />
+        </div>
+      )}
+    </span>
   );
 }
 
