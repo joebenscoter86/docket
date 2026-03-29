@@ -183,26 +183,35 @@ export async function PUT(request: NextRequest) {
     return validationError("prefix is required");
   }
 
-  const result = await setCustomPrefix(orgId, body.prefix);
+  try {
+    const result = await setCustomPrefix(orgId, body.prefix);
 
-  if (!result.success) {
-    if (result.code === "CONFLICT") {
-      return conflict(result.error);
+    if (!result.success) {
+      if (result.code === "CONFLICT") {
+        return conflict(result.error);
+      }
+      return validationError(result.error);
     }
-    return validationError(result.error);
+
+    logger.info("email_forwarding_prefix_updated", {
+      orgId,
+      userId: user.id,
+      newAddress: result.address,
+      status: "updated",
+    });
+
+    trackServerEvent(user.id, AnalyticsEvents.EMAIL_FORWARDING_PREFIX_UPDATED, {
+      orgId,
+    });
+
+    return apiSuccess({ address: result.address });
+  } catch (err) {
+    logger.error("email_forwarding_prefix_update_failed", {
+      orgId,
+      userId: user.id,
+      error: err instanceof Error ? err.message : "Unknown error",
+      exception: err instanceof Error ? err : undefined,
+    });
+    return internalError("Failed to update email prefix");
   }
-
-  logger.info("email_forwarding_prefix_updated", {
-    orgId,
-    userId: user.id,
-    newAddress: result.address,
-    status: "updated",
-  });
-
-  trackServerEvent(user.id, AnalyticsEvents.EMAIL_FORWARDING_ENABLED, {
-    orgId,
-    customPrefix: true,
-  });
-
-  return apiSuccess({ address: result.address });
 }

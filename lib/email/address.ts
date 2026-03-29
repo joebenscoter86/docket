@@ -127,11 +127,16 @@ export async function setCustomPrefix(
   const admin = createAdminClient();
 
   // Check if another org already uses this address
-  const { data: existing } = await admin
+  const { data: existing, error: checkError } = await admin
     .from("organizations")
     .select("id")
     .eq("inbound_email_address", address)
     .single();
+
+  // PGRST116 = no rows found (address available) — any other error is unexpected
+  if (checkError && checkError.code !== "PGRST116") {
+    throw new Error("Failed to check address availability: " + checkError.message);
+  }
 
   if (existing && existing.id !== orgId) {
     return {
