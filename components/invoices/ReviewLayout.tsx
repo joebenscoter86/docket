@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef, useCallback } from "react";
 import Link from "next/link";
 import InvoiceStatusBadge from "./InvoiceStatusBadge";
 import dynamic from "next/dynamic";
@@ -63,11 +63,40 @@ export default function ReviewLayout({
   accountingProvider,
 }: ReviewLayoutProps) {
   const [activeTab, setActiveTab] = useState<MobileTab>("document");
+  const [leftPct, setLeftPct] = useState(50);
+  const isDragging = useRef(false);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  const handlePointerDown = useCallback((e: React.PointerEvent) => {
+    isDragging.current = true;
+    (e.target as HTMLElement).setPointerCapture(e.pointerId);
+    document.body.style.cursor = "col-resize";
+    document.body.style.userSelect = "none";
+  }, []);
+
+  const handlePointerMove = useCallback((e: React.PointerEvent) => {
+    if (!isDragging.current || !containerRef.current) return;
+    const rect = containerRef.current.getBoundingClientRect();
+    const pct = ((e.clientX - rect.left) / rect.width) * 100;
+    setLeftPct(Math.min(75, Math.max(25, pct)));
+  }, []);
+
+  const handlePointerUp = useCallback(() => {
+    isDragging.current = false;
+    document.body.style.cursor = "";
+    document.body.style.userSelect = "";
+  }, []);
 
   const confidence = extractedData?.confidence_score ?? null;
 
   return (
     <div className="flex flex-col h-full -m-6">
+      <style>{`
+        @media (min-width: 768px) {
+          .review-panel-left { width: ${leftPct}% !important; flex: none !important; }
+          .review-panel-right { width: ${100 - leftPct}% !important; flex: none !important; }
+        }
+      `}</style>
       {/* Batch navigation bar */}
       {invoice.batchId && batchManifest && batchManifest.length > 1 && (
         <BatchNavigation
@@ -154,23 +183,39 @@ export default function ReviewLayout({
       </div>
 
       {/* Two-panel content area */}
-      <div className="flex flex-1 min-h-0">
+      <div
+        ref={containerRef}
+        className="flex flex-1 min-h-0"
+        onPointerMove={handlePointerMove}
+        onPointerUp={handlePointerUp}
+      >
         {/* Left panel: PDF viewer */}
         <div
           className={`${
             activeTab === "document" ? "flex" : "hidden"
-          } md:flex w-full md:w-1/2 overflow-y-auto md:border-r md:border-border`}
+          } md:flex w-full overflow-y-auto review-panel-left`}
         >
           <div className="flex-1">
             <PdfViewer signedUrl={signedUrl} fileType={invoice.fileType} />
           </div>
         </div>
 
+        {/* Draggable divider */}
+        <div
+          className="hidden md:flex items-center justify-center w-0 relative cursor-col-resize select-none z-10 group"
+          onPointerDown={handlePointerDown}
+        >
+          {/* Wide hit target */}
+          <div className="absolute inset-y-0 -left-1.5 -right-1.5 w-3" />
+          {/* Visible line */}
+          <div className="h-full w-px bg-border group-hover:w-[3px] group-hover:bg-primary/40 transition-all duration-150" />
+        </div>
+
         {/* Right panel: Extraction form */}
         <div
           className={`${
             activeTab === "details" ? "flex" : "hidden"
-          } md:flex w-full md:w-1/2 overflow-y-auto`}
+          } md:flex w-full overflow-y-auto review-panel-right`}
         >
           <div className="flex-1 p-4 md:p-6">
             {extractedData ? (
