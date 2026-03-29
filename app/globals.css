@@ -3,7 +3,7 @@
   --color-background: #F8FAFC;
   --color-surface: #FFFFFF;
   --color-text: #0F172A;
-  --color-muted: #94A3B8;
+  --color-muted: #64748B;
   --color-accent: #10B981;
   --color-warning: #F59E0B;
   --color-error: #DC2626;
@@ -29,4 +29,5 @@
 body {
   color: var(--color-text);
   background: var(--color-background);
+  font-weight: 500;
 }

@@ -273,13 +273,13 @@ export default function InvoiceList({
             <span className="text-muted">Pending</span>
           )}
         </td>
-        <td className="py-3.5 px-3 font-mono text-[13px] text-[#475569]">
+        <td className="py-3.5 px-3 font-mono text-[13px] text-text">
           {invoice.extracted_data?.invoice_number ?? "\u2014"}
         </td>
-        <td className="py-3.5 px-3 font-mono text-[13px] text-[#475569]">
+        <td className="py-3.5 px-3 font-mono text-[13px] text-text">
           {formatDate(invoice.extracted_data?.invoice_date ?? null)}
         </td>
-        <td className="py-3.5 px-3 text-[14px] text-right font-mono">
+        <td className="py-3.5 px-3 text-[14px] text-right font-mono font-medium">
           {invoice.extracted_data?.total_amount != null
             ? formatCurrency(invoice.extracted_data.total_amount, null)
             : "\u2014"}
@@ -336,12 +336,12 @@ export default function InvoiceList({
             )}
           </span>
         </div>
-        <div className="text-sm text-muted mb-1">
+        <div className="text-sm text-text mb-1">
           {invoice.extracted_data?.vendor_name ?? (
             <span className="text-muted">Pending</span>
           )}
           {invoice.extracted_data?.invoice_number && (
-            <span className="text-muted ml-2 font-mono text-[13px]">
+            <span className="text-text/70 ml-2 font-mono text-[13px]">
               #{invoice.extracted_data.invoice_number}
             </span>
           )}
