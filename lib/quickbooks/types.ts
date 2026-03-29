@@ -55,6 +55,7 @@ export interface QBOBillPayload {
   DueDate?: string;
   DocNumber?: string;
   PrivateNote?: string;
+  GlobalTaxCalculation?: "TaxExcluded" | "TaxInclusive" | "NotApplicable";
 }
 
 export interface QBOBillResponse {
@@ -157,6 +158,7 @@ export interface QBOPurchasePayload {
   TxnDate?: string;
   DocNumber?: string;
   Line: QBOPurchaseLine[];
+  GlobalTaxCalculation?: "TaxExcluded" | "TaxInclusive" | "NotApplicable";
 }
 
 export interface QBOPurchaseResponse {
