@@ -99,6 +99,14 @@ export async function PATCH(
       update.payment_account_name = body.payment_account_name ?? null;
     }
 
+    if ("xero_bill_status" in body) {
+      const status = body.xero_bill_status as string | null;
+      if (status !== null && status !== "DRAFT" && status !== "AUTHORISED") {
+        return validationError("Invalid xero_bill_status. Must be DRAFT, AUTHORISED, or null.");
+      }
+      update.xero_bill_status = status;
+    }
+
     if (Object.keys(update).length === 0) {
       return validationError("No valid fields to update.");
     }
