@@ -231,7 +231,7 @@ export function EmailIngestionCard() {
 
           {/* Setup hint */}
           <p className="text-[12px] text-muted">
-            Add this address as a forwarding rule in your email client. Invoices sent here are automatically extracted and queued for review.
+            Forward invoices to this address. We'll take it from there.
           </p>
 
           {/* Disable button */}
