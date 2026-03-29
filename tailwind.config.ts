@@ -31,7 +31,7 @@ const config: Config = {
           DEFAULT: "#0F172A",
         },
         muted: {
-          DEFAULT: "#94A3B8",
+          DEFAULT: "#64748B",
         },
         accent: {
           DEFAULT: "#10B981",
