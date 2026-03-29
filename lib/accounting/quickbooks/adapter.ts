@@ -29,6 +29,13 @@ type SupabaseAdminClient = ReturnType<
   typeof import("@/lib/supabase/admin").createAdminClient
 >;
 
+/** Map provider-agnostic tax treatment to QBO's GlobalTaxCalculation values. */
+const GLOBAL_TAX_MAP = {
+  exclusive: "TaxExcluded",
+  inclusive: "TaxInclusive",
+  no_tax: "NotApplicable",
+} as const;
+
 // ─── Error Wrapping ───
 
 /**
@@ -137,6 +144,7 @@ export class QuickBooksAccountingAdapter implements AccountingProvider {
       ...(input.invoiceDate ? { TxnDate: input.invoiceDate } : {}),
       ...(input.dueDate ? { DueDate: input.dueDate } : {}),
       ...(input.invoiceNumber ? { DocNumber: input.invoiceNumber } : {}),
+      ...(input.taxTreatment ? { GlobalTaxCalculation: GLOBAL_TAX_MAP[input.taxTreatment] } : {}),
     };
 
     try {
@@ -170,6 +178,7 @@ export class QuickBooksAccountingAdapter implements AccountingProvider {
       })),
       ...(input.invoiceDate ? { TxnDate: input.invoiceDate } : {}),
       ...(input.invoiceNumber ? { DocNumber: input.invoiceNumber } : {}),
+      ...(input.taxTreatment ? { GlobalTaxCalculation: GLOBAL_TAX_MAP[input.taxTreatment] } : {}),
     };
 
     try {
