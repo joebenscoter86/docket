@@ -231,7 +231,7 @@ export function EmailIngestionCard() {
 
           {/* Setup hint */}
           <p className="text-[12px] text-muted">
-            Forward invoices to this address. We'll take it from there.
+            Forward invoices to this address. We&apos;ll take it from there.
           </p>
 
           {/* Disable button */}
