@@ -20,6 +20,7 @@ export class MockExtractionProvider implements ExtractionProvider {
         currency: "USD",
         paymentTerms: "Net 30",
         confidenceScore: "high",
+        taxTreatment: "exclusive",
         lineItems: [
           {
             description: "Premium copy paper (10 reams)",

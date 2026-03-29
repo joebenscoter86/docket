@@ -68,7 +68,8 @@ Return ONLY valid JSON matching this exact schema — no markdown, no explanatio
   "subtotal": number or null,
   "tax_amount": number or null — use 0 if no tax shown,
   "total_amount": number or null,
-  "confidence": "high | medium | low — your confidence in the overall extraction accuracy"
+  "confidence": "high | medium | low — your confidence in the overall extraction accuracy",
+  "tax_treatment": "exclusive | inclusive | no_tax — how line item amounts relate to tax"
 }
 
 Rules:
@@ -83,6 +84,7 @@ Rules:
 - Detect whether this document is a RECEIPT or an INVOICE. A receipt is any document showing a completed purchase: it says "receipt", shows a payment method (credit card, cash, check), has a transaction date, or comes from a retail store. An invoice is a request for future payment with terms like "Net 30" or "Due by [date]".
 - If it is a RECEIPT: you MUST set payment_terms to "Paid" and you MUST set due_date equal to the invoice_date. Do not leave these null for receipts.
 - If it is an INVOICE with no explicit due date: leave due_date as null so the user can enter it manually. Do NOT infer a due date from payment terms.
+- For tax_treatment: "exclusive" if line item amounts are before tax (tax is shown separately), "inclusive" if line item amounts already include tax (common in UK/AU invoices), "no_tax" if no tax is shown at all. Default to "exclusive" if unclear.
 - Do not infer or calculate values — extract only what is explicitly shown
 - Return raw JSON only — no wrapping, no explanation`;
 
@@ -126,6 +128,7 @@ interface AIResponse {
   tax_amount: number | null;
   total_amount: number | null;
   confidence: "high" | "medium" | "low";
+  tax_treatment?: "exclusive" | "inclusive" | "no_tax";
 }
 
 function buildContentBlock(
@@ -199,6 +202,9 @@ function mapToExtractedInvoice(ai: AIResponse): ExtractedInvoice {
     currency: ai.currency ?? "USD",
     paymentTerms: ai.payment_terms,
     confidenceScore: ai.confidence,
+    taxTreatment: (ai.tax_treatment === "exclusive" || ai.tax_treatment === "inclusive" || ai.tax_treatment === "no_tax")
+      ? ai.tax_treatment
+      : "exclusive",
     lineItems,
   };
 

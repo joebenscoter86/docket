@@ -55,6 +55,7 @@ export async function runExtraction(params: {
           currency: "USD",
           paymentTerms: null,
           confidenceScore: "low",
+          taxTreatment: "exclusive",
           lineItems: [],
         },
         rawResponse: {},
@@ -224,10 +225,14 @@ export async function runExtraction(params: {
       }
     }
 
-    // 8. Update invoice status to pending_review
+    // 8. Update invoice status to pending_review + AI-inferred tax treatment
     const { error: statusError } = await admin
       .from("invoices")
-      .update({ status: "pending_review", error_message: null })
+      .update({
+        status: "pending_review",
+        error_message: null,
+        tax_treatment: result.data.taxTreatment,
+      })
       .eq("id", invoiceId);
 
     if (statusError) {
