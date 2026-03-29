@@ -107,6 +107,14 @@ export async function PATCH(
       update.xero_bill_status = status;
     }
 
+    if ("tax_treatment" in body) {
+      const treatment = body.tax_treatment as string | null;
+      if (treatment !== null && !["exclusive", "inclusive", "no_tax"].includes(treatment)) {
+        return validationError("Invalid tax_treatment. Must be exclusive, inclusive, no_tax, or null.");
+      }
+      update.tax_treatment = treatment;
+    }
+
     if (Object.keys(update).length === 0) {
       return validationError("No valid fields to update.");
     }
