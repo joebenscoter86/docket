@@ -80,6 +80,8 @@ export interface CreateBillInput {
   invoiceDate: string | null;
   dueDate: string | null;
   invoiceNumber: string | null;
+  /** Xero-only: bill status on creation. QBO ignores this. Defaults to AUTHORISED. */
+  xeroStatus?: "DRAFT" | "AUTHORISED";
 }
 
 /** Provider-agnostic input for creating a Purchase (Check / Cash / CreditCard). */

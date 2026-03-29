@@ -305,6 +305,71 @@ describe("XeroAccountingAdapter", () => {
       expect(payload.Reference).toBeUndefined();
     });
 
+    it("defaults to AUTHORISED when xeroStatus is not provided", async () => {
+      mockCreateInvoice.mockResolvedValue({
+        Invoices: [
+          {
+            InvoiceID: "xero-inv-uuid-3",
+            InvoiceNumber: "INV-002",
+            Type: "ACCPAY",
+            Status: "AUTHORISED",
+            Contact: { ContactID: "contact-1", Name: "Acme" },
+            DateString: "2026-03-28",
+            DueDateString: "2026-04-28",
+            Total: 100,
+            AmountDue: 100,
+            CurrencyCode: "USD",
+            LineItems: [],
+          },
+        ],
+      });
+
+      const adapter = await getAdapter();
+      await adapter.createBill(mockSupabase, "org-1", {
+        vendorRef: "contact-1",
+        lineItems: [{ amount: 100, glAccountId: "500", description: null }],
+        invoiceDate: "2026-03-28",
+        dueDate: "2026-04-28",
+        invoiceNumber: "INV-002",
+      });
+
+      const payload = mockCreateInvoice.mock.calls[0][2];
+      expect(payload.Status).toBe("AUTHORISED");
+    });
+
+    it("uses DRAFT status when xeroStatus is DRAFT", async () => {
+      mockCreateInvoice.mockResolvedValue({
+        Invoices: [
+          {
+            InvoiceID: "xero-inv-uuid-4",
+            InvoiceNumber: "INV-003",
+            Type: "ACCPAY",
+            Status: "DRAFT",
+            Contact: { ContactID: "contact-1", Name: "Acme" },
+            DateString: "2026-03-28",
+            DueDateString: "2026-04-28",
+            Total: 100,
+            AmountDue: 100,
+            CurrencyCode: "USD",
+            LineItems: [],
+          },
+        ],
+      });
+
+      const adapter = await getAdapter();
+      await adapter.createBill(mockSupabase, "org-1", {
+        vendorRef: "contact-1",
+        lineItems: [{ amount: 100, glAccountId: "500", description: null }],
+        invoiceDate: "2026-03-28",
+        dueDate: "2026-04-28",
+        invoiceNumber: "INV-003",
+        xeroStatus: "DRAFT",
+      });
+
+      const payload = mockCreateInvoice.mock.calls[0][2];
+      expect(payload.Status).toBe("DRAFT");
+    });
+
     it("wraps XeroApiError into AccountingApiError", async () => {
       mockCreateInvoice.mockRejectedValue(
         new XeroApiError({
