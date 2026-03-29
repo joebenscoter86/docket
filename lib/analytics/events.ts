@@ -14,6 +14,7 @@ export const AnalyticsEvents = {
   EMAIL_INGESTION_REJECTED: "email_ingestion_rejected",
   EMAIL_FORWARDING_ENABLED: "email_forwarding_enabled",
   EMAIL_FORWARDING_DISABLED: "email_forwarding_disabled",
+  EMAIL_FORWARDING_PREFIX_UPDATED: "email_forwarding_prefix_updated",
 } as const;
 
 export type AnalyticsEvent = (typeof AnalyticsEvents)[keyof typeof AnalyticsEvents];

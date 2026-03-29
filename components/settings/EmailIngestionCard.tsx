@@ -10,7 +10,10 @@ export function EmailIngestionCard() {
   const [disabling, setDisabling] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
   const [copied, setCopied] = useState(false);
-  const [showInstructions, setShowInstructions] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const [prefix, setPrefix] = useState("");
+  const [prefixError, setPrefixError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     fetch("/api/email/address")
@@ -29,7 +32,6 @@ export function EmailIngestionCard() {
       const data = await res.json();
       if (data.data?.address) {
         setAddress(data.data.address);
-        setShowInstructions(true);
       }
     } catch {
       // Fail silently -- user can retry
@@ -51,11 +53,40 @@ export function EmailIngestionCard() {
     }
   }
 
+  function extractPrefix(addr: string): string {
+    return addr.split("@")[0];
+  }
+
   function handleCopy() {
     if (!address) return;
     navigator.clipboard.writeText(address);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
+  }
+
+  async function handleSavePrefix() {
+    if (!prefix.trim()) return;
+    setSaving(true);
+    setPrefixError(null);
+    try {
+      const res = await fetch("/api/email/address", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ prefix: prefix.trim() }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setPrefixError(data.error || "Failed to update prefix");
+        return;
+      }
+      setAddress(data.data.address);
+      setEditing(false);
+      setPrefixError(null);
+    } catch {
+      setPrefixError("Failed to update prefix. Please try again.");
+    } finally {
+      setSaving(false);
+    }
   }
 
   if (loading) {
@@ -103,25 +134,88 @@ export function EmailIngestionCard() {
       {/* Enabled state: show address + instructions */}
       {address && (
         <div className="mt-5 space-y-4">
-          {/* Address display */}
+          {/* Address display / edit */}
           <div>
             <label className="block text-[13px] font-medium text-muted mb-1.5">
               Your forwarding address
             </label>
-            <div className="flex items-center gap-2">
-              <input
-                type="text"
-                readOnly
-                value={address}
-                className="flex-1 font-mono text-[14px] bg-gray-50 border border-border rounded-brand-md px-3 py-2 text-text select-all"
-              />
-              <button
-                onClick={handleCopy}
-                className="px-3 py-2 text-[13px] font-medium bg-blue-600 text-white rounded-brand-md hover:bg-blue-700 transition-colors whitespace-nowrap"
-              >
-                {copied ? "Copied!" : "Copy"}
-              </button>
-            </div>
+
+            {editing ? (
+              <div className="space-y-2">
+                <div className="flex items-center gap-0">
+                  <input
+                    type="text"
+                    value={prefix}
+                    onChange={(e) => {
+                      setPrefix(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ""));
+                      setPrefixError(null);
+                    }}
+                    placeholder="your-prefix"
+                    maxLength={20}
+                    className="font-mono text-[14px] bg-white border border-border border-r-0 rounded-l-brand-md px-3 py-2 text-text w-40 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    autoFocus
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") handleSavePrefix();
+                      if (e.key === "Escape") {
+                        setEditing(false);
+                        setPrefixError(null);
+                      }
+                    }}
+                  />
+                  <span className="font-mono text-[14px] bg-gray-100 border border-border border-l-0 rounded-r-brand-md px-3 py-2 text-muted select-none">
+                    @ingest.dockett.app
+                  </span>
+                </div>
+                {prefixError && (
+                  <p className="text-[12px] text-red-600">{prefixError}</p>
+                )}
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={handleSavePrefix}
+                    disabled={saving || prefix.length < 3}
+                    className="px-3 py-1.5 text-[13px] font-medium bg-blue-600 text-white rounded-brand-md hover:bg-blue-700 transition-colors disabled:opacity-50"
+                  >
+                    {saving ? "Saving..." : "Save"}
+                  </button>
+                  <button
+                    onClick={() => {
+                      setEditing(false);
+                      setPrefixError(null);
+                    }}
+                    className="px-3 py-1.5 text-[13px] font-medium text-muted hover:text-text transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <p className="text-[12px] text-muted">
+                    3-20 characters. Letters, numbers, hyphens.
+                  </p>
+                </div>
+              </div>
+            ) : (
+              <div className="flex items-center gap-2">
+                <input
+                  type="text"
+                  readOnly
+                  value={address}
+                  className="flex-1 font-mono text-[14px] bg-gray-50 border border-border rounded-brand-md px-3 py-2 text-text select-all"
+                />
+                <button
+                  onClick={() => {
+                    setPrefix(extractPrefix(address!));
+                    setEditing(true);
+                  }}
+                  className="px-3 py-2 text-[13px] font-medium text-muted border border-border rounded-brand-md hover:bg-gray-50 transition-colors whitespace-nowrap"
+                >
+                  Edit
+                </button>
+                <button
+                  onClick={handleCopy}
+                  className="px-3 py-2 text-[13px] font-medium bg-blue-600 text-white rounded-brand-md hover:bg-blue-700 transition-colors whitespace-nowrap"
+                >
+                  {copied ? "Copied!" : "Copy"}
+                </button>
+              </div>
+            )}
           </div>
 
           {/* Test email link */}
@@ -135,38 +229,10 @@ export function EmailIngestionCard() {
             Send a test email
           </a>
 
-          {/* Setup instructions (collapsible) */}
-          <button
-            onClick={() => setShowInstructions(!showInstructions)}
-            className="flex items-center gap-1.5 text-[13px] font-medium text-muted hover:text-text transition-colors"
-          >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              viewBox="0 0 16 16"
-              fill="currentColor"
-              className={`w-3.5 h-3.5 transition-transform ${showInstructions ? "rotate-90" : ""}`}
-            >
-              <path fillRule="evenodd" d="M6.22 4.22a.75.75 0 011.06 0l3.25 3.25a.75.75 0 010 1.06l-3.25 3.25a.75.75 0 01-1.06-1.06L8.94 8 6.22 5.28a.75.75 0 010-1.06z" clipRule="evenodd" />
-            </svg>
-            Setup instructions
-          </button>
-
-          {showInstructions && (
-            <div className="bg-gray-50 rounded-brand-md p-4 space-y-3 text-[13px] text-muted">
-              <div>
-                <p className="font-medium text-text mb-1">Gmail</p>
-                <p>Settings &gt; Forwarding and POP/IMAP &gt; Add a forwarding address &gt; paste the address above &gt; confirm.</p>
-              </div>
-              <div>
-                <p className="font-medium text-text mb-1">Outlook</p>
-                <p>Settings &gt; Mail &gt; Forwarding &gt; Enable forwarding &gt; paste the address above.</p>
-              </div>
-              <div>
-                <p className="font-medium text-text mb-1">Other</p>
-                <p>Add the address above as a forwarding rule in your email client. You only need to do this once.</p>
-              </div>
-            </div>
-          )}
+          {/* Setup hint */}
+          <p className="text-[12px] text-muted">
+            Forward invoices to this address. We&apos;ll take it from there.
+          </p>
 
           {/* Disable button */}
           <div className="pt-2 border-t border-border">
