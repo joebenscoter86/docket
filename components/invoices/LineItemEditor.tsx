@@ -404,7 +404,7 @@ export default function LineItemEditor({
       </div>
 
       {/* Table header */}
-      <div className="grid grid-cols-[minmax(120px,2fr)_70px_100px_100px_minmax(140px,1.5fr)_32px] gap-x-2 items-center mb-1">
+      <div className="grid grid-cols-[minmax(120px,2fr)_70px_100px_100px_minmax(140px,1.5fr)_32px] gap-x-2 items-center pb-2 mb-2 border-b border-border">
         <span className="text-xs font-medium text-muted uppercase">Description</span>
         <span className="text-xs font-medium text-muted uppercase text-right">Qty</span>
         <span className="text-xs font-medium text-muted uppercase text-right">Unit Price</span>
@@ -414,12 +414,12 @@ export default function LineItemEditor({
       </div>
 
       {/* Rows */}
-      <div className="space-y-1">
+      <div className="space-y-0 divide-y divide-border/40">
         {state.items.map((item) => {
           const hasTracking = (item.values.tracking as TrackingAssignment[] | null)?.length;
           const isTrackingExpanded = expandedTracking.has(item.id);
           return (
-          <div key={item.id} className={isTrackingExpanded || hasTracking ? "bg-gray-50 border border-gray-100 rounded-md px-2 py-1.5 -mx-2" : ""}>
+          <div key={item.id} className={`py-2.5 transition-colors duration-150 hover:bg-background/60 ${isTrackingExpanded || hasTracking ? "bg-background/40 rounded-md px-2 -mx-2" : ""}`}>
           <div
             className="grid grid-cols-[minmax(120px,2fr)_70px_100px_100px_minmax(140px,1.5fr)_32px] gap-x-2 items-center"
           >

@@ -106,12 +106,17 @@ export default function ReviewLayout({
   const confidence = extractedData?.confidence_score ?? null;
 
   return (
-    <div className="flex flex-col h-full -m-6">
+    <div className={`flex flex-col -m-6 md:-m-8 lg:-m-10 review-root-${scopeId}`} style={{ height: 'calc(100% + 48px)' }}>
       <style>{`
         @media (min-width: 768px) {
           .rp-left-${scopeId} { width: ${leftPct}% !important; flex: none !important; }
           .rp-right-${scopeId} { width: ${100 - leftPct}% !important; flex: none !important; }
+          .review-root-${scopeId} { height: calc(100% + 64px) !important; }
         }
+        @media (min-width: 1024px) {
+          .review-root-${scopeId} { height: calc(100% + 80px) !important; }
+        }
+        #app-footer { display: none; }
       `}</style>
       {/* Batch navigation bar */}
       {invoice.batchId && batchManifest && batchManifest.length > 1 && (
@@ -233,7 +238,7 @@ export default function ReviewLayout({
             activeTab === "details" ? "flex" : "hidden"
           } md:flex w-full overflow-y-auto rp-right-${scopeId}`}
         >
-          <div className="flex-1 p-4 md:p-6">
+          <div className="flex-1 p-4 md:p-6 bg-background">
             {extractedData ? (
               <ExtractionForm
                 extractedData={extractedData}
