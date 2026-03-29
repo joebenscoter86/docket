@@ -458,11 +458,7 @@ export default function ExtractionForm({
           <p className="mt-1 text-xs text-error">{fieldError}</p>
         )}
 
-        {field === "total_amount" && totalMismatch && (
-          <p className="mt-1 text-xs text-warning">
-            Total doesn&apos;t match subtotal + tax
-          </p>
-        )}
+        {/* total mismatch shown at card level in amounts strip */}
       </div>
     );
   }
@@ -543,7 +539,7 @@ export default function ExtractionForm({
       )}
 
       {/* Vendor Mapping */}
-      <div className="bg-background border border-border rounded-lg p-4 space-y-3">
+      <div className="bg-white rounded-brand-md shadow-soft p-5 space-y-3">
         <h3 className="text-xs font-semibold uppercase tracking-wide text-muted">
           Vendor Mapping
         </h3>
@@ -584,7 +580,7 @@ export default function ExtractionForm({
       </div>
 
       {/* Section 1: Invoice Details */}
-      <div>
+      <div className="bg-white rounded-brand-md shadow-soft p-5">
         <h3 className="text-xs font-semibold uppercase tracking-wide text-muted mb-4">
           Invoice Details
         </h3>
@@ -602,42 +598,62 @@ export default function ExtractionForm({
         </div>
       </div>
 
-      <div className="border-t border-border" />
-
       {/* Section 2: Line Items */}
-      <LineItemEditor
-        lineItems={extractedData.extracted_line_items ?? []}
-        invoiceId={invoiceId}
-        extractedDataId={extractedData.id}
-        currency={currency}
-        onSubtotalChange={handleSubtotalChange}
-        onMissingGlCountChange={setLineItemsMissingGl}
-        accounts={accountingOptions.accounts}
-        accountsLoading={accountingOptions.loading}
-        accountingConnected={accountingOptions.connected}
-        disabled={currentStatus === "synced"}
-        trackingCategories={accountingOptions.trackingCategories}
-      />
+      <div className="bg-white rounded-brand-md shadow-soft p-5">
+        <LineItemEditor
+          lineItems={extractedData.extracted_line_items ?? []}
+          invoiceId={invoiceId}
+          extractedDataId={extractedData.id}
+          currency={currency}
+          onSubtotalChange={handleSubtotalChange}
+          onMissingGlCountChange={setLineItemsMissingGl}
+          accounts={accountingOptions.accounts}
+          accountsLoading={accountingOptions.loading}
+          accountingConnected={accountingOptions.connected}
+          disabled={currentStatus === "synced"}
+          trackingCategories={accountingOptions.trackingCategories}
+        />
+      </div>
 
-      <div className="border-t border-border" />
-
-      {/* Section 3: Amounts */}
-      <div>
-        <h3 className="text-xs font-semibold uppercase tracking-wide text-muted mb-4">
-          Amounts
-        </h3>
-        <div className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {renderField("subtotal")}
-            {renderField("tax_amount")}
+      {/* Section 3: Amounts — summary strip */}
+      <div className="bg-white rounded-brand-md shadow-soft p-5">
+        <div className="flex flex-col items-end space-y-2">
+          <div className="w-full md:w-1/2 space-y-2">
+            {/* Subtotal */}
+            <div className="flex items-center justify-between gap-4">
+              <span className="text-sm text-muted">Subtotal</span>
+              <div className="w-32">
+                {renderField("subtotal")}
+              </div>
+            </div>
+            {/* Tax */}
+            <div className="flex items-center justify-between gap-4">
+              <span className="text-sm text-muted">Tax</span>
+              <div className="w-32">
+                {renderField("tax_amount")}
+              </div>
+            </div>
+            {/* Divider */}
+            <div className="border-t border-border" />
+            {/* Total */}
+            <div className="flex items-center justify-between gap-4">
+              <span className="text-base font-semibold font-headings text-text">Total</span>
+              <div className="w-32">
+                {renderField("total_amount")}
+              </div>
+            </div>
           </div>
-          {renderField("total_amount")}
         </div>
+        {totalMismatch && (
+          <p className="mt-2 text-xs text-warning text-right">
+            Total doesn&apos;t match subtotal + tax
+          </p>
+        )}
       </div>
 
       {/* Xero bill status selector — only for Xero users syncing as a Bill */}
       {accountingProvider === "xero" && currentOutputType === "bill" && currentStatus !== "synced" && (
-        <div className="flex items-center justify-between gap-3 bg-background border border-border rounded-lg px-4 py-3">
+        <div className="flex items-center justify-between gap-3 bg-white rounded-brand-md shadow-soft px-5 py-4">
           <div className="min-w-0">
             <p className="text-sm font-medium text-text">Bill status in Xero</p>
             <p className="text-xs text-muted mt-0.5">How this bill appears after syncing</p>
@@ -663,7 +679,7 @@ export default function ExtractionForm({
 
       {/* Tax treatment selector — all providers, all output types, hidden when synced */}
       {accountingOptions.connected && currentStatus !== "synced" && (
-        <div className="flex items-center justify-between gap-3 bg-background border border-border rounded-lg px-4 py-3">
+        <div className="flex items-center justify-between gap-3 bg-white rounded-brand-md shadow-soft px-5 py-4">
           <div className="min-w-0">
             <p className="text-sm font-medium text-text">Tax treatment</p>
             <p className="text-xs text-muted mt-0.5">How line item amounts relate to tax</p>
@@ -688,10 +704,9 @@ export default function ExtractionForm({
         </div>
       )}
 
-      {/* Action bar — shown for pending_review, approved, and synced invoices */}
+      {/* Action bar — sticky at bottom of scroll container */}
       {(currentStatus === "pending_review" || currentStatus === "approved" || currentStatus === "synced") && (
-        <>
-          <div className="border-t border-border" />
+        <div className="sticky bottom-0 -mx-4 md:-mx-6 px-4 md:px-6 py-3 bg-white border-t border-border shadow-[0_-4px_12px_rgba(0,0,0,0.04)] z-10">
           <ActionBar
             invoiceId={invoiceId}
             currentStatus={currentStatus}
@@ -703,13 +718,12 @@ export default function ExtractionForm({
             provider={accountingProvider}
             onStatusChange={handleStatusChange}
           />
-        </>
+        </div>
       )}
 
       {/* Sync status panel — shows sync history for approved/synced invoices */}
       {(currentStatus === "approved" || currentStatus === "synced") && (
         <>
-          <div className="border-t border-border" />
           <SyncStatusPanel
             key={syncKey}
             invoiceId={invoiceId}
