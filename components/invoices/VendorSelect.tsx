@@ -49,6 +49,7 @@ export default function VendorSelect({
   const inputRef = useRef<HTMLInputElement>(null);
   const savedTimer = useRef<ReturnType<typeof setTimeout>>();
   const autoMatchedRef = useRef(false);
+  const [autoMatchAttempted, setAutoMatchAttempted] = useState(false);
   const [wasAutoMatched, setWasAutoMatched] = useState(false);
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
@@ -75,6 +76,7 @@ export default function VendorSelect({
     if (exactMatches.length === 1) {
       setSelectedRef(exactMatches[0].value);
       setWasAutoMatched(true);
+      setAutoMatchAttempted(true);
       onSelect(exactMatches[0].value);
       return;
     }
@@ -87,8 +89,13 @@ export default function VendorSelect({
     if (startsWithMatches.length === 1) {
       setSelectedRef(startsWithMatches[0].value);
       setWasAutoMatched(true);
+      setAutoMatchAttempted(true);
       onSelect(startsWithMatches[0].value);
+      return;
     }
+
+    // No match found — trigger re-render so UI shows "No match found" immediately
+    setAutoMatchAttempted(true);
   }, [vendors, vendorName, selectedRef, onSelect]);
 
   // Close dropdown on outside click
@@ -250,6 +257,11 @@ export default function VendorSelect({
             Auto-matched
           </span>
         )}
+        {!selectedRef && !saving && autoMatchAttempted && vendors.length > 0 && (
+          <span className="inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] font-medium rounded-full bg-warning/10 text-warning">
+            No match found
+          </span>
+        )}
       </label>
 
       <div className="relative">
@@ -351,7 +363,14 @@ export default function VendorSelect({
 
       {!selectedRef && !isOpen && (
         <p className="mt-1 text-xs text-muted">
-          Select which vendor in {providerLabel} this invoice should be filed under.
+          {autoMatchAttempted && vendors.length > 0
+            ? `No matching vendor was found in ${providerLabel}. Select one from the dropdown, or create a new one.`
+            : `Select which vendor in ${providerLabel} this invoice should be filed under.`}
+        </p>
+      )}
+      {wasAutoMatched && selectedRef && (
+        <p className="mt-1 text-xs text-muted">
+          Docket matched this vendor automatically. You can change it if needed.
         </p>
       )}
     </div>
