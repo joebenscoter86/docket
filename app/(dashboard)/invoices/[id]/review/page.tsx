@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { getActiveOrgId } from "@/lib/supabase/helpers";
 import { getExtractedData } from "@/lib/extraction/data";
 import { getOrgConnection } from "@/lib/accounting";
 import { logger } from "@/lib/utils/logger";
@@ -65,29 +66,26 @@ export default async function ReviewPage({
   // Fetch extracted data, signed URL, org defaults, and accounting provider in parallel
   // Admin client required for Storage — bucket RLS restricts anon access
   const admin = createAdminClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  const activeOrgId = user ? await getActiveOrgId(supabase, user.id) : null;
   const [extractedData, signedUrlResult, orgAndProviderResult] = await Promise.all([
     getExtractedData(invoice.id),
     admin.storage
       .from("invoices")
       .createSignedUrl(invoice.file_path, 3600),
-    supabase
-      .from("org_memberships")
-      .select("org_id")
-      .limit(1)
-      .single()
-      .then(async ({ data: membership }) => {
-        if (!membership) return { org: null, provider: null as AccountingProviderType | null };
-        const [orgData, connection] = await Promise.all([
-          admin
-            .from("organizations")
-            .select("default_output_type, default_payment_account_id, default_payment_account_name")
-            .eq("id", membership.org_id)
-            .single()
-            .then(({ data }) => data),
-          getOrgConnection(admin, membership.org_id),
-        ]);
-        return { org: orgData, provider: connection?.provider ?? null };
-      }),
+    (async () => {
+      if (!activeOrgId) return { org: null, provider: null as AccountingProviderType | null };
+      const [orgData, connection] = await Promise.all([
+        admin
+          .from("organizations")
+          .select("default_output_type, default_payment_account_id, default_payment_account_name")
+          .eq("id", activeOrgId)
+          .single()
+          .then(({ data }) => data),
+        getOrgConnection(admin, activeOrgId),
+      ]);
+      return { org: orgData, provider: connection?.provider ?? null };
+    })(),
   ]);
 
   const orgResult = orgAndProviderResult?.org ?? null;

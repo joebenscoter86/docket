@@ -1,6 +1,7 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { getActiveOrgId } from "@/lib/supabase/helpers";
 import { checkInvoiceAccess } from "@/lib/billing/access";
 import { logger } from "@/lib/utils/logger";
 import { trackServerEvent, AnalyticsEvents } from "@/lib/analytics/events";
@@ -31,18 +32,10 @@ export async function POST(request: Request) {
   }
 
   // 2. Resolve org
-  const { data: membership } = await supabase
-    .from("org_memberships")
-    .select("org_id")
-    .eq("user_id", user.id)
-    .limit(1)
-    .single();
-
-  if (!membership) {
+  const orgId = await getActiveOrgId(supabase, user.id);
+  if (!orgId) {
     return authError("No organization found.");
   }
-
-  const orgId = membership.org_id;
 
   logger.info("batch_approve.start", { userId: user.id, orgId });
 

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { getActiveOrgWithRole } from "@/lib/supabase/helpers";
 import { exchangeCodeForTokens, getXeroTenantId, storeConnection } from "@/lib/xero/auth";
 import { logger } from "@/lib/utils/logger";
 
@@ -85,27 +86,29 @@ export async function GET(request: NextRequest) {
       return NextResponse.redirect(`${baseUrl}/login?redirect=${returnTo}`);
     }
 
-    const { data: membership } = await supabase
-      .from("org_memberships")
-      .select("org_id")
-      .eq("user_id", user.id)
-      .limit(1)
-      .single();
+    const orgWithRole = await getActiveOrgWithRole(supabase, user.id);
 
-    if (!membership) {
+    if (!orgWithRole) {
       logger.error("xero.oauth_no_org", { userId: user.id });
       return errorRedirect("No organization found. Please contact support.");
     }
+
+    if (orgWithRole.role !== "owner") {
+      logger.warn("xero.oauth_not_owner", { userId: user.id, orgId: orgWithRole.orgId, role: orgWithRole.role });
+      return errorRedirect("Only the organization owner can connect Xero.");
+    }
+
+    const orgId = orgWithRole.orgId;
 
     const tokens = await exchangeCodeForTokens(code, codeVerifier);
     const { tenantId, tenantName } = await getXeroTenantId(tokens.accessToken);
 
     const adminSupabase = createAdminClient();
-    await storeConnection(adminSupabase, membership.org_id, tokens, tenantId, tenantName);
+    await storeConnection(adminSupabase, orgId, tokens, tenantId, tenantName);
 
     logger.info("xero.oauth_complete", {
       userId: user.id,
-      orgId: membership.org_id,
+      orgId,
       tenantId,
       durationMs: Date.now() - startTime,
     });

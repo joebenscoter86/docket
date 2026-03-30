@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { getActiveOrgId } from "@/lib/supabase/helpers";
 import {
   getAccountingProvider,
   getOrgProvider,
@@ -37,18 +38,11 @@ export async function GET() {
     }
 
     // Get user's org
-    const { data: membership } = await supabase
-      .from("org_memberships")
-      .select("org_id")
-      .eq("user_id", user.id)
-      .limit(1)
-      .single();
-
-    if (!membership) {
+    const orgId = await getActiveOrgId(supabase, user.id);
+    if (!orgId) {
       return authError("No organization found.");
     }
 
-    const orgId = membership.org_id;
     const adminSupabase = createAdminClient();
 
     // Check for a connected accounting provider
@@ -115,18 +109,11 @@ export async function POST(request: Request) {
       return authError();
     }
 
-    const { data: membership } = await supabase
-      .from("org_memberships")
-      .select("org_id")
-      .eq("user_id", user.id)
-      .limit(1)
-      .single();
-
-    if (!membership) {
+    const orgId = await getActiveOrgId(supabase, user.id);
+    if (!orgId) {
       return authError("No organization found.");
     }
 
-    const orgId = membership.org_id;
     const adminSupabase = createAdminClient();
 
     // Require an active accounting connection to create a vendor

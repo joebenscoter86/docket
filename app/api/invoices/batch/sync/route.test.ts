@@ -31,13 +31,11 @@ const mockMembershipSingle = vi.fn();
 const mockServerClient = {
   auth: { getUser: mockGetUser },
   from: vi.fn((table: string) => {
-    if (table === "org_memberships") {
+    if (table === "users") {
       return {
         select: vi.fn(() => ({
           eq: vi.fn(() => ({
-            limit: vi.fn(() => ({
-              single: mockMembershipSingle,
-            })),
+            single: mockMembershipSingle,
           })),
         })),
       };
@@ -159,7 +157,7 @@ describe("POST /api/invoices/batch/sync", () => {
 
     // Default: authenticated
     mockGetUser.mockResolvedValue({ data: { user: { id: "user-1" } }, error: null });
-    mockMembershipSingle.mockResolvedValue({ data: { org_id: ORG_ID }, error: null });
+    mockMembershipSingle.mockResolvedValue({ data: { active_org_id: ORG_ID }, error: null });
 
     // Default: subscription allowed
     mockCheckInvoiceAccess.mockResolvedValue({ allowed: true, reason: "active_subscription" });

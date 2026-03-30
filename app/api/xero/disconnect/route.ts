@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { getActiveOrgId } from "@/lib/supabase/helpers";
 import { disconnect } from "@/lib/xero/auth";
 import { logger } from "@/lib/utils/logger";
 import { authError, apiSuccess, internalError } from "@/lib/utils/errors";
@@ -20,23 +21,17 @@ export async function POST() {
       return authError();
     }
 
-    const { data: membership } = await supabase
-      .from("org_memberships")
-      .select("org_id")
-      .eq("user_id", user.id)
-      .limit(1)
-      .single();
-
-    if (!membership) {
+    const orgId = await getActiveOrgId(supabase, user.id);
+    if (!orgId) {
       return authError("No organization found.");
     }
 
     const adminSupabase = createAdminClient();
-    await disconnect(adminSupabase, membership.org_id);
+    await disconnect(adminSupabase, orgId);
 
     logger.info("xero.disconnect_requested", {
       userId: user.id,
-      orgId: membership.org_id,
+      orgId,
       durationMs: Date.now() - startTime,
     });
 

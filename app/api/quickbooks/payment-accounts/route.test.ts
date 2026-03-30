@@ -11,9 +11,7 @@ const mockServerClient = {
   from: vi.fn(() => ({
     select: vi.fn(() => ({
       eq: vi.fn(() => ({
-        limit: vi.fn(() => ({
-          single: mockMembershipSelect,
-        })),
+        single: mockMembershipSelect,
       })),
     })),
   })),
@@ -82,7 +80,7 @@ describe("GET /api/quickbooks/payment-accounts", () => {
       error: null,
     });
     mockMembershipSelect.mockResolvedValue({
-      data: { org_id: "org-1" },
+      data: { active_org_id: "org-1" },
       error: null,
     });
     mockIsConnected.mockResolvedValue(true);

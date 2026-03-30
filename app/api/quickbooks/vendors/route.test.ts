@@ -39,10 +39,8 @@ function mockAuthUser(userId: string | null, orgId: string | null) {
     from: vi.fn().mockReturnValue({
       select: vi.fn().mockReturnValue({
         eq: vi.fn().mockReturnValue({
-          limit: vi.fn().mockReturnValue({
-            single: vi.fn().mockResolvedValue({
-              data: orgId ? { org_id: orgId } : null,
-            }),
+          single: vi.fn().mockResolvedValue({
+            data: orgId ? { active_org_id: orgId } : null,
           }),
         }),
       }),

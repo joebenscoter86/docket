@@ -14,6 +14,7 @@ import { SubscriptionCancelledEmail } from "./templates/subscription-cancelled";
 import { ConnectionExpiringEmail } from "./templates/connection-expiring";
 import { IngestionNoAttachmentEmail } from "./templates/ingestion-no-attachment";
 import { IngestionErrorEmail } from "./templates/ingestion-error";
+import { TeamInviteEmail } from "./templates/team-invite";
 import { logger } from "@/lib/utils/logger";
 
 /**
@@ -656,4 +657,31 @@ export async function checkAndSendBatchCompleteEmail(
       error: String(err),
     });
   }
+}
+
+/**
+ * Send a team invite email to a prospective org member.
+ * No dedup needed since the unique partial index prevents duplicate pending invites.
+ */
+export async function sendTeamInviteEmail(
+  inviterEmail: string,
+  invitedEmail: string,
+  orgName: string,
+  token: string,
+  expiresAt: string
+): Promise<void> {
+  const inviteUrl = `https://dockett.app/invite/${token}`;
+  const subject = `${inviterEmail} invited you to join ${orgName} on Dockett`;
+
+  await sendEmail({
+    to: invitedEmail,
+    subject,
+    react: TeamInviteEmail({ inviterEmail, orgName, inviteUrl, expiresAt }),
+  });
+
+  logger.info("team_invite_email_sent", {
+    inviterEmail,
+    invitedEmail,
+    orgName,
+  });
 }

@@ -14,13 +14,11 @@ const mockMembershipSelect = vi.fn();
 const mockServerClient = {
   auth: { getUser: mockGetUser },
   from: vi.fn((table: string) => {
-    if (table === "org_memberships") {
+    if (table === "users") {
       return {
         select: vi.fn(() => ({
           eq: vi.fn(() => ({
-            limit: vi.fn(() => ({
-              single: mockMembershipSelect,
-            })),
+            single: mockMembershipSelect,
           })),
         })),
       };
@@ -107,7 +105,7 @@ describe("POST /api/invoices/batch/approve", () => {
       error: null,
     });
     mockMembershipSelect.mockResolvedValue({
-      data: { org_id: ORG_ID },
+      data: { active_org_id: ORG_ID },
       error: null,
     });
 

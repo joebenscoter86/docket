@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { getActiveOrgId } from "@/lib/supabase/helpers";
 import { getOrgConnection } from "@/lib/accounting";
 import { QBOConnectionCard } from "@/components/settings/QBOConnectionCard";
 import { XeroConnectionCard } from "@/components/settings/XeroConnectionCard";
@@ -9,6 +10,7 @@ import { BillingCard } from "@/components/settings/BillingCard";
 import { AccountCard } from "@/components/settings/AccountCard";
 import { EmailPreferencesCard } from "@/components/settings/EmailPreferencesCard";
 import { EmailIngestionCard } from "@/components/settings/EmailIngestionCard";
+import { TeamCard } from "@/components/settings/TeamCard";
 import { getUsageThisPeriod } from "@/lib/billing/usage";
 import type { SubscriptionTier } from "@/lib/billing/tiers";
 
@@ -20,17 +22,27 @@ export default async function SettingsPage({
   const supabase = createClient();
   const { data: { user } } = await supabase.auth.getUser();
 
-  // Get org membership
-  const { data: membership } = await supabase
-    .from("org_memberships")
-    .select("org_id, organizations(name)")
-    .eq("user_id", user!.id)
-    .limit(1)
-    .single();
+  // Get active org
+  const orgId = await getActiveOrgId(supabase, user!.id) ?? "";
 
-  const orgId = membership?.org_id ?? "";
-  const orgNameData = membership?.organizations as { name: string }[] | { name: string } | null;
-  const orgName = Array.isArray(orgNameData) ? orgNameData[0]?.name ?? "" : orgNameData?.name ?? "";
+  let orgName = "";
+  let isOwner = false;
+  if (orgId) {
+    const { data: org } = await supabase
+      .from("organizations")
+      .select("name")
+      .eq("id", orgId)
+      .single();
+    orgName = org?.name ?? "";
+
+    const { data: membership } = await supabase
+      .from("org_memberships")
+      .select("role")
+      .eq("user_id", user!.id)
+      .eq("org_id", orgId)
+      .single();
+    isOwner = membership?.role === "owner";
+  }
 
   // Fetch user billing data
   const { data: userData } = await supabase
@@ -171,13 +183,13 @@ export default async function SettingsPage({
         <div className="space-y-3">
           <QBOConnectionCard
             connection={qboConnection}
-            disabled={connectedProvider === "xero"}
-            disabledReason="Disconnect Xero before connecting QuickBooks"
+            disabled={connectedProvider === "xero" || !isOwner}
+            disabledReason={!isOwner ? "Only the organization owner can manage connections" : "Disconnect Xero before connecting QuickBooks"}
           />
           <XeroConnectionCard
             connection={xeroConnection}
-            disabled={connectedProvider === "quickbooks"}
-            disabledReason="Disconnect QuickBooks before connecting Xero"
+            disabled={connectedProvider === "quickbooks" || !isOwner}
+            disabledReason={!isOwner ? "Only the organization owner can manage connections" : "Disconnect QuickBooks before connecting Xero"}
           />
         </div>
       </div>
@@ -188,6 +200,14 @@ export default async function SettingsPage({
           Email Forwarding
         </p>
         <EmailIngestionCard />
+      </div>
+
+      {/* Team Section */}
+      <div>
+        <p className="text-[13px] font-bold uppercase tracking-wider text-muted mb-3">
+          Team
+        </p>
+        <TeamCard isOwner={isOwner} />
       </div>
 
       {/* Account Section */}

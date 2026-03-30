@@ -19,9 +19,7 @@ const mockServerClient = {
   from: vi.fn(() => ({
     select: vi.fn(() => ({
       eq: vi.fn(() => ({
-        limit: vi.fn(() => ({
-          single: mockMembershipSelect,
-        })),
+        single: mockMembershipSelect,
       })),
     })),
   })),
@@ -187,7 +185,7 @@ const fakeFileBlob = new Blob(["fake-pdf"]);
 
 function setupSuccessMocks(invoiceOverrides: Partial<typeof fakeInvoice> = {}) {
   mockGetUser.mockResolvedValue({ data: { user: { id: "user-1" } }, error: null });
-  mockMembershipSelect.mockResolvedValue({ data: { org_id: "org-1" }, error: null });
+  mockMembershipSelect.mockResolvedValue({ data: { active_org_id: "org-1" }, error: null });
   mockCheckInvoiceAccess.mockResolvedValue({ allowed: true });
   mockInvoiceSelect.mockResolvedValue({ data: { ...fakeInvoice, ...invoiceOverrides }, error: null });
   mockSyncLogSelect.mockResolvedValue({ data: null, error: { code: "PGRST116" } });

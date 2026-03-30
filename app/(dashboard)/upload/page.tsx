@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { getActiveOrgId } from "@/lib/supabase/helpers";
 import { checkInvoiceAccess } from "@/lib/billing/access";
 import { getUsageThisPeriod } from "@/lib/billing/usage";
 import UploadFlow from "@/components/invoices/UploadFlow";
@@ -35,13 +36,7 @@ export default async function UploadPage() {
   }
 
   // Fetch org for usage check
-  const { data: membership } = await supabase
-    .from("org_memberships")
-    .select("org_id")
-    .eq("user_id", user.id)
-    .single();
-
-  const orgId = membership?.org_id;
+  const orgId = await getActiveOrgId(supabase, user.id);
   let usageInfo: Awaited<ReturnType<typeof getUsageThisPeriod>> | null = null;
 
   if (orgId) {

@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { getActiveOrgId } from "@/lib/supabase/helpers";
 import { stripe } from "@/lib/stripe/client";
 import { getOrCreateStripeCustomer } from "@/lib/stripe/helpers";
 import { validatePriceId } from "@/lib/billing/tiers";
@@ -41,15 +42,8 @@ export async function POST(request: Request) {
       return validationError("Invalid price ID.");
     }
 
-    // 3. Fetch org membership
-    const { data: membership } = await supabase
-      .from("org_memberships")
-      .select("org_id")
-      .eq("user_id", user.id)
-      .limit(1)
-      .single();
-
-    const orgId = membership?.org_id ?? "";
+    // 3. Fetch org
+    const orgId = (await getActiveOrgId(supabase, user.id)) ?? "";
 
     // 4. Guard: check design partner and subscription status
     const { data: userData, error: userErr } = await supabase

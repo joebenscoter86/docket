@@ -39,7 +39,7 @@ describe("PATCH /api/settings/organization", () => {
     });
 
     mockSelectOrgMembership.mockResolvedValue({
-      data: { org_id: "org-456" },
+      data: { active_org_id: "org-456" },
       error: null,
     });
 
@@ -53,9 +53,7 @@ describe("PATCH /api/settings/organization", () => {
       from: vi.fn().mockReturnValue({
         select: vi.fn().mockReturnValue({
           eq: vi.fn().mockReturnValue({
-            limit: vi.fn().mockReturnValue({
-              single: mockSelectOrgMembership,
-            }),
+            single: mockSelectOrgMembership,
           }),
         }),
       }),
