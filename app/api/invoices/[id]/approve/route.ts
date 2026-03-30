@@ -90,7 +90,11 @@ export async function POST(
   const admin = createAdminClient();
   const { error: updateErr } = await admin
     .from("invoices")
-    .update({ status: "approved" })
+    .update({
+      status: "approved",
+      approved_by: user.id,
+      approved_at: new Date().toISOString(),
+    })
     .eq("id", invoiceId);
 
   if (updateErr) {
