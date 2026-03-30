@@ -65,7 +65,7 @@ function makeQueryChain(resolved: { data: unknown; error: null }) {
     chain[m] = vi.fn(() => chain);
   }
   // The final awaited call resolves with the mock data
-  (chain as unknown as Promise<unknown>)[Symbol.iterator] = undefined;
+  (chain as unknown as Record<symbol, unknown>)[Symbol.iterator] = undefined;
   Object.defineProperty(chain, "then", {
     get() {
       return (resolve: (v: unknown) => void) => resolve(resolved);

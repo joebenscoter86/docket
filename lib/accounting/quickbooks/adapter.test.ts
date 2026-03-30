@@ -42,6 +42,15 @@ import {
   QBOApiError,
 } from "@/lib/quickbooks/api";
 import { AccountingApiError } from "@/lib/accounting/types";
+import type { QBOBillResponse, QBOPurchaseResponse, QBOAttachableResponse } from "@/lib/quickbooks/types";
+
+/**
+ * The mock QBOApiError in this file takes a single object arg (for readability),
+ * but the real class takes 3 positional args. This helper casts the constructor
+ * so TypeScript is satisfied without changing test semantics.
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const MockQBOApiErrorCtor = QBOApiError as unknown as new (opts: Record<string, any>) => InstanceType<typeof QBOApiError>;
 
 const mockGetVendorOptions = vi.mocked(getVendorOptions);
 const mockCreateVendor = vi.mocked(qboCreateVendor);
@@ -82,7 +91,7 @@ describe("QuickBooksAccountingAdapter", () => {
 
     it("wraps QBOApiError into AccountingApiError", async () => {
       mockGetVendorOptions.mockRejectedValue(
-        new QBOApiError({
+        new MockQBOApiErrorCtor({
           message: "Token expired",
           statusCode: 401,
           errorCode: "3200",
@@ -120,7 +129,7 @@ describe("QuickBooksAccountingAdapter", () => {
 
     it("wraps QBOApiError into AccountingApiError", async () => {
       mockCreateVendor.mockRejectedValue(
-        new QBOApiError({
+        new MockQBOApiErrorCtor({
           message: "Validation failed",
           statusCode: 400,
           errorCode: "2020",
@@ -188,7 +197,7 @@ describe("QuickBooksAccountingAdapter", () => {
           TotalAmt: 225.0,
           Balance: 225.0,
         },
-      });
+      } as unknown as QBOBillResponse);
 
       const adapter = await getAdapter();
       const result = await adapter.createBill(mockSupabase, "org-1", {
@@ -224,7 +233,7 @@ describe("QuickBooksAccountingAdapter", () => {
     it("omits optional fields when null", async () => {
       mockCreateBill.mockResolvedValue({
         Bill: { Id: "qbo-bill-2", SyncToken: "0", VendorRef: { value: "42" }, Line: [], TotalAmt: 100, Balance: 100 },
-      });
+      } as unknown as QBOBillResponse);
 
       const adapter = await getAdapter();
       await adapter.createBill(mockSupabase, "org-1", {
@@ -244,7 +253,7 @@ describe("QuickBooksAccountingAdapter", () => {
     it("maps memo to PrivateNote on bill payload", async () => {
       mockCreateBill.mockResolvedValue({
         Bill: { Id: "qbo-bill-memo", SyncToken: "0", VendorRef: { value: "42" }, Line: [], TotalAmt: 100, Balance: 100 },
-      });
+      } as unknown as QBOBillResponse);
 
       const adapter = await getAdapter();
       await adapter.createBill(mockSupabase, "org-1", {
@@ -263,7 +272,7 @@ describe("QuickBooksAccountingAdapter", () => {
     it("omits PrivateNote when memo is not provided on bill", async () => {
       mockCreateBill.mockResolvedValue({
         Bill: { Id: "qbo-bill-nomemo", SyncToken: "0", VendorRef: { value: "42" }, Line: [], TotalAmt: 100, Balance: 100 },
-      });
+      } as unknown as QBOBillResponse);
 
       const adapter = await getAdapter();
       await adapter.createBill(mockSupabase, "org-1", {
@@ -281,7 +290,7 @@ describe("QuickBooksAccountingAdapter", () => {
     it("sends GlobalTaxCalculation when taxTreatment is provided", async () => {
       mockCreateBill.mockResolvedValue({
         Bill: { Id: "qbo-bill-tax", SyncToken: "0", VendorRef: { value: "42" }, Line: [], TotalAmt: 100, Balance: 100 },
-      });
+      } as unknown as QBOBillResponse);
 
       const adapter = await getAdapter();
       await adapter.createBill(mockSupabase, "org-1", {
@@ -299,7 +308,7 @@ describe("QuickBooksAccountingAdapter", () => {
 
     it("wraps QBOApiError into AccountingApiError", async () => {
       mockCreateBill.mockRejectedValue(
-        new QBOApiError({
+        new MockQBOApiErrorCtor({
           message: "Vendor not found",
           statusCode: 400,
           errorCode: "6240",
@@ -349,7 +358,7 @@ describe("QuickBooksAccountingAdapter", () => {
           DocNumber: "CHK-001",
           TotalAmt: 200,
         },
-      });
+      } as unknown as QBOPurchaseResponse);
 
       const adapter = await getAdapter();
       const result = await adapter.createPurchase(mockSupabase, "org-1", {
@@ -382,7 +391,7 @@ describe("QuickBooksAccountingAdapter", () => {
     it("omits optional fields when null", async () => {
       mockCreatePurchase.mockResolvedValue({
         Purchase: { Id: "qbo-purchase-2", SyncToken: "0", PaymentType: "Cash", AccountRef: { value: "35" }, EntityRef: { value: "42", type: "Vendor" }, Line: [], TotalAmt: 100 },
-      });
+      } as unknown as QBOPurchaseResponse);
 
       const adapter = await getAdapter();
       await adapter.createPurchase(mockSupabase, "org-1", {
@@ -402,7 +411,7 @@ describe("QuickBooksAccountingAdapter", () => {
     it("maps memo to PrivateNote on purchase payload", async () => {
       mockCreatePurchase.mockResolvedValue({
         Purchase: { Id: "qbo-purchase-memo", SyncToken: "0", PaymentType: "CreditCard", AccountRef: { value: "36" }, EntityRef: { value: "42", type: "Vendor" }, Line: [], TotalAmt: 50 },
-      });
+      } as unknown as QBOPurchaseResponse);
 
       const adapter = await getAdapter();
       await adapter.createPurchase(mockSupabase, "org-1", {
@@ -422,7 +431,7 @@ describe("QuickBooksAccountingAdapter", () => {
     it("omits PrivateNote when memo is not provided on purchase", async () => {
       mockCreatePurchase.mockResolvedValue({
         Purchase: { Id: "qbo-purchase-nomemo", SyncToken: "0", PaymentType: "Check", AccountRef: { value: "35" }, EntityRef: { value: "42", type: "Vendor" }, Line: [], TotalAmt: 100 },
-      });
+      } as unknown as QBOPurchaseResponse);
 
       const adapter = await getAdapter();
       await adapter.createPurchase(mockSupabase, "org-1", {
@@ -441,7 +450,7 @@ describe("QuickBooksAccountingAdapter", () => {
     it("sends GlobalTaxCalculation when taxTreatment is provided", async () => {
       mockCreatePurchase.mockResolvedValue({
         Purchase: { Id: "qbo-purchase-tax", SyncToken: "0", PaymentType: "Check", AccountRef: { value: "35" }, EntityRef: { value: "42", type: "Vendor" }, Line: [], TotalAmt: 100 },
-      });
+      } as unknown as QBOPurchaseResponse);
 
       const adapter = await getAdapter();
       await adapter.createPurchase(mockSupabase, "org-1", {
@@ -460,7 +469,7 @@ describe("QuickBooksAccountingAdapter", () => {
 
     it("wraps QBOApiError into AccountingApiError", async () => {
       mockCreatePurchase.mockRejectedValue(
-        new QBOApiError({
+        new MockQBOApiErrorCtor({
           message: "Account not found",
           statusCode: 400,
           errorCode: "2500",
@@ -510,7 +519,7 @@ describe("QuickBooksAccountingAdapter", () => {
             },
           },
         ],
-      });
+      } as unknown as QBOAttachableResponse);
 
       const adapter = await getAdapter();
       const result = await adapter.attachDocument(
