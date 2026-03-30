@@ -95,7 +95,8 @@ export async function PATCH(
         invoice.org_id,
         field,
         stringifyValue(preUpdateValue),
-        stringifyValue(castValue)
+        stringifyValue(castValue),
+        user.id
       );
     }
   }

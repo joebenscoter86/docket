@@ -222,6 +222,43 @@ describe("recordCorrection", () => {
     });
   });
 
+  it("forwards user_id to insert when provided", async () => {
+    mockInsert.mockResolvedValue({ error: null });
+
+    await recordCorrection(
+      "inv-uuid-1",
+      "org-uuid-1",
+      "vendor_name",
+      "Acme Corp",
+      "Acme Corporation",
+      "user-uuid-1"
+    );
+
+    expect(mockInsert).toHaveBeenCalledWith({
+      invoice_id: "inv-uuid-1",
+      org_id: "org-uuid-1",
+      field_name: "vendor_name",
+      original_value: "Acme Corp",
+      corrected_value: "Acme Corporation",
+      user_id: "user-uuid-1",
+    });
+  });
+
+  it("omits user_id from insert when not provided", async () => {
+    mockInsert.mockResolvedValue({ error: null });
+
+    await recordCorrection(
+      "inv-uuid-1",
+      "org-uuid-1",
+      "vendor_name",
+      "Acme Corp",
+      "Acme Corporation"
+    );
+
+    const insertArg = mockInsert.mock.calls[0][0];
+    expect(insertArg).not.toHaveProperty("user_id");
+  });
+
   it("handles null original value", async () => {
     mockInsert.mockResolvedValue({ error: null });
 
