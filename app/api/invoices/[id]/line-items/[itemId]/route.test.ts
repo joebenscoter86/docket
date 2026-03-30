@@ -171,7 +171,8 @@ describe("PATCH /api/invoices/[id]/line-items/[itemId]", () => {
       "org-1",
       "line_item.li-1.description",
       "Web dev",
-      "Updated"
+      "Updated",
+      "user-1"
     );
   });
 
