@@ -121,6 +121,8 @@ export async function POST(
       return authError();
     }
 
+    const syncMemo = `Synced by ${user.email} via Docket`;
+
     // 2. Get user's org
     const orgId = await getActiveOrgId(supabase, user.id);
 
@@ -311,6 +313,7 @@ export async function POST(
           invoiceNumber: extractedData.invoice_number,
           xeroStatus,
           taxTreatment,
+          memo: syncMemo,
         };
         requestInput = input;
         result = await provider.createBill(adminSupabase, orgId, input);
@@ -323,6 +326,7 @@ export async function POST(
           invoiceDate: extractedData.invoice_date,
           invoiceNumber: extractedData.invoice_number,
           taxTreatment,
+          memo: syncMemo,
         };
         requestInput = input;
         result = await provider.createPurchase(adminSupabase, orgId, input);
@@ -338,6 +342,7 @@ export async function POST(
         status: "success",
         transaction_type: transactionType,
         provider_entity_type: result.entityType,
+        synced_by: user.id,
       });
     } catch (error) {
       // Log failure in sync_log
@@ -354,6 +359,7 @@ export async function POST(
         status: "failed",
         transaction_type: transactionType,
         provider_entity_type: providerEntityType,
+        synced_by: user.id,
       });
 
       // Update invoice with error

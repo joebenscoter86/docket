@@ -184,7 +184,7 @@ const fakeLineItems = [
 const fakeFileBlob = new Blob(["fake-pdf"]);
 
 function setupSuccessMocks(invoiceOverrides: Partial<typeof fakeInvoice> = {}) {
-  mockGetUser.mockResolvedValue({ data: { user: { id: "user-1" } }, error: null });
+  mockGetUser.mockResolvedValue({ data: { user: { id: "user-1", email: "test@example.com" } }, error: null });
   mockMembershipSelect.mockResolvedValue({ data: { active_org_id: "org-1" }, error: null });
   mockCheckInvoiceAccess.mockResolvedValue({ allowed: true });
   mockInvoiceSelect.mockResolvedValue({ data: { ...fakeInvoice, ...invoiceOverrides }, error: null });
@@ -414,6 +414,60 @@ describe("POST /api/invoices/[id]/sync", () => {
         status: "failed",
       })
     );
+  });
+
+  // ── synced_by and memo audit trail ──
+
+  it("includes synced_by in sync_log on success", async () => {
+    setupSuccessMocks();
+    mockCreateBill.mockResolvedValue({ entityId: "bill-99", entityType: "Bill", providerResponse: {} });
+
+    const { request, params } = makeRequest();
+    await POST(request, { params });
+
+    expect(mockSyncLogInsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        synced_by: "user-1",
+        status: "success",
+      })
+    );
+  });
+
+  it("includes synced_by in sync_log on failure", async () => {
+    setupSuccessMocks({ output_type: "bill", payment_account_id: null });
+    mockCreateBill.mockRejectedValue(new Error("QBO timeout"));
+
+    const { request, params } = makeRequest();
+    await POST(request, { params });
+
+    expect(mockSyncLogInsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        synced_by: "user-1",
+        status: "failed",
+      })
+    );
+  });
+
+  it("passes memo with user email to createBill", async () => {
+    setupSuccessMocks();
+    mockCreateBill.mockResolvedValue({ entityId: "bill-99", entityType: "Bill", providerResponse: {} });
+
+    const { request, params } = makeRequest();
+    await POST(request, { params });
+
+    const billInput = mockCreateBill.mock.calls[0][2];
+    expect(billInput.memo).toBe("Synced by test@example.com via Docket");
+  });
+
+  it("passes memo with user email to createPurchase", async () => {
+    setupSuccessMocks({ output_type: "check", payment_account_id: "bank-1" });
+    mockCreatePurchase.mockResolvedValue({ entityId: "purchase-1", entityType: "Purchase", providerResponse: {} });
+
+    const { request, params } = makeRequest();
+    await POST(request, { params });
+
+    const purchaseInput = mockCreatePurchase.mock.calls[0][2];
+    expect(purchaseInput.memo).toBe("Synced by test@example.com via Docket");
   });
 
   // ── Auth checks (regression) ──
