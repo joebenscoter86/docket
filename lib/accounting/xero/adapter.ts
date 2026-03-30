@@ -149,9 +149,11 @@ export class XeroAccountingAdapter implements AccountingProvider {
       LineItems: lineItems,
       ...(input.invoiceDate ? { DateString: input.invoiceDate } : {}),
       ...(input.dueDate ? { DueDateString: input.dueDate } : {}),
-      ...(input.invoiceNumber
-        ? { InvoiceNumber: input.invoiceNumber, Reference: input.invoiceNumber }
-        : {}),
+      ...(input.invoiceNumber ? { InvoiceNumber: input.invoiceNumber } : {}),
+      ...(() => {
+        const parts = [input.invoiceNumber, input.memo].filter(Boolean);
+        return parts.length > 0 ? { Reference: parts.join(" | ") } : {};
+      })(),
       ...(input.taxTreatment ? { LineAmountTypes: LINE_AMOUNT_TYPES_MAP[input.taxTreatment] } : {}),
     };
 
@@ -197,7 +199,7 @@ export class XeroAccountingAdapter implements AccountingProvider {
       BankAccount: { AccountID: input.paymentAccountRef },
       LineItems: lineItems,
       ...(input.invoiceDate ? { Date: input.invoiceDate } : {}),
-      ...(input.invoiceNumber ? { Reference: input.invoiceNumber } : {}),
+      ...(input.invoiceNumber ? { Reference: input.invoiceNumber } : input.memo ? { Reference: input.memo } : {}),
       ...(input.taxTreatment ? { LineAmountTypes: LINE_AMOUNT_TYPES_MAP[input.taxTreatment] } : {}),
     };
 
