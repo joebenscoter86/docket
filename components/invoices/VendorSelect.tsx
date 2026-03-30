@@ -250,6 +250,11 @@ export default function VendorSelect({
             Auto-matched
           </span>
         )}
+        {!selectedRef && !saving && autoMatchedRef.current && vendors.length > 0 && (
+          <span className="inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] font-medium rounded-full bg-warning/10 text-warning">
+            No match found
+          </span>
+        )}
       </label>
 
       <div className="relative">
@@ -351,7 +356,14 @@ export default function VendorSelect({
 
       {!selectedRef && !isOpen && (
         <p className="mt-1 text-xs text-muted">
-          Select which vendor in {providerLabel} this invoice should be filed under.
+          {autoMatchedRef.current && vendors.length > 0
+            ? `No matching vendor was found in ${providerLabel}. Select one from the dropdown, or create a new one.`
+            : `Select which vendor in ${providerLabel} this invoice should be filed under.`}
+        </p>
+      )}
+      {wasAutoMatched && selectedRef && (
+        <p className="mt-1 text-xs text-muted">
+          Docket matched this vendor automatically. You can change it if needed.
         </p>
       )}
     </div>

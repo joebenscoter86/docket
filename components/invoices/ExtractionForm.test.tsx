@@ -120,11 +120,11 @@ describe("ExtractionForm confidence indicators", () => {
       />
     );
     expect(
-      screen.getByText("Some fields may need extra attention. Please review carefully.")
+      screen.getByText("Low confidence extraction")
     ).toBeDefined();
   });
 
-  it("does not render banner for high confidence", () => {
+  it("renders high-confidence banner when confidence is high", () => {
     render(
       <ExtractionForm
         extractedData={makeExtractedData({ confidence_score: "high" })}
@@ -134,11 +134,11 @@ describe("ExtractionForm confidence indicators", () => {
       />
     );
     expect(
-      screen.queryByText("Some fields may need extra attention. Please review carefully.")
-    ).toBeNull();
+      screen.getByText("High confidence extraction")
+    ).toBeDefined();
   });
 
-  it("does not render banner for medium confidence", () => {
+  it("renders medium-confidence banner when confidence is medium", () => {
     render(
       <ExtractionForm
         extractedData={makeExtractedData({ confidence_score: "medium" })}
@@ -148,8 +148,8 @@ describe("ExtractionForm confidence indicators", () => {
       />
     );
     expect(
-      screen.queryByText("Some fields may need extra attention. Please review carefully.")
-    ).toBeNull();
+      screen.getByText("Medium confidence extraction")
+    ).toBeDefined();
   });
 
   it("renders no confidence indicators when confidence_score is null", () => {

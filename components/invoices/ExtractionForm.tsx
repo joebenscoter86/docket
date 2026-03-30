@@ -517,8 +517,30 @@ export default function ExtractionForm({
         </div>
       )}
 
-      {/* Low-confidence banner */}
-      {confidenceScore === "low" && (
+      {/* Extraction confidence banner */}
+      {confidenceScore === "high" && (
+        <div className="flex items-start gap-2 bg-accent/5 border border-accent/20 rounded-md p-3">
+          <svg
+            className="h-5 w-5 text-accent shrink-0 mt-0.5"
+            viewBox="0 0 20 20"
+            fill="currentColor"
+            aria-hidden="true"
+          >
+            <path
+              fillRule="evenodd"
+              d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
+              clipRule="evenodd"
+            />
+          </svg>
+          <div>
+            <p className="text-sm font-medium text-accent">High confidence extraction</p>
+            <p className="text-xs text-muted mt-0.5">
+              The AI was able to read all fields clearly. Give it a quick review and approve when ready.
+            </p>
+          </div>
+        </div>
+      )}
+      {confidenceScore === "medium" && (
         <div className="flex items-start gap-2 bg-warning/5 border border-warning/20 rounded-md p-3">
           <svg
             className="h-5 w-5 text-warning shrink-0 mt-0.5"
@@ -532,17 +554,45 @@ export default function ExtractionForm({
               clipRule="evenodd"
             />
           </svg>
-          <p className="text-sm text-warning">
-            Some fields may need extra attention. Please review carefully.
-          </p>
+          <div>
+            <p className="text-sm font-medium text-warning">Medium confidence extraction</p>
+            <p className="text-xs text-muted mt-0.5">
+              Some fields were ambiguous. Please double-check the highlighted values against the document.
+            </p>
+          </div>
+        </div>
+      )}
+      {confidenceScore === "low" && (
+        <div className="flex items-start gap-2 bg-error/5 border border-error/20 rounded-md p-3">
+          <svg
+            className="h-5 w-5 text-error shrink-0 mt-0.5"
+            viewBox="0 0 20 20"
+            fill="currentColor"
+            aria-hidden="true"
+          >
+            <path
+              fillRule="evenodd"
+              d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z"
+              clipRule="evenodd"
+            />
+          </svg>
+          <div>
+            <p className="text-sm font-medium text-error">Low confidence extraction</p>
+            <p className="text-xs text-muted mt-0.5">
+              The document quality was poor or heavily obscured. Most fields will need manual review.
+            </p>
+          </div>
         </div>
       )}
 
       {/* Vendor Mapping */}
       <div className="bg-white rounded-brand-md shadow-soft p-5 space-y-3">
-        <h3 className="text-xs font-semibold uppercase tracking-wide text-muted">
-          Vendor Mapping
-        </h3>
+        <div className="flex items-center gap-2">
+          <h3 className="text-xs font-semibold uppercase tracking-wide text-muted">
+            Vendor Mapping
+          </h3>
+          <InfoTooltip text="Docket reads the vendor name from your invoice and tries to match it to a vendor in your accounting software. The more invoices you process, the better Docket gets at picking the right vendor automatically." />
+        </div>
 
         {/* AI-extracted vendor name (editable -- users may need to correct extraction errors) */}
         <div>
@@ -586,6 +636,11 @@ export default function ExtractionForm({
         </h3>
         <div className="space-y-4">
           {renderField("vendor_address")}
+          {state.values.vendor_address === null && state.originalValues.vendor_address === null && (
+            <p className="text-xs text-muted -mt-2">
+              No company address was found. This is common for store receipts and point-of-sale transactions where only a store location is shown. You can add an address manually if needed.
+            </p>
+          )}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {renderField("invoice_number")}
             {renderField("payment_terms")}
