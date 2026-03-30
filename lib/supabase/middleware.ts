@@ -50,8 +50,11 @@ export async function updateSession(request: NextRequest) {
 
   // Redirect authenticated users away from auth pages
   if (user && AUTH_PATHS.some((path) => pathname.startsWith(path))) {
+    const redirectTo = request.nextUrl.searchParams.get('redirect')
     const dashboardUrl = request.nextUrl.clone()
-    dashboardUrl.pathname = '/invoices'
+    // Preserve redirect param for invite flow (validate it starts with /invite/)
+    dashboardUrl.pathname = redirectTo?.startsWith('/invite/') ? redirectTo : '/invoices'
+    dashboardUrl.search = ''
     return NextResponse.redirect(dashboardUrl)
   }
 

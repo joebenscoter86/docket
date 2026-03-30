@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import Image from 'next/image'
 import posthog from "posthog-js";
@@ -9,6 +9,8 @@ import { createClient } from '@/lib/supabase/client'
 
 export default function SignupPage() {
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const redirectTo = searchParams.get('redirect')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
@@ -87,7 +89,9 @@ export default function SignupPage() {
       body: JSON.stringify({ email }),
     }).catch(function noop() { /* non-critical */ })
 
-    router.push('/onboarding')
+    // Redirect to invite page if coming from an invite, otherwise onboarding
+    const safeDest = redirectTo?.startsWith('/invite/') ? redirectTo : '/onboarding'
+    router.push(safeDest)
     router.refresh()
   }
 

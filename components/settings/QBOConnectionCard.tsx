@@ -130,6 +130,11 @@ export function QBOConnectionCard({ connection, disabled, disabledReason }: QBOC
           </>
         )}
       </div>
+      {!connection.connected && !disabled && (
+        <p className="text-xs text-muted mt-2">
+          The person connecting must be a Master Admin or Company Admin in QuickBooks Online.
+        </p>
+      )}
     </div>
   );
 }

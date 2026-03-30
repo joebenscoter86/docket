@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { getActiveOrgId } from "@/lib/supabase/helpers";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { validateListParams, fetchInvoiceList, fetchInvoiceCounts } from "@/lib/invoices/queries";
@@ -32,16 +33,11 @@ export default async function InvoicesPage({ searchParams }: InvoicesPageProps) 
   const toastMessage =
     resolvedParams.toast === "all-reviewed" ? "All invoices reviewed!" : null;
 
-  // Fetch org membership for accounting connection check
-  const { data: membership } = await supabase
-    .from("org_memberships")
-    .select("org_id")
-    .eq("user_id", user.id)
-    .limit(1)
-    .single();
+  // Fetch org for accounting connection check
+  const orgId = await getActiveOrgId(supabase, user.id);
 
-  const isAccountingConnected = membership
-    ? await isOrgConnected(createAdminClient(), membership.org_id)
+  const isAccountingConnected = orgId
+    ? await isOrgConnected(createAdminClient(), orgId)
     : false;
 
   const params = validateListParams({

@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { getActiveOrgId } from "@/lib/supabase/helpers";
 import { apiSuccess, authError, validationError, notFound, internalError } from "@/lib/utils/errors";
 import { logger } from "@/lib/utils/logger";
 import { revalidatePath } from "next/cache";
@@ -61,20 +62,12 @@ export async function PATCH(request: Request) {
     return validationError("No valid fields to update.");
   }
 
-  // Look up org from membership — never accept org_id from request body
-  const { data: membership, error: membershipErr } = await supabase
-    .from("org_memberships")
-    .select("org_id")
-    .eq("user_id", user.id)
-    .limit(1)
-    .single();
-
-  if (membershipErr || !membership) {
-    logger.warn("settings.update_org", { userId: user.id, error: "No org membership found" });
+  // Look up org — never accept org_id from request body
+  const orgId = await getActiveOrgId(supabase, user.id);
+  if (!orgId) {
+    logger.warn("settings.update_org", { userId: user.id, error: "No org found" });
     return notFound("Organization not found.");
   }
-
-  const orgId = membership.org_id;
 
   // Update via admin client (RLS doesn't cover org table writes from user context)
   const admin = createAdminClient();

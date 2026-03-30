@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { getActiveOrgId } from "@/lib/supabase/helpers";
 import { getVendorOptions, createVendor, QBOApiError } from "@/lib/quickbooks/api";
 import { logger } from "@/lib/utils/logger";
 import { authError, apiSuccess, internalError, validationError, conflict, unprocessableEntity } from "@/lib/utils/errors";
@@ -23,24 +24,18 @@ export async function GET() {
     }
 
     // Get user's org
-    const { data: membership } = await supabase
-      .from("org_memberships")
-      .select("org_id")
-      .eq("user_id", user.id)
-      .limit(1)
-      .single();
-
-    if (!membership) {
+    const orgId = await getActiveOrgId(supabase, user.id);
+    if (!orgId) {
       return authError("No organization found.");
     }
 
     // Fetch vendors from QBO
     const adminSupabase = createAdminClient();
-    const vendors = await getVendorOptions(adminSupabase, membership.org_id);
+    const vendors = await getVendorOptions(adminSupabase, orgId);
 
     logger.info("qbo.vendors_fetched", {
       userId: user.id,
-      orgId: membership.org_id,
+      orgId,
       count: String(vendors.length),
       durationMs: Date.now() - startTime,
     });
@@ -91,14 +86,8 @@ export async function POST(request: Request) {
       return authError();
     }
 
-    const { data: membership } = await supabase
-      .from("org_memberships")
-      .select("org_id")
-      .eq("user_id", user.id)
-      .limit(1)
-      .single();
-
-    if (!membership) {
+    const orgId = await getActiveOrgId(supabase, user.id);
+    if (!orgId) {
       return authError("No organization found.");
     }
 
@@ -111,11 +100,11 @@ export async function POST(request: Request) {
     }
 
     const adminSupabase = createAdminClient();
-    const vendor = await createVendor(adminSupabase, membership.org_id, displayName, address);
+    const vendor = await createVendor(adminSupabase, orgId, displayName, address);
 
     logger.info("qbo.vendor_created_via_api", {
       userId: user.id,
-      orgId: membership.org_id,
+      orgId,
       vendorId: vendor.value,
       displayName: vendor.label,
       durationMs: Date.now() - startTime,

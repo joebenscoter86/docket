@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { getActiveOrgWithRole } from "@/lib/supabase/helpers";
 import { generateState, generatePKCE, getAuthorizationUrl } from "@/lib/xero/auth";
 import { logger } from "@/lib/utils/logger";
-import { authError, internalError } from "@/lib/utils/errors";
+import { authError, forbiddenError, internalError } from "@/lib/utils/errors";
 
 /**
  * GET /api/xero/connect
@@ -19,6 +20,15 @@ export async function GET(request: NextRequest) {
 
     if (!user) {
       return authError("You must be logged in to connect Xero.");
+    }
+
+    // Verify owner role
+    const orgWithRole = await getActiveOrgWithRole(supabase, user.id);
+    if (!orgWithRole) {
+      return forbiddenError("No organization found.");
+    }
+    if (orgWithRole.role !== "owner") {
+      return forbiddenError("Only the organization owner can connect Xero.");
     }
 
     const { codeVerifier, codeChallenge } = generatePKCE();

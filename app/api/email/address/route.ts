@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { getActiveOrgId } from "@/lib/supabase/helpers";
 import { logger } from "@/lib/utils/logger";
 import {
   authError,
@@ -18,19 +19,6 @@ import { type NextRequest } from "next/server";
 import { trackServerEvent, AnalyticsEvents } from "@/lib/analytics/events";
 
 /**
- * Get the user's org ID from their membership.
- */
-async function getUserOrgId(userId: string): Promise<string | null> {
-  const admin = createAdminClient();
-  const { data } = await admin
-    .from("org_memberships")
-    .select("org_id")
-    .eq("user_id", userId)
-    .single();
-  return data?.org_id ?? null;
-}
-
-/**
  * GET /api/email/address
  * Returns the org's current inbound email address (or null if not generated).
  */
@@ -42,7 +30,7 @@ export async function GET() {
 
   if (!user) return authError();
 
-  const orgId = await getUserOrgId(user.id);
+  const orgId = await getActiveOrgId(supabase, user.id);
   if (!orgId) return authError("No organization found");
 
   const admin = createAdminClient();
@@ -70,7 +58,7 @@ export async function POST() {
 
   if (!user) return authError();
 
-  const orgId = await getUserOrgId(user.id);
+  const orgId = await getActiveOrgId(supabase, user.id);
   if (!orgId) return authError("No organization found");
 
   try {
@@ -110,7 +98,7 @@ export async function DELETE() {
 
   if (!user) return authError();
 
-  const orgId = await getUserOrgId(user.id);
+  const orgId = await getActiveOrgId(supabase, user.id);
   if (!orgId) return authError("No organization found");
 
   try {
@@ -155,7 +143,7 @@ export async function PUT(request: NextRequest) {
 
   if (!user) return authError();
 
-  const orgId = await getUserOrgId(user.id);
+  const orgId = await getActiveOrgId(supabase, user.id);
   if (!orgId) return authError("No organization found");
 
   // Check that email forwarding is already enabled

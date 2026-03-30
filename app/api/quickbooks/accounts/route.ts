@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { getActiveOrgId } from "@/lib/supabase/helpers";
 import { getAccountOptions, QBOApiError } from "@/lib/quickbooks/api";
 import { logger } from "@/lib/utils/logger";
 import { authError, apiSuccess, internalError } from "@/lib/utils/errors";
@@ -24,24 +25,18 @@ export async function GET() {
     }
 
     // Get user's org
-    const { data: membership } = await supabase
-      .from("org_memberships")
-      .select("org_id")
-      .eq("user_id", user.id)
-      .limit(1)
-      .single();
-
-    if (!membership) {
+    const orgId = await getActiveOrgId(supabase, user.id);
+    if (!orgId) {
       return authError("No organization found.");
     }
 
     // Fetch accounts from QBO
     const adminSupabase = createAdminClient();
-    const accounts = await getAccountOptions(adminSupabase, membership.org_id);
+    const accounts = await getAccountOptions(adminSupabase, orgId);
 
     logger.info("qbo.accounts_fetched", {
       userId: user.id,
-      orgId: membership.org_id,
+      orgId,
       count: String(accounts.length),
       durationMs: Date.now() - startTime,
     });

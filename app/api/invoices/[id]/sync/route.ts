@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { getActiveOrgId } from "@/lib/supabase/helpers";
 import { checkInvoiceAccess } from "@/lib/billing/access";
 import {
   getAccountingProvider,
@@ -121,18 +122,11 @@ export async function POST(
     }
 
     // 2. Get user's org
-    const { data: membership } = await supabase
-      .from("org_memberships")
-      .select("org_id")
-      .eq("user_id", user.id)
-      .limit(1)
-      .single();
+    const orgId = await getActiveOrgId(supabase, user.id);
 
-    if (!membership) {
+    if (!orgId) {
       return authError("No organization found.");
     }
-
-    const orgId = membership.org_id;
 
     // 2b. Subscription check
     const access = await checkInvoiceAccess(user.id);

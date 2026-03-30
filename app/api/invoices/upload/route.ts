@@ -1,6 +1,7 @@
 import { createHash } from "crypto";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { getActiveOrgId } from "@/lib/supabase/helpers";
 import { validateFileMagicBytes, validateFileSize } from "@/lib/upload/validate";
 import { checkInvoiceAccess } from "@/lib/billing/access";
 import { checkUsageLimit } from "@/lib/billing/usage";
@@ -44,17 +45,12 @@ export async function POST(request: Request) {
     userId = user.id;
 
     // 2. Org lookup
-    const { data: membership, error: membershipError } = await supabase
-      .from("org_memberships")
-      .select("org_id")
-      .eq("user_id", user.id)
-      .single();
-
-    if (membershipError || !membership) {
+    const resolvedOrgId = await getActiveOrgId(supabase, user.id);
+    if (!resolvedOrgId) {
       logger.warn("invoice_upload_no_org", { userId });
       return forbiddenError("No organization found. Please contact support.");
     }
-    orgId = membership.org_id;
+    orgId = resolvedOrgId;
 
     // 2b. Subscription check
     const access = await checkInvoiceAccess(user.id);

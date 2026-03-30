@@ -114,7 +114,7 @@ function setupAuthenticatedUser() {
     error: null,
   });
   mockFrom.mockResolvedValue({
-    data: { org_id: "org-1" },
+    data: { active_org_id: "org-1" },
     error: null,
   });
 }
@@ -183,7 +183,7 @@ describe("POST /api/invoices/upload", () => {
       error: null,
     });
     mockFrom.mockResolvedValue({
-      data: { org_id: "org-1" },
+      data: { active_org_id: "org-1" },
       error: null,
     });
     mockCheckInvoiceAccess.mockResolvedValueOnce({

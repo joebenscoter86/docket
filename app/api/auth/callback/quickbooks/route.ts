@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { getActiveOrgWithRole } from "@/lib/supabase/helpers";
 import { exchangeCodeForTokens, storeConnection } from "@/lib/quickbooks/auth";
 import { logger } from "@/lib/utils/logger";
 
@@ -76,20 +77,24 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Get the user's org
-    const { data: membership } = await supabase
-      .from("org_memberships")
-      .select("org_id")
-      .eq("user_id", user.id)
-      .limit(1)
-      .single();
+    // Get the user's org and verify owner role
+    const orgWithRole = await getActiveOrgWithRole(supabase, user.id);
 
-    if (!membership) {
+    if (!orgWithRole) {
       logger.error("qbo.oauth_no_org", { userId: user.id });
       return NextResponse.redirect(
         `${baseUrl}${returnTo}?qbo_error=${encodeURIComponent("No organization found. Please contact support.")}`
       );
     }
+
+    if (orgWithRole.role !== "owner") {
+      logger.warn("qbo.oauth_not_owner", { userId: user.id, orgId: orgWithRole.orgId, role: orgWithRole.role });
+      return NextResponse.redirect(
+        `${baseUrl}${returnTo}?qbo_error=${encodeURIComponent("Only the organization owner can connect QuickBooks.")}`
+      );
+    }
+
+    const orgId = orgWithRole.orgId;
 
     // Exchange code for tokens
     const tokens = await exchangeCodeForTokens(code);
@@ -97,11 +102,11 @@ export async function GET(request: NextRequest) {
 
     // Store encrypted tokens
     const adminSupabase = createAdminClient();
-    await storeConnection(adminSupabase, membership.org_id, tokens);
+    await storeConnection(adminSupabase, orgId, tokens);
 
     logger.info("qbo.oauth_complete", {
       userId: user.id,
-      orgId: membership.org_id,
+      orgId,
       companyId: realmId,
       durationMs: Date.now() - startTime,
     });

@@ -132,6 +132,11 @@ export function XeroConnectionCard({ connection, disabled, disabledReason }: Xer
           </>
         )}
       </div>
+      {!connection.connected && !disabled && (
+        <p className="text-xs text-muted mt-2">
+          The person connecting needs Standard or Adviser access in Xero. Don&apos;t see your organization? Check your user permissions.
+        </p>
+      )}
     </div>
   );
 }

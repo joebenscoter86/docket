@@ -1,5 +1,6 @@
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
+import { getActiveOrgId } from '@/lib/supabase/helpers'
 import OnboardingShell from './OnboardingShell'
 
 export default async function OnboardingLayout({
@@ -14,15 +15,8 @@ export default async function OnboardingLayout({
     redirect('/login')
   }
 
-  // Fetch org membership
-  const { data: membership } = await supabase
-    .from('org_memberships')
-    .select('org_id')
-    .eq('user_id', user.id)
-    .limit(1)
-    .single()
-
-  const orgId = membership?.org_id
+  // Fetch org
+  const orgId = await getActiveOrgId(supabase, user.id)
 
   // Derive step completion from existing data
   let connectComplete = false

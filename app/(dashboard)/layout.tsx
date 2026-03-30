@@ -1,5 +1,6 @@
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
+import { getActiveOrgId } from '@/lib/supabase/helpers'
 import AppShell from '@/components/layout/AppShell'
 import PostHogIdentify from '@/components/providers/PostHogIdentify'
 import OnboardingBanner from '@/components/onboarding/OnboardingBanner'
@@ -16,16 +17,18 @@ export default async function DashboardLayout({
     redirect('/login')
   }
 
-  // Fetch org name via org_memberships → organizations
-  const { data: membership } = await supabase
-    .from('org_memberships')
-    .select('org_id, organizations(name)')
-    .eq('user_id', user.id)
-    .limit(1)
-    .single()
+  // Get active org
+  const orgId = await getActiveOrgId(supabase, user.id)
 
-  const orgs = membership?.organizations as { name: string }[] | { name: string } | null
-  const orgName = Array.isArray(orgs) ? orgs[0]?.name ?? '' : orgs?.name ?? ''
+  let orgName = ''
+  if (orgId) {
+    const { data: org } = await supabase
+      .from('organizations')
+      .select('name')
+      .eq('id', orgId)
+      .single()
+    orgName = org?.name ?? ''
+  }
 
   // Fetch onboarding state for banner
   const { data: userData } = await supabase
@@ -39,8 +42,6 @@ export default async function DashboardLayout({
 
   let hasConnection = false
   let hasInvoices = false
-
-  const orgId = (membership as { org_id?: string } | null)?.org_id
 
   if (!onboardingCompleted && orgId) {
     const [{ count: connCount }, { count: invCount }] = await Promise.all([

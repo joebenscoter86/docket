@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { getActiveOrgId } from "@/lib/supabase/helpers";
 import {
   getAccountingProvider,
   getOrgProvider,
@@ -28,18 +29,10 @@ export async function GET() {
       return authError();
     }
 
-    const { data: membership } = await supabase
-      .from("org_memberships")
-      .select("org_id")
-      .eq("user_id", user.id)
-      .limit(1)
-      .single();
-
-    if (!membership) {
+    const orgId = await getActiveOrgId(supabase, user.id);
+    if (!orgId) {
       return authError("No organization found.");
     }
-
-    const orgId = membership.org_id;
     const adminSupabase = createAdminClient();
 
     const providerType = await getOrgProvider(adminSupabase, orgId);

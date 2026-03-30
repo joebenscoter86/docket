@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { getActiveOrgId } from "@/lib/supabase/helpers";
 import { logger } from "@/lib/utils/logger";
 import { authError, validationError, apiSuccess, internalError, conflict } from "@/lib/utils/errors";
 
@@ -28,18 +29,11 @@ export async function POST(
       return authError();
     }
 
-    const { data: membership } = await supabase
-      .from("org_memberships")
-      .select("org_id")
-      .eq("user_id", user.id)
-      .limit(1)
-      .single();
+    const orgId = await getActiveOrgId(supabase, user.id);
 
-    if (!membership) {
+    if (!orgId) {
       return authError("No organization found.");
     }
-
-    const orgId = membership.org_id;
     const adminSupabase = createAdminClient();
 
     // Verify invoice exists and belongs to org

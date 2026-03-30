@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { getActiveOrgId } from "@/lib/supabase/helpers";
 import { TRIAL_INVOICE_LIMIT } from "@/lib/billing/tiers";
 import {
   sendNoUploadNudgeEmail,
@@ -45,23 +46,19 @@ export async function GET(request: Request) {
 
     if (noUploadUsers) {
       for (const user of noUploadUsers) {
-        // Check if they have any invoices via org_memberships
-        const { data: memberships } = await admin
-          .from("org_memberships")
-          .select("org_id")
-          .eq("user_id", user.id);
+        // Check if they have any invoices via active org
+        const orgId = await getActiveOrgId(admin, user.id);
 
-        if (!memberships || memberships.length === 0) {
+        if (!orgId) {
           await sendNoUploadNudgeEmail(user.id);
           sent++;
           continue;
         }
 
-        const orgIds = memberships.map((m) => m.org_id);
         const { count } = await admin
           .from("invoices")
           .select("*", { count: "exact", head: true })
-          .in("org_id", orgIds);
+          .eq("org_id", orgId);
 
         if (count === 0) {
           await sendNoUploadNudgeEmail(user.id);
@@ -84,20 +81,15 @@ export async function GET(request: Request) {
 
     if (noSyncUsers) {
       for (const user of noSyncUsers) {
-        const { data: memberships } = await admin
-          .from("org_memberships")
-          .select("org_id")
-          .eq("user_id", user.id);
+        const orgId = await getActiveOrgId(admin, user.id);
 
-        if (!memberships || memberships.length === 0) continue;
-
-        const orgIds = memberships.map((m) => m.org_id);
+        if (!orgId) continue;
 
         // Count extracted invoices (pending_review or approved)
         const { count: extractedCount } = await admin
           .from("invoices")
           .select("*", { count: "exact", head: true })
-          .in("org_id", orgIds)
+          .eq("org_id", orgId)
           .in("status", ["pending_review", "approved"]);
 
         if (!extractedCount || extractedCount === 0) continue;
@@ -106,7 +98,7 @@ export async function GET(request: Request) {
         const { count: syncedCount } = await admin
           .from("invoices")
           .select("*", { count: "exact", head: true })
-          .in("org_id", orgIds)
+          .eq("org_id", orgId)
           .eq("status", "synced");
 
         if (syncedCount === 0) {
