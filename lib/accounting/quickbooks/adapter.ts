@@ -145,6 +145,7 @@ export class QuickBooksAccountingAdapter implements AccountingProvider {
       ...(input.dueDate ? { DueDate: input.dueDate } : {}),
       ...(input.invoiceNumber ? { DocNumber: input.invoiceNumber } : {}),
       ...(input.taxTreatment ? { GlobalTaxCalculation: GLOBAL_TAX_MAP[input.taxTreatment] } : {}),
+      ...(input.memo ? { PrivateNote: input.memo } : {}),
     };
 
     try {
@@ -179,6 +180,7 @@ export class QuickBooksAccountingAdapter implements AccountingProvider {
       ...(input.invoiceDate ? { TxnDate: input.invoiceDate } : {}),
       ...(input.invoiceNumber ? { DocNumber: input.invoiceNumber } : {}),
       ...(input.taxTreatment ? { GlobalTaxCalculation: GLOBAL_TAX_MAP[input.taxTreatment] } : {}),
+      ...(input.memo ? { PrivateNote: input.memo } : {}),
     };
 
     try {
