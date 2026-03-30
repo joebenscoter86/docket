@@ -86,6 +86,7 @@ Rules:
 - If it is an INVOICE with no explicit due date: leave due_date as null so the user can enter it manually. Do NOT infer a due date from payment terms.
 - For tax_treatment: "exclusive" if line item amounts are before tax (tax is shown separately), "inclusive" if line item amounts already include tax (common in UK/AU invoices), "no_tax" if no tax is shown at all. Default to "exclusive" if unclear.
 - Do not infer or calculate values — extract only what is explicitly shown
+- CRITICAL — arithmetic cross-check: after extracting all numbers, verify that subtotal + tax_amount = total_amount. If they do not add up, re-read the subtotal, tax, and total from the document carefully — receipt fonts can cause digits to be misread (e.g., "87" vs "59", "58" vs "86"). The total is usually the most prominent and reliable number. If after re-reading you still cannot make them add up, set confidence to "medium".
 - Return raw JSON only — no wrapping, no explanation`;
 
 function buildAccountPromptSection(
@@ -343,18 +344,43 @@ export class ClaudeExtractionProvider implements ExtractionProvider {
       data.confidenceScore = "low";
     }
 
-    // Subtotal/total mismatch detection: likely missing shipping/handling or discount charges
-    if (data.subtotal != null && data.totalAmount != null) {
-      const expected = Math.round((data.subtotal + (data.taxAmount ?? 0)) * 100) / 100;
+    // Arithmetic cross-check: the total is the most prominent number on receipts
+    // and is almost always read correctly. Subtotal and tax are smaller/lighter
+    // and frequently misread on receipt images. When we can detect a mismatch,
+    // back-calculate the subtotal from total - tax.
+    if (data.subtotal != null && data.totalAmount != null && data.taxAmount != null) {
+      const expected = Math.round((data.subtotal + data.taxAmount) * 100) / 100;
       const actual = Math.round(data.totalAmount * 100) / 100;
+      const correctedSubtotal = Math.round((data.totalAmount - data.taxAmount) * 100) / 100;
+
       if (Math.abs(actual - expected) > 0.01) {
-        logger.warn("extraction_subtotal_total_mismatch", {
-          action: "extract_invoice",
-          subtotal: data.subtotal,
-          taxAmount: data.taxAmount,
-          totalAmount: data.totalAmount,
-          gap: Math.round((actual - expected) * 100) / 100,
-        });
+        // Case 1: subtotal + tax != total — clear mismatch.
+        // Trust total and back-calculate subtotal.
+        if (correctedSubtotal > 0) {
+          logger.warn("extraction_subtotal_corrected_from_total", {
+            action: "extract_invoice",
+            originalSubtotal: data.subtotal,
+            correctedSubtotal,
+            taxAmount: data.taxAmount,
+            totalAmount: data.totalAmount,
+          });
+          data.subtotal = correctedSubtotal;
+          // Fix single line item to match corrected subtotal
+          if (data.lineItems.length === 1) {
+            data.lineItems[0].amount = correctedSubtotal;
+            if (data.lineItems[0].quantity === 1) {
+              data.lineItems[0].unitPrice = correctedSubtotal;
+            }
+          }
+        } else {
+          logger.warn("extraction_subtotal_total_mismatch", {
+            action: "extract_invoice",
+            subtotal: data.subtotal,
+            taxAmount: data.taxAmount,
+            totalAmount: data.totalAmount,
+            gap: Math.round((actual - expected) * 100) / 100,
+          });
+        }
         if (data.confidenceScore === "high") {
           data.confidenceScore = "medium";
         }
