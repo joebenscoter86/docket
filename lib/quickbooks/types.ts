@@ -158,6 +158,7 @@ export interface QBOPurchasePayload {
   TxnDate?: string;
   DocNumber?: string;
   Line: QBOPurchaseLine[];
+  PrivateNote?: string;
   GlobalTaxCalculation?: "TaxExcluded" | "TaxInclusive" | "NotApplicable";
 }
 
