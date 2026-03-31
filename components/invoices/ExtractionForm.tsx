@@ -114,12 +114,13 @@ export default function ExtractionForm({
   );
   const [xeroBillStatusSaving, setXeroBillStatusSaving] = useState(false);
 
-  // Tax treatment (exclusive/inclusive/no_tax/null). Null = provider default (omit from API call).
+  // Tax treatment toggle + value. Null = off (provider default, no per-line tax codes).
   const [taxTreatment, setTaxTreatment] = useState<"exclusive" | "inclusive" | "no_tax" | null>(
     initialTaxTreatment === "exclusive" || initialTaxTreatment === "inclusive" || initialTaxTreatment === "no_tax"
       ? initialTaxTreatment
       : null
   );
+  const taxEnabled = taxTreatment !== null;
   const [taxTreatmentSaving, setTaxTreatmentSaving] = useState(false);
 
   const handleVendorSelect = useCallback(
@@ -667,7 +668,7 @@ export default function ExtractionForm({
           accountingConnected={accountingOptions.connected}
           disabled={currentStatus === "synced"}
           trackingCategories={accountingOptions.trackingCategories}
-          taxCodes={accountingOptions.taxCodes}
+          taxCodes={taxEnabled ? accountingOptions.taxCodes : []}
         />
       </div>
 
@@ -738,37 +739,52 @@ export default function ExtractionForm({
 
       {/* Tax treatment selector — all providers, all output types, hidden when synced */}
       {accountingOptions.connected && currentStatus !== "synced" && (
-        <div className="flex items-center justify-between gap-3 bg-white rounded-brand-md shadow-soft px-5 py-4">
-          <div className="min-w-0">
-            <div className="flex items-center gap-1.5">
-              <p className="text-sm font-medium text-text">Tax treatment</p>
-              <InfoTooltip text="Tax Exclusive: line item amounts are before tax. Tax is calculated on top. This is standard for US invoices and receipts with a separate tax line. Tax Inclusive: line item amounts already include tax. Common in UK/EU/AU where VAT is baked into prices. No Tax: no tax applies to this invoice." />
+        <div className="bg-white rounded-brand-md shadow-soft px-5 py-4 space-y-3">
+          <div className="flex items-center justify-between gap-3">
+            <div className="min-w-0">
+              <p className="text-sm font-medium text-text">Would you like to enable line item tax treatment?</p>
+              <p className="text-xs text-muted mt-0.5">Assigns a tax treatment to this invoice and lets you set tax codes per line item</p>
             </div>
-            <p className="text-xs text-muted mt-0.5">How line item amounts relate to tax</p>
+            <div className="flex items-center gap-1.5 shrink-0">
+              {taxTreatmentSaving && (
+                <svg className="h-3.5 w-3.5 animate-spin text-muted" viewBox="0 0 24 24" fill="none">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                </svg>
+              )}
+              <button
+                type="button"
+                role="switch"
+                aria-checked={taxEnabled}
+                onClick={() => handleTaxTreatmentChange(taxEnabled ? null : "exclusive")}
+                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${taxEnabled ? "bg-primary" : "bg-gray-300"}`}
+              >
+                <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${taxEnabled ? "translate-x-6" : "translate-x-1"}`} />
+              </button>
+            </div>
           </div>
-          <div className="flex items-center gap-1.5 shrink-0">
-            {taxTreatmentSaving && (
-              <svg className="h-3.5 w-3.5 animate-spin text-muted" viewBox="0 0 24 24" fill="none">
-                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-              </svg>
-            )}
-            <select
-              value={taxTreatment ?? ""}
-              onChange={(e) => {
-                const val = e.target.value;
-                handleTaxTreatmentChange(
-                  val === "exclusive" || val === "inclusive" || val === "no_tax" ? val : null
+          {taxEnabled && (
+            <div className="flex items-center gap-2 pt-1">
+              {(["exclusive", "inclusive", "no_tax"] as const).map((option) => {
+                const labels = { exclusive: "Tax Exclusive", inclusive: "Tax Inclusive", no_tax: "No Tax" };
+                const isSelected = taxTreatment === option;
+                return (
+                  <button
+                    key={option}
+                    type="button"
+                    onClick={() => handleTaxTreatmentChange(option)}
+                    className={`px-3 py-1.5 text-xs font-medium rounded-md border transition-colors ${
+                      isSelected
+                        ? "bg-primary text-white border-primary"
+                        : "bg-white text-text border-border hover:bg-background"
+                    }`}
+                  >
+                    {labels[option]}
+                  </button>
                 );
-              }}
-              className="text-sm border border-border rounded-md px-3 py-1.5 bg-white text-text focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
-            >
-              <option value="">Default</option>
-              <option value="exclusive">Tax Exclusive</option>
-              <option value="inclusive">Tax Inclusive</option>
-              <option value="no_tax">No Tax</option>
-            </select>
-          </div>
+              })}
+            </div>
+          )}
         </div>
       )}
 
