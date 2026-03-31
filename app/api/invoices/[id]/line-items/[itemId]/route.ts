@@ -105,7 +105,8 @@ export async function PATCH(
       invoice.org_id,
       `line_item.${itemId}.${field}`,
       stringify(preUpdateValue),
-      stringify(castValue)
+      stringify(castValue),
+      user.id
     );
   }
 

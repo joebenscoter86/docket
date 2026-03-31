@@ -99,7 +99,8 @@ export async function recordCorrection(
   orgId: string,
   fieldName: string,
   originalValue: string | null,
-  correctedValue: string | null
+  correctedValue: string | null,
+  userId?: string
 ) {
   const supabase = createClient();
 
@@ -109,6 +110,7 @@ export async function recordCorrection(
     field_name: fieldName,
     original_value: originalValue,
     corrected_value: correctedValue,
+    ...(userId ? { user_id: userId } : {}),
   });
 
   if (error) {

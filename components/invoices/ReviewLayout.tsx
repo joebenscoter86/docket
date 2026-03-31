@@ -21,6 +21,8 @@ import DuplicateWarningBanner from "./DuplicateWarningBanner";
 import type { InvoiceStatus, ExtractedDataRow, OutputType, DuplicateMatch } from "@/lib/types/invoice";
 import type { BatchManifestItem } from "@/lib/invoices/queries";
 import type { AccountingProviderType } from "@/lib/accounting/types";
+import type { ActivityEvent } from "@/lib/invoices/activity";
+import ActivityFeed from "./ActivityFeed";
 
 interface ReviewLayoutProps {
   invoice: {
@@ -45,6 +47,7 @@ interface ReviewLayoutProps {
   };
   batchManifest?: { id: string; status: string }[];
   accountingProvider?: AccountingProviderType | null;
+  activityEvents?: ActivityEvent[];
 }
 
 type MobileTab = "document" | "details";
@@ -62,6 +65,7 @@ export default function ReviewLayout({
   orgDefaults,
   batchManifest,
   accountingProvider,
+  activityEvents,
 }: ReviewLayoutProps) {
   const [activeTab, setActiveTab] = useState<MobileTab>("document");
   const [leftPct, setLeftPct] = useState(50);
@@ -240,21 +244,26 @@ export default function ReviewLayout({
         >
           <div className="flex-1 p-4 md:p-6 bg-background">
             {extractedData ? (
-              <ExtractionForm
-                extractedData={extractedData}
-                invoiceId={invoice.id}
-                invoiceStatus={invoice.status}
-                errorMessage={invoice.errorMessage}
-                outputType={invoice.outputType}
-                paymentAccountId={invoice.paymentAccountId}
-                paymentAccountName={invoice.paymentAccountName}
-                orgDefaults={orgDefaults}
-                batchId={invoice.batchId}
-                batchManifest={batchManifest}
-                accountingProvider={accountingProvider ?? null}
-                xeroBillStatus={invoice.xeroBillStatus ?? null}
-                taxTreatment={invoice.taxTreatment ?? null}
-              />
+              <>
+                <ExtractionForm
+                  extractedData={extractedData}
+                  invoiceId={invoice.id}
+                  invoiceStatus={invoice.status}
+                  errorMessage={invoice.errorMessage}
+                  outputType={invoice.outputType}
+                  paymentAccountId={invoice.paymentAccountId}
+                  paymentAccountName={invoice.paymentAccountName}
+                  orgDefaults={orgDefaults}
+                  batchId={invoice.batchId}
+                  batchManifest={batchManifest}
+                  accountingProvider={accountingProvider ?? null}
+                  xeroBillStatus={invoice.xeroBillStatus ?? null}
+                  taxTreatment={invoice.taxTreatment ?? null}
+                />
+                {activityEvents && activityEvents.length > 0 && (
+                  <ActivityFeed events={activityEvents} />
+                )}
+              </>
             ) : (
               <div className="flex items-center justify-center h-full text-sm text-muted">
                 <div className="text-center">

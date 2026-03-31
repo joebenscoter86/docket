@@ -42,11 +42,12 @@ vi.mock("@/lib/supabase/server", () => ({
 }));
 
 const mockAdminUpdate = vi.fn();
+const mockAdminUpdateFn = vi.fn(() => ({
+  eq: mockAdminUpdate,
+}));
 const mockAdminClient = {
   from: vi.fn(() => ({
-    update: vi.fn(() => ({
-      eq: mockAdminUpdate,
-    })),
+    update: mockAdminUpdateFn,
   })),
 };
 
@@ -80,6 +81,9 @@ describe("POST /api/invoices/[id]/approve", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockAdminUpdate.mockResolvedValue({ error: null });
+    mockAdminUpdateFn.mockImplementation(() => ({
+      eq: mockAdminUpdate,
+    }));
   });
 
   it("returns 401 when user is not authenticated", async () => {
@@ -252,6 +256,15 @@ describe("POST /api/invoices/[id]/approve", () => {
     expect(res.status).toBe(200);
     expect(body.data.status).toBe("approved");
     expect(mockAdminClient.from).toHaveBeenCalledWith("invoices");
+
+    // Verify the update payload includes approved_by and approved_at
+    expect(mockAdminUpdateFn).toHaveBeenCalledOnce();
+    const updatePayload = mockAdminUpdateFn.mock.calls[0][0] as Record<string, unknown>;
+    expect(updatePayload.status).toBe("approved");
+    expect(updatePayload.approved_by).toBe("user-1");
+    expect(typeof updatePayload.approved_at).toBe("string");
+    // Verify it's a valid ISO timestamp
+    expect(new Date(updatePayload.approved_at as string).getTime()).not.toBeNaN();
   });
 
   it("returns 500 when status update fails", async () => {

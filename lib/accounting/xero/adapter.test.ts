@@ -435,6 +435,74 @@ describe("XeroAccountingAdapter", () => {
       expect(payload.LineAmountTypes).toBeUndefined();
     });
 
+    it("includes memo in Reference when both invoiceNumber and memo provided", async () => {
+      mockCreateInvoice.mockResolvedValue({
+        Invoices: [
+          {
+            InvoiceID: "xero-inv-uuid-memo",
+            InvoiceNumber: "INV-001",
+            Type: "ACCPAY",
+            Status: "AUTHORISED",
+            Contact: { ContactID: "contact-1", Name: "Acme" },
+            DateString: "2026-03-20",
+            DueDateString: "",
+            Total: 100,
+            AmountDue: 100,
+            CurrencyCode: "USD",
+            LineItems: [],
+          },
+        ],
+      });
+
+      const adapter = await getAdapter();
+      await adapter.createBill(mockSupabase, "org-1", {
+        vendorRef: "contact-1",
+        lineItems: [{ amount: 100, glAccountId: "500", description: null }],
+        invoiceDate: "2026-03-20",
+        dueDate: null,
+        invoiceNumber: "INV-001",
+        memo: "Synced by joe@acme.com via Docket",
+      });
+
+      const payload = mockCreateInvoice.mock.calls[0][2];
+      expect(payload.InvoiceNumber).toBe("INV-001");
+      expect(payload.Reference).toBe("INV-001 | Synced by joe@acme.com via Docket");
+    });
+
+    it("uses memo alone as Reference when no invoiceNumber", async () => {
+      mockCreateInvoice.mockResolvedValue({
+        Invoices: [
+          {
+            InvoiceID: "xero-inv-uuid-memo-only",
+            InvoiceNumber: "",
+            Type: "ACCPAY",
+            Status: "AUTHORISED",
+            Contact: { ContactID: "contact-1", Name: "Acme" },
+            DateString: "2026-03-20",
+            DueDateString: "",
+            Total: 100,
+            AmountDue: 100,
+            CurrencyCode: "USD",
+            LineItems: [],
+          },
+        ],
+      });
+
+      const adapter = await getAdapter();
+      await adapter.createBill(mockSupabase, "org-1", {
+        vendorRef: "contact-1",
+        lineItems: [{ amount: 100, glAccountId: "500", description: null }],
+        invoiceDate: "2026-03-20",
+        dueDate: null,
+        invoiceNumber: null,
+        memo: "Synced by joe@acme.com via Docket",
+      });
+
+      const payload = mockCreateInvoice.mock.calls[0][2];
+      expect(payload.InvoiceNumber).toBeUndefined();
+      expect(payload.Reference).toBe("Synced by joe@acme.com via Docket");
+    });
+
     it("wraps XeroApiError into AccountingApiError", async () => {
       mockCreateInvoice.mockRejectedValue(
         new XeroApiError({
@@ -583,6 +651,38 @@ describe("XeroAccountingAdapter", () => {
       const payload = mockCreateBankTransaction.mock.calls[0][2];
       expect(payload.Date).toBeUndefined();
       expect(payload.Reference).toBeUndefined();
+    });
+
+    it("maps memo to Reference on purchase payload", async () => {
+      mockCreateBankTransaction.mockResolvedValue({
+        BankTransactions: [
+          {
+            BankTransactionID: "xero-bt-uuid-memo",
+            Type: "SPEND",
+            Contact: { ContactID: "contact-1", Name: "Acme" },
+            BankAccount: { AccountID: "bank-1", Name: "Business Checking", Code: "090" },
+            DateString: "2026-03-20",
+            Reference: "Synced by joe@acme.com via Docket",
+            Total: 100,
+            Status: "AUTHORISED",
+            LineItems: [],
+          },
+        ],
+      });
+
+      const adapter = await getAdapter();
+      await adapter.createPurchase(mockSupabase, "org-1", {
+        vendorRef: "contact-1",
+        paymentAccountRef: "bank-1",
+        paymentType: "Check",
+        lineItems: [{ amount: 100, glAccountId: "500", description: null }],
+        invoiceDate: "2026-03-20",
+        invoiceNumber: null,
+        memo: "Synced by joe@acme.com via Docket",
+      });
+
+      const payload = mockCreateBankTransaction.mock.calls[0][2];
+      expect(payload.Reference).toBe("Synced by joe@acme.com via Docket");
     });
 
     it("wraps XeroApiError into AccountingApiError", async () => {

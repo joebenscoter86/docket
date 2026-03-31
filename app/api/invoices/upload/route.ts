@@ -260,6 +260,7 @@ export async function POST(request: Request) {
       file_type: fileType,
       file_size_bytes: fileSize,
       file_hash: fileHash,
+      uploaded_by: userId,
     };
     if (batchId) {
       insertData.batch_id = batchId;

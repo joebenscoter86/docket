@@ -160,7 +160,8 @@ describe("PATCH /api/invoices/[id]/extracted-data", () => {
       "org-1",
       "vendor_name",
       "Acme Corp",
-      "New Vendor"
+      "New Vendor",
+      "user-1"
     );
   });
 

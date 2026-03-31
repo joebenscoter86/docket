@@ -28,6 +28,7 @@ const mockCreateSignedUrl = vi.fn();
 const mockStorageRemove = vi.fn();
 const mockInsert = vi.fn();
 const mockBatchCount = vi.fn();
+const mockInvoicesInsert = vi.fn();
 const mockAdminClient = {
   storage: {
     from: vi.fn(() => ({
@@ -39,11 +40,14 @@ const mockAdminClient = {
   from: vi.fn((table: string) => {
     if (table === "invoices") {
       return {
-        insert: vi.fn(() => ({
-          select: vi.fn(() => ({
-            single: mockInsert,
-          })),
-        })),
+        insert: vi.fn((data: unknown) => {
+          mockInvoicesInsert(data);
+          return {
+            select: vi.fn(() => ({
+              single: mockInsert,
+            })),
+          };
+        }),
         select: vi.fn(() => ({
           eq: mockBatchCount,
         })),
@@ -133,6 +137,7 @@ function setupSuccessPath() {
 describe("POST /api/invoices/upload", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockInvoicesInsert.mockReset();
     mockEnqueueExtraction.mockResolvedValue({
       data: { vendorName: "Test Vendor", lineItems: [] },
       rawResponse: {},
@@ -318,6 +323,11 @@ describe("POST /api/invoices/upload", () => {
     expect(body.data).toHaveProperty("invoiceId");
     expect(body.data).toHaveProperty("signedUrl");
     expect(body.data).toHaveProperty("fileName", "invoice.pdf");
+    // Verify uploaded_by is set to the authenticated user's ID
+    expect(mockInvoicesInsert).toHaveBeenCalledOnce();
+    expect(mockInvoicesInsert).toHaveBeenCalledWith(
+      expect.objectContaining({ uploaded_by: "user-1" })
+    );
   });
 
   it("fires extraction without awaiting it", async () => {

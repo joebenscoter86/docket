@@ -12,6 +12,7 @@ import Link from "next/link";
 import type { InvoiceStatus, ExtractedDataRow, OutputType } from "@/lib/types/invoice";
 import type { AccountingProviderType } from "@/lib/accounting/types";
 import { fetchBatchManifest, type BatchManifestItem } from "@/lib/invoices/queries";
+import { getInvoiceActivity } from "@/lib/invoices/activity";
 
 const PROCESSING_STATUSES: InvoiceStatus[] = ["uploading", "extracting", "error"];
 
@@ -68,7 +69,7 @@ export default async function ReviewPage({
   const admin = createAdminClient();
   const { data: { user } } = await supabase.auth.getUser();
   const activeOrgId = user ? await getActiveOrgId(supabase, user.id) : null;
-  const [extractedData, signedUrlResult, orgAndProviderResult] = await Promise.all([
+  const [extractedData, signedUrlResult, orgAndProviderResult, activityEvents] = await Promise.all([
     getExtractedData(invoice.id),
     admin.storage
       .from("invoices")
@@ -86,6 +87,7 @@ export default async function ReviewPage({
       ]);
       return { org: orgData, provider: connection?.provider ?? null };
     })(),
+    getInvoiceActivity(invoice.id),
   ]);
 
   const orgResult = orgAndProviderResult?.org ?? null;
@@ -142,6 +144,7 @@ export default async function ReviewPage({
         }}
         batchManifest={batchManifest}
         accountingProvider={accountingProvider}
+        activityEvents={activityEvents}
       />
   );
 }
