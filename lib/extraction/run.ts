@@ -12,6 +12,7 @@ import {
   checkAndSendBatchCompleteEmail,
 } from "@/lib/email/triggers";
 import type { ExtractionResult, ExtractionContext } from "./types";
+import { isRetryableError, toUserFriendlyError } from "./errors";
 
 // Minimum resolution for image extraction accuracy.
 // Images below this threshold on their shortest side get upscaled.
@@ -178,9 +179,42 @@ export async function runExtraction(params: {
       });
     }
 
-    // 4. Call extraction provider
+    // 4. Call extraction provider with retry for transient errors
     const provider = getExtractionProvider();
-    const result = await provider.extractInvoiceData(fileBuffer, fileType, accountContext);
+    const RETRY_DELAYS = [1000, 2000, 4000]; // exponential backoff: 1s, 2s, 4s
+    let lastError: Error | null = null;
+    let result: ExtractionResult | null = null;
+
+    for (let attempt = 0; attempt <= RETRY_DELAYS.length; attempt++) {
+      try {
+        result = await provider.extractInvoiceData(fileBuffer, fileType, accountContext);
+        lastError = null;
+        break;
+      } catch (err) {
+        lastError = err instanceof Error ? err : new Error(String(err));
+
+        if (!isRetryableError(lastError) || attempt === RETRY_DELAYS.length) {
+          break;
+        }
+
+        const delay = RETRY_DELAYS[attempt];
+        logger.warn("extraction_retrying", {
+          action: "run_extraction",
+          invoiceId,
+          orgId,
+          attempt: attempt + 1,
+          maxRetries: RETRY_DELAYS.length,
+          delayMs: delay,
+          error: lastError.message.substring(0, 200),
+        });
+
+        await new Promise((resolve) => setTimeout(resolve, delay));
+      }
+    }
+
+    if (lastError || !result) {
+      throw lastError ?? new Error("Extraction failed after retries");
+    }
 
     // 4.5. Validate AI-suggested GL account IDs against real account list
     if (validAccountIds && result.data.lineItems.length > 0) {
@@ -386,8 +420,9 @@ export async function runExtraction(params: {
 
     return result;
   } catch (error) {
-    const errorMessage =
+    const rawMessage =
       error instanceof Error ? error.message : "Unknown extraction error";
+    const friendlyMessage = toUserFriendlyError(rawMessage);
 
     // Read current retry_count, then update with increment
     const { data: currentInvoice } = await admin
@@ -400,7 +435,7 @@ export async function runExtraction(params: {
       .from("invoices")
       .update({
         status: "error",
-        error_message: errorMessage,
+        error_message: friendlyMessage,
         retry_count: (currentInvoice?.retry_count ?? 0) + 1,
       })
       .eq("id", invoiceId);
@@ -409,7 +444,8 @@ export async function runExtraction(params: {
       invoiceId,
       orgId,
       userId,
-      error: errorMessage,
+      error: rawMessage,
+      friendlyError: friendlyMessage,
       status: "error",
     });
 
