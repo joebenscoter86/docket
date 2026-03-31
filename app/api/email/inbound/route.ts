@@ -144,6 +144,11 @@ export async function POST(request: NextRequest) {
     messageId: parsedEmail.messageId,
     attachmentCount: parsedEmail.attachmentMetas.length,
     recipients: parsedEmail.to,
+    hasHtmlBody: !!parsedEmail.htmlBody,
+    hasTextBody: !!parsedEmail.textBody,
+    htmlBodyLength: parsedEmail.htmlBody?.length ?? 0,
+    textBodyLength: parsedEmail.textBody?.length ?? 0,
+    payloadKeys: Object.keys((payload.data as Record<string, unknown>) ?? payload),
   });
 
   // Find the recipient org
