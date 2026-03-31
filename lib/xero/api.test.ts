@@ -290,11 +290,39 @@ const ACCOUNT_ARCHIVED: XeroAccount = {
   Class: "EXPENSE",
 };
 
+const ACCOUNT_LIABILITY: XeroAccount = {
+  AccountID: "uuid-4",
+  Code: "800",
+  Name: "Officers Loans",
+  Status: "ACTIVE",
+  Type: "CURRLIAB",
+  Class: "LIABILITY",
+};
+
+const ACCOUNT_ASSET: XeroAccount = {
+  AccountID: "uuid-5",
+  Code: "150",
+  Name: "Prepaid Expenses",
+  Status: "ACTIVE",
+  Type: "PREPAYMENT",
+  Class: "ASSET",
+};
+
+const ACCOUNT_BANK: XeroAccount = {
+  AccountID: "uuid-6",
+  Code: "090",
+  Name: "Business Checking",
+  Status: "ACTIVE",
+  Type: "BANK",
+  Class: "ASSET",
+  BankAccountType: "BANK",
+};
+
 describe("fetchAccounts", () => {
   it("returns AccountOption[] sorted alphabetically by label", async () => {
     server.use(
       http.get(`${XERO_BASE}/Accounts`, () => {
-        return HttpResponse.json({ Accounts: [ACCOUNT_1, ACCOUNT_2] });
+        return HttpResponse.json({ Accounts: [ACCOUNT_1, ACCOUNT_2, ACCOUNT_LIABILITY] });
       })
     );
 
@@ -302,10 +330,10 @@ describe("fetchAccounts", () => {
     const mockSupabase = {} as Parameters<typeof fetchAccounts>[0];
     const result = await fetchAccounts(mockSupabase, "org-1");
 
-    // Sorted alphabetically: Advertising before Cost of Goods Sold
     expect(result).toEqual([
-      { value: "600", label: "Advertising", accountType: "EXPENSE" },
-      { value: "500", label: "Cost of Goods Sold", accountType: "DIRECTCOSTS" },
+      { value: "600", label: "Advertising", accountType: "EXPENSE", classification: "Expense" },
+      { value: "500", label: "Cost of Goods Sold", accountType: "DIRECTCOSTS", classification: "Expense" },
+      { value: "800", label: "Officers Loans", accountType: "CURRLIAB", classification: "Liability" },
     ]);
   });
 
@@ -322,6 +350,7 @@ describe("fetchAccounts", () => {
 
     expect(result).toHaveLength(1);
     expect(result[0].label).toBe("Cost of Goods Sold");
+    expect(result[0].classification).toBe("Expense");
   });
 
   it("sets xero-tenant-id header on the request", async () => {
@@ -340,7 +369,22 @@ describe("fetchAccounts", () => {
     expect(capturedHeaders["xero-tenant-id"]).toBe("test-tenant-id");
   });
 
-  it("uses OData where filter for expense class", async () => {
+  it("excludes bank-type accounts from GL dropdown", async () => {
+    server.use(
+      http.get(`${XERO_BASE}/Accounts`, () => {
+        return HttpResponse.json({ Accounts: [ACCOUNT_1, ACCOUNT_BANK] });
+      })
+    );
+
+    const { fetchAccounts } = await import("@/lib/xero/api");
+    const mockSupabase = {} as Parameters<typeof fetchAccounts>[0];
+    const result = await fetchAccounts(mockSupabase, "org-1");
+
+    expect(result).toHaveLength(1);
+    expect(result[0].label).toBe("Cost of Goods Sold");
+  });
+
+  it("fetches all accounts without class filter", async () => {
     let capturedUrl = "";
     server.use(
       http.get(`${XERO_BASE}/Accounts`, ({ request }) => {
@@ -353,7 +397,7 @@ describe("fetchAccounts", () => {
     const mockSupabase = {} as Parameters<typeof fetchAccounts>[0];
     await fetchAccounts(mockSupabase, "org-1");
 
-    expect(capturedUrl).toContain('where=Class%3D%3D%22EXPENSE%22');
+    expect(capturedUrl).not.toContain("where=");
   });
 
   it("throws XeroApiError on non-ok response", async () => {

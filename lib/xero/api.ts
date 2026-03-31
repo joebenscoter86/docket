@@ -301,10 +301,21 @@ export async function createContact(
 
 // ─── Account Operations ───
 
+/** Map Xero's uppercase Class values to title-case classification labels. */
+function mapXeroClass(xeroClass: string): string {
+  const map: Record<string, string> = {
+    EXPENSE: "Expense",
+    LIABILITY: "Liability",
+    ASSET: "Asset",
+    EQUITY: "Equity",
+    REVENUE: "Revenue",
+  };
+  return map[xeroClass] ?? xeroClass;
+}
+
 /**
- * Fetch expense-type accounts from Xero.
- * Filters by Class=="EXPENSE" server-side (OData where clause).
- * Excludes archived accounts in the response mapping.
+ * Fetch all active accounts from Xero.
+ * Excludes archived accounts and bank-type accounts (those are payment accounts).
  * Returns AccountOption[] sorted alphabetically for dropdown display.
  *
  * AccountOption.value = AccountCode (e.g., "500"), NOT AccountID.
@@ -316,19 +327,19 @@ export async function fetchAccounts(
 ): Promise<AccountOption[]> {
   const startTime = Date.now();
 
-  const where = encodeURIComponent('Class=="EXPENSE"');
   const response = await xeroFetch<XeroAccountsResponse>(
     supabase,
     orgId,
-    `/Accounts?where=${where}`
+    `/Accounts`
   );
 
   const accounts = (response.Accounts ?? [])
-    .filter((a: XeroAccount) => a.Status !== "ARCHIVED")
+    .filter((a: XeroAccount) => a.Status !== "ARCHIVED" && a.Type !== "BANK")
     .map((a: XeroAccount) => ({
       value: a.Code,
       label: a.Name,
       accountType: a.Type,
+      classification: mapXeroClass(a.Class),
     }))
     .sort((a, b) => a.label.localeCompare(b.label));
 
