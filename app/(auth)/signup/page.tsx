@@ -11,6 +11,7 @@ export default function SignupPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const redirectTo = searchParams.get('redirect')
+  const [fullName, setFullName] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
@@ -22,6 +23,11 @@ export default function SignupPage() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setError(null)
+
+    if (!fullName.trim()) {
+      setError('Please enter your full name.')
+      return
+    }
 
     if (password.length < 8) {
       setError('Password must be at least 8 characters.')
@@ -61,7 +67,12 @@ export default function SignupPage() {
     const { error: authError } = await supabase.auth.signUp({
       email,
       password,
-      options: trimmedCode ? { data: { invite_code: trimmedCode } } : undefined,
+      options: {
+        data: {
+          full_name: fullName.trim(),
+          ...(trimmedCode ? { invite_code: trimmedCode } : {}),
+        },
+      },
     })
 
     if (authError) {
@@ -120,6 +131,22 @@ export default function SignupPage() {
 
         {/* Form */}
         <form onSubmit={handleSubmit} className="space-y-5">
+          <div>
+            <label htmlFor="fullName" className="mb-1.5 block text-sm font-semibold text-text">
+              Full Name
+            </label>
+            <input
+              id="fullName"
+              type="text"
+              value={fullName}
+              onChange={(e) => setFullName(e.target.value)}
+              required
+              autoComplete="name"
+              className="block w-full rounded-xl border border-border bg-white px-4 py-3 text-sm text-text placeholder-muted transition-colors focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+              placeholder="Jane Smith"
+            />
+          </div>
+
           <div>
             <label htmlFor="email" className="mb-1.5 block text-sm font-semibold text-text">
               Email Address

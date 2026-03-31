@@ -16,7 +16,7 @@ export async function GET(
 
     const { data: invite, error } = await adminSupabase
       .from("org_invites")
-      .select("id, org_id, invited_email, expires_at, accepted_at, organizations(name), users!org_invites_invited_by_fkey(email)")
+      .select("id, org_id, invited_email, expires_at, accepted_at, organizations(name), users!org_invites_invited_by_fkey(email, full_name)")
       .eq("token", params.token)
       .single();
 
@@ -41,7 +41,7 @@ export async function GET(
       });
     }
 
-    const inviterData = invite.users as unknown as { email: string };
+    const inviterData = invite.users as unknown as { email: string; full_name: string | null };
 
     return apiSuccess({
       status: "pending",
@@ -49,6 +49,7 @@ export async function GET(
       orgName: (invite.organizations as unknown as { name: string })?.name ?? "",
       invitedEmail: invite.invited_email,
       inviterEmail: inviterData?.email ?? "",
+      inviterName: inviterData?.full_name ?? null,
       expiresAt: invite.expires_at,
     });
   } catch (err) {

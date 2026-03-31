@@ -259,7 +259,7 @@ describe("POST /api/invoices/[id]/approve", () => {
 
     // Verify the update payload includes approved_by and approved_at
     expect(mockAdminUpdateFn).toHaveBeenCalledOnce();
-    const updatePayload = mockAdminUpdateFn.mock.calls[0][0] as Record<string, unknown>;
+    const updatePayload = (mockAdminUpdateFn.mock.calls as unknown as Record<string, unknown>[][])[0][0];
     expect(updatePayload.status).toBe("approved");
     expect(updatePayload.approved_by).toBe("user-1");
     expect(typeof updatePayload.approved_at).toBe("string");
