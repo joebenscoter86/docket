@@ -669,6 +669,7 @@ export default function ExtractionForm({
           disabled={currentStatus === "synced"}
           trackingCategories={accountingOptions.trackingCategories}
           taxCodes={taxEnabled ? accountingOptions.taxCodes : []}
+          taxTreatmentLabel={taxTreatment === "exclusive" ? "Tax Exclusive" : taxTreatment === "inclusive" ? "Tax Inclusive" : taxTreatment === "no_tax" ? "No Tax" : undefined}
         />
       </div>
 

@@ -26,6 +26,8 @@ interface LineItemEditorProps {
   disabled?: boolean;
   trackingCategories: TrackingCategory[];
   taxCodes: TaxCodeOption[];
+  /** Label for the active tax treatment (e.g., "Tax Exclusive"). Shown as the default option in per-line dropdowns. */
+  taxTreatmentLabel?: string;
 }
 
 const STATUS_BORDER: Record<string, string> = {
@@ -48,6 +50,7 @@ export default function LineItemEditor({
   disabled = false,
   trackingCategories,
   taxCodes,
+  taxTreatmentLabel,
 }: LineItemEditorProps) {
   const [state, dispatch] = useReducer(lineItemsReducer, lineItems, initLineItemsState);
   const savedTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
@@ -566,7 +569,7 @@ export default function LineItemEditor({
                   disabled={disabled}
                   className="w-full text-xs border border-border rounded-md px-2 py-1.5 bg-white text-text focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary disabled:bg-surface-alt disabled:cursor-not-allowed"
                 >
-                  <option value="">Default</option>
+                  <option value="">{taxTreatmentLabel ?? "Default"}</option>
                   {taxCodes.map((tc) => (
                     <option key={tc.value} value={tc.value}>
                       {tc.label}{tc.rate != null ? ` (${tc.rate}%)` : ""}
