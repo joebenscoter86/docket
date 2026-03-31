@@ -89,6 +89,7 @@ export interface QBOBillPayload {
   DocNumber?: string;
   PrivateNote?: string;
   GlobalTaxCalculation?: "TaxExcluded" | "TaxInclusive" | "NotApplicable";
+  TxnTaxDetail?: { TotalTax: number };
 }
 
 export interface QBOBillResponse {
@@ -194,6 +195,7 @@ export interface QBOPurchasePayload {
   Line: QBOPurchaseLine[];
   PrivateNote?: string;
   GlobalTaxCalculation?: "TaxExcluded" | "TaxInclusive" | "NotApplicable";
+  TxnTaxDetail?: { TotalTax: number };
 }
 
 export interface QBOPurchaseResponse {

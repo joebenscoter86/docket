@@ -300,6 +300,7 @@ export async function POST(
 
     let result: TransactionResult;
     let requestInput: unknown;
+    const taxAmount = Number(extractedData.tax_amount) || 0;
 
     try {
       if (isBill) {
@@ -314,6 +315,7 @@ export async function POST(
           invoiceNumber: extractedData.invoice_number,
           xeroStatus,
           taxTreatment,
+          taxAmount: taxAmount > 0 ? taxAmount : undefined,
           memo: syncMemo,
         };
         requestInput = input;
@@ -327,6 +329,7 @@ export async function POST(
           invoiceDate: extractedData.invoice_date,
           invoiceNumber: extractedData.invoice_number,
           taxTreatment,
+          taxAmount: taxAmount > 0 ? taxAmount : undefined,
           memo: syncMemo,
         };
         requestInput = input;

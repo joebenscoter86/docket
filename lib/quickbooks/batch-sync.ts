@@ -143,6 +143,8 @@ export async function processBatchSync(
       let result: TransactionResult;
       let requestInput: unknown;
 
+      const batchTaxAmount = Number(extractedData.tax_amount) || 0;
+
       if (isBill) {
         const xeroStatus = (invoice.xero_bill_status === "DRAFT" || invoice.xero_bill_status === "AUTHORISED")
           ? invoice.xero_bill_status
@@ -155,6 +157,7 @@ export async function processBatchSync(
           invoiceNumber: extractedData.invoice_number,
           xeroStatus,
           taxTreatment,
+          taxAmount: batchTaxAmount > 0 ? batchTaxAmount : undefined,
         };
         requestInput = input;
         result = await provider.createBill(adminSupabase, orgId, input);
@@ -169,6 +172,7 @@ export async function processBatchSync(
           invoiceDate: extractedData.invoice_date,
           invoiceNumber: extractedData.invoice_number,
           taxTreatment,
+          taxAmount: batchTaxAmount > 0 ? batchTaxAmount : undefined,
         };
         requestInput = input;
         result = await provider.createPurchase(adminSupabase, orgId, input);

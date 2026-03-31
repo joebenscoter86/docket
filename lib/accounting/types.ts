@@ -100,6 +100,8 @@ export interface CreateBillInput {
   xeroStatus?: "DRAFT" | "AUTHORISED";
   /** How line item amounts should be interpreted for tax. Both QBO and Xero support this. */
   taxTreatment?: "exclusive" | "inclusive" | "no_tax";
+  /** Tax amount from the invoice. Sent to the provider so the bill total includes tax. */
+  taxAmount?: number;
   /** Free-text note written to the bill. Used for audit trail (e.g., "Synced by user@example.com via Docket"). */
   memo?: string;
 }
@@ -116,6 +118,8 @@ export interface CreatePurchaseInput {
   invoiceNumber: string | null;
   /** How line item amounts should be interpreted for tax. Both QBO and Xero support this. */
   taxTreatment?: "exclusive" | "inclusive" | "no_tax";
+  /** Tax amount from the invoice. Sent to the provider so the bill total includes tax. */
+  taxAmount?: number;
   /** Free-text note written to the purchase. Used for audit trail (e.g., "Synced by user@example.com via Docket"). */
   memo?: string;
 }
