@@ -29,9 +29,8 @@ export async function getExtractedData(invoiceId: string) {
     .select(
       `
       *,
-      extracted_line_items (
-        id, description, quantity, unit_price, amount, gl_account_id, suggested_gl_account_id, gl_suggestion_source, is_user_confirmed, sort_order, tax_code_id
-      )
+      extracted_line_items (*)
+
     `
     )
     .eq("invoice_id", invoiceId)
