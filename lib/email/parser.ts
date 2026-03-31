@@ -71,6 +71,72 @@ export function parseInboundEmail(payload: Record<string, unknown>): ParsedEmail
 }
 
 /**
+ * Fetch the HTML/text body of a received email via the Resend API.
+ *
+ * Resend's inbound webhook omits the body for certain email types (e.g.
+ * forwarded receipts). This fallback fetches the full email object and
+ * extracts the html/text fields.
+ */
+export async function fetchEmailBody(
+  emailId: string
+): Promise<{ htmlBody?: string; textBody?: string }> {
+  const apiKey = process.env.RESEND_API_KEY;
+  if (!apiKey) {
+    logger.error("email_fetch_body_no_api_key", {
+      error: "RESEND_API_KEY is not configured",
+    });
+    return {};
+  }
+
+  try {
+    const response = await fetch(
+      `https://api.resend.com/emails/receiving/${emailId}`,
+      {
+        headers: { Authorization: `Bearer ${apiKey}` },
+      }
+    );
+
+    if (!response.ok) {
+      logger.error("email_fetch_body_failed", {
+        emailId,
+        status: response.status,
+        error: await response.text(),
+      });
+      return {};
+    }
+
+    const json = (await response.json()) as Record<string, unknown>;
+    // Resend may wrap in a `data` object or return flat
+    const data = (json.data as Record<string, unknown>) ?? json;
+
+    const htmlBody =
+      typeof data.html === "string" && data.html.trim()
+        ? data.html
+        : undefined;
+    const textBody =
+      typeof data.text === "string" && data.text.trim()
+        ? data.text
+        : undefined;
+
+    logger.info("email_fetch_body_result", {
+      emailId,
+      hasHtml: !!htmlBody,
+      hasText: !!textBody,
+      htmlLength: htmlBody?.length ?? 0,
+      textLength: textBody?.length ?? 0,
+    });
+
+    return { htmlBody, textBody };
+  } catch (err) {
+    logger.error("email_fetch_body_error", {
+      emailId,
+      error: err instanceof Error ? err.message : String(err),
+    });
+    return {};
+  }
+}
+
+/**
  * Fetch attachment content from Resend's Received Emails API.
  * Returns the binary content as a Buffer.
  */

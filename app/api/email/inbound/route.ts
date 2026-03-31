@@ -5,6 +5,7 @@ import { logger } from "@/lib/utils/logger";
 import {
   parseInboundEmail,
   fetchEmailAttachments,
+  fetchEmailBody,
   validateAttachments,
 } from "@/lib/email/parser";
 import { getOrgByInboundAddress } from "@/lib/email/address";
@@ -230,6 +231,14 @@ export async function POST(request: NextRequest) {
 
   // No attachment metadata -- check if email body can be used as invoice content
   if (parsedEmail.attachmentMetas.length === 0) {
+    // Resend omits html/text from the webhook payload for certain email types
+    // (e.g. forwarded receipts). Fetch the full email via API as a fallback.
+    if (!parsedEmail.htmlBody && !parsedEmail.textBody && parsedEmail.emailId) {
+      const fetched = await fetchEmailBody(parsedEmail.emailId);
+      if (fetched.htmlBody) parsedEmail.htmlBody = fetched.htmlBody;
+      if (fetched.textBody) parsedEmail.textBody = fetched.textBody;
+    }
+
     const hasBody = !!(parsedEmail.htmlBody || parsedEmail.textBody);
 
     if (!hasBody) {
