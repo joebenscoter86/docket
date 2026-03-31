@@ -162,7 +162,10 @@ export async function runExtraction(params: {
       if (providerType) {
         const provider = getAccountingProvider(providerType);
         const accountOptions = await provider.fetchAccounts(admin, orgId);
-        accounts = accountOptions.map((a) => ({ id: a.value, name: a.label }));
+        // AI inference is scoped to Expense accounts only.
+        // Full account list is available in the dropdown for manual override.
+        const expenseAccounts = accountOptions.filter((a) => a.classification === "Expense");
+        accounts = expenseAccounts.map((a) => ({ id: a.value, name: a.label }));
       }
       if (accounts.length > 0) {
         accountContext = { accounts };
