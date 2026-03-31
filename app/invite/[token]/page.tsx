@@ -6,11 +6,12 @@ import Link from "next/link";
 import Image from "next/image";
 import { createClient } from "@/lib/supabase/client";
 
-type InviteStatus = "loading" | "pending" | "expired" | "accepted" | "invalid";
+type InviteStatus = "loading" | "pending" | "expired" | "accepted" | "invalid" | "mismatch";
 
 interface InviteData {
   orgName: string;
   inviterEmail: string;
+  inviterName: string | null;
   invitedEmail: string;
   expiresAt: string;
 }
@@ -23,6 +24,7 @@ export default function InviteAcceptPage() {
   const [status, setStatus] = useState<InviteStatus>("loading");
   const [invite, setInvite] = useState<InviteData | null>(null);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [currentUserEmail, setCurrentUserEmail] = useState<string | null>(null);
   const [accepting, setAccepting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -33,6 +35,7 @@ export default function InviteAcceptPage() {
         data: { user },
       } = await supabase.auth.getUser();
       setIsLoggedIn(!!user);
+      setCurrentUserEmail(user?.email ?? null);
     }
     checkAuth();
   }, []);
@@ -51,28 +54,41 @@ export default function InviteAcceptPage() {
         const data = body.data;
         if (data.status === "expired") {
           setStatus("expired");
-          setInvite({ orgName: data.orgName, inviterEmail: "", invitedEmail: "", expiresAt: "" });
+          setInvite({ orgName: data.orgName, inviterEmail: "", inviterName: null, invitedEmail: "", expiresAt: "" });
           return;
         }
         if (data.status === "accepted") {
           setStatus("accepted");
-          setInvite({ orgName: data.orgName, inviterEmail: "", invitedEmail: "", expiresAt: "" });
+          setInvite({ orgName: data.orgName, inviterEmail: "", inviterName: null, invitedEmail: "", expiresAt: "" });
           return;
         }
 
-        setStatus("pending");
         setInvite({
           orgName: data.orgName,
           inviterEmail: data.inviterEmail,
+          inviterName: data.inviterName ?? null,
           invitedEmail: data.invitedEmail,
           expiresAt: data.expiresAt,
         });
+        setStatus("pending");
       } catch {
         setStatus("invalid");
       }
     }
     validateInvite();
   }, [token]);
+
+  useEffect(() => {
+    if (
+      status === "pending" &&
+      isLoggedIn &&
+      currentUserEmail &&
+      invite?.invitedEmail &&
+      currentUserEmail.toLowerCase() !== invite.invitedEmail.toLowerCase()
+    ) {
+      setStatus("mismatch");
+    }
+  }, [status, isLoggedIn, currentUserEmail, invite]);
 
   async function handleAccept() {
     setAccepting(true);
@@ -181,6 +197,45 @@ export default function InviteAcceptPage() {
             </div>
           )}
 
+          {/* Email mismatch -- logged in as wrong account */}
+          {status === "mismatch" && invite && (
+            <div className="text-center">
+              <h1 className="font-headings text-xl font-bold text-text mb-3">
+                Wrong Account
+              </h1>
+              <p className="text-sm text-muted mb-2">
+                You&apos;re signed in as <strong>{currentUserEmail}</strong>, but
+                this invite was sent to <strong>{invite.invitedEmail}</strong>.
+              </p>
+              <p className="text-sm text-muted mb-6">
+                Sign in or create an account with that email to accept.
+              </p>
+
+              <div className="space-y-3">
+                <button
+                  onClick={async () => {
+                    const supabase = createClient();
+                    await supabase.auth.signOut();
+                    router.push(`/login?redirect=/invite/${token}`);
+                  }}
+                  className="block w-full rounded-2xl bg-gradient-to-r from-blue-500 to-blue-600 px-4 py-3.5 text-center text-base font-semibold text-white shadow-md transition-all hover:from-blue-600 hover:to-blue-700 hover:shadow-lg"
+                >
+                  Switch Account
+                </button>
+                <button
+                  onClick={async () => {
+                    const supabase = createClient();
+                    await supabase.auth.signOut();
+                    router.push(`/signup?redirect=/invite/${token}`);
+                  }}
+                  className="block w-full rounded-2xl border border-border px-4 py-3.5 text-center text-base font-semibold text-text transition-all hover:bg-gray-50"
+                >
+                  Create Account
+                </button>
+              </div>
+            </div>
+          )}
+
           {/* Valid pending invite */}
           {status === "pending" && invite && (
             <div className="text-center">
@@ -188,7 +243,7 @@ export default function InviteAcceptPage() {
                 You&apos;re Invited
               </h1>
               <p className="text-sm text-muted mb-6">
-                <strong>{invite.inviterEmail}</strong> invited you to join{" "}
+                <strong>{invite.inviterName || invite.inviterEmail}</strong> invited you to join{" "}
                 <strong>{invite.orgName}</strong> on Dockett.
               </p>
 
