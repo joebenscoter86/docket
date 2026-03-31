@@ -1,12 +1,13 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import type { VendorOption, AccountOption, TrackingCategory } from "@/lib/accounting";
+import type { VendorOption, AccountOption, TrackingCategory, TaxCodeOption } from "@/lib/accounting";
 
 interface AccountingOptionsState {
   vendors: VendorOption[];
   accounts: AccountOption[];
   trackingCategories: TrackingCategory[];
+  taxCodes: TaxCodeOption[];
   loading: boolean;
   connected: boolean;
   error: string | null;
@@ -17,6 +18,7 @@ export function useAccountingOptions(): AccountingOptionsState & { addVendor: (v
     vendors: [],
     accounts: [],
     trackingCategories: [],
+    taxCodes: [],
     loading: true,
     connected: true,
     error: null,
@@ -27,10 +29,11 @@ export function useAccountingOptions(): AccountingOptionsState & { addVendor: (v
 
     async function fetchOptions() {
       try {
-        const [vendorRes, accountRes, trackingRes] = await Promise.all([
+        const [vendorRes, accountRes, trackingRes, taxCodeRes] = await Promise.all([
           fetch("/api/accounting/vendors"),
           fetch("/api/accounting/accounts"),
           fetch("/api/accounting/tracking-categories"),
+          fetch("/api/accounting/tax-codes"),
         ]);
 
         if (cancelled) return;
@@ -41,6 +44,7 @@ export function useAccountingOptions(): AccountingOptionsState & { addVendor: (v
             vendors: [],
             accounts: [],
             trackingCategories: [],
+            taxCodes: [],
             loading: false,
             connected: false,
             error: "Accounting connection expired. Reconnect in Settings.",
@@ -53,6 +57,7 @@ export function useAccountingOptions(): AccountingOptionsState & { addVendor: (v
             vendors: [],
             accounts: [],
             trackingCategories: [],
+            taxCodes: [],
             loading: false,
             connected: false,
             error: null,
@@ -63,12 +68,14 @@ export function useAccountingOptions(): AccountingOptionsState & { addVendor: (v
         const vendorBody = await vendorRes.json();
         const accountBody = await accountRes.json();
         const trackingBody = trackingRes.ok ? await trackingRes.json() : { data: [] };
+        const taxCodeBody = taxCodeRes.ok ? await taxCodeRes.json() : { data: [] };
 
         if (cancelled) return;
 
         const vendors: VendorOption[] = vendorBody.data ?? [];
         const accounts: AccountOption[] = accountBody.data ?? [];
         const trackingCategories: TrackingCategory[] = trackingBody.data ?? [];
+        const taxCodes: TaxCodeOption[] = taxCodeBody.data ?? [];
 
         const connected = vendorRes.ok && accountRes.ok;
 
@@ -76,6 +83,7 @@ export function useAccountingOptions(): AccountingOptionsState & { addVendor: (v
           vendors,
           accounts,
           trackingCategories,
+          taxCodes,
           loading: false,
           connected,
           error: null,
@@ -86,6 +94,7 @@ export function useAccountingOptions(): AccountingOptionsState & { addVendor: (v
           vendors: [],
           accounts: [],
           trackingCategories: [],
+          taxCodes: [],
           loading: false,
           connected: false,
           error: "Failed to load accounting data.",

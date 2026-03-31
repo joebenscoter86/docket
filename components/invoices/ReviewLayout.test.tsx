@@ -73,6 +73,7 @@ const defaultProps = {
         gl_suggestion_source: null,
         is_user_confirmed: false,
         tracking: null,
+        tax_code_id: null,
       },
     ],
   },

@@ -3,6 +3,8 @@ import {
   createVendor as qboCreateVendor,
   getAccountOptions,
   fetchPaymentAccounts as qboFetchPaymentAccounts,
+  queryTaxCodes,
+  queryTaxRates,
   createBill as qboCreateBill,
   createPurchase as qboCreatePurchase,
   attachPdfToEntity,
@@ -19,6 +21,7 @@ import {
   type AccountOption,
   type PaymentAccount,
   type TrackingCategory,
+  type TaxCodeOption,
   type CreateBillInput,
   type CreatePurchaseInput,
   type TransactionResult,
@@ -120,6 +123,55 @@ export class QuickBooksAccountingAdapter implements AccountingProvider {
     }
   }
 
+  async fetchTaxCodes(
+    supabase: SupabaseAdminClient,
+    orgId: string
+  ): Promise<TaxCodeOption[]> {
+    try {
+      const [taxCodes, taxRates] = await Promise.all([
+        queryTaxCodes(supabase, orgId),
+        queryTaxRates(supabase, orgId),
+      ]);
+
+      // Build a lookup of tax rate ID -> rate value
+      const rateMap = new Map<string, number>();
+      for (const rate of taxRates) {
+        rateMap.set(rate.Id, rate.RateValue);
+      }
+
+      return taxCodes
+        .filter((tc) => {
+          // Filter out hidden codes
+          if (tc.Hidden) return false;
+          // Include pseudo codes (TAX/NON) -- they are not TaxGroups
+          if (!tc.TaxGroup) return true;
+          // For real tax codes, only include if they have purchase tax rates
+          const purchaseRates = tc.PurchaseTaxRateList?.TaxRateDetail ?? [];
+          return purchaseRates.length > 0;
+        })
+        .map((tc) => {
+          // Calculate effective rate by summing purchase tax rates
+          const purchaseRates = tc.PurchaseTaxRateList?.TaxRateDetail ?? [];
+          let rate: number | null = null;
+          if (purchaseRates.length > 0) {
+            rate = purchaseRates.reduce((sum, detail) => {
+              const rateValue = rateMap.get(detail.TaxRateRef.value);
+              return sum + (rateValue ?? 0);
+            }, 0);
+          }
+
+          return {
+            value: tc.Id,
+            label: tc.Name,
+            rate,
+          };
+        })
+        .sort((a, b) => a.label.localeCompare(b.label));
+    } catch (err) {
+      wrapQBOError(err);
+    }
+  }
+
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   async fetchTrackingCategories(supabase: SupabaseAdminClient, orgId: string): Promise<TrackingCategory[]> {
     // QBO classes/locations support will be added in DOC-125
@@ -138,6 +190,7 @@ export class QuickBooksAccountingAdapter implements AccountingProvider {
         Amount: item.amount,
         AccountBasedExpenseLineDetail: {
           AccountRef: { value: item.glAccountId },
+          ...(item.taxCodeId ? { TaxCodeRef: { value: item.taxCodeId } } : {}),
         },
         ...(item.description ? { Description: item.description } : {}),
       })),
@@ -174,6 +227,7 @@ export class QuickBooksAccountingAdapter implements AccountingProvider {
         DetailType: "AccountBasedExpenseLineDetail" as const,
         AccountBasedExpenseLineDetail: {
           AccountRef: { value: item.glAccountId },
+          ...(item.taxCodeId ? { TaxCodeRef: { value: item.taxCodeId } } : {}),
         },
         ...(item.description ? { Description: item.description } : {}),
       })),

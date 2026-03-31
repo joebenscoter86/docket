@@ -10,6 +10,8 @@ import type {
   XeroAddress,
   XeroAccount,
   XeroAccountsResponse,
+  XeroTaxRate,
+  XeroTaxRatesResponse,
   XeroInvoicePayload,
   XeroInvoiceResponse,
   XeroBankTransactionPayload,
@@ -17,7 +19,7 @@ import type {
   XeroAttachmentResponse,
   XeroTrackingCategoriesResponse,
 } from "./types";
-import type { VendorOption, AccountOption, PaymentAccount, TrackingCategory } from "@/lib/accounting/types";
+import type { VendorOption, AccountOption, PaymentAccount, TrackingCategory, TaxCodeOption } from "@/lib/accounting/types";
 
 // ─── Configuration ───
 
@@ -427,6 +429,46 @@ export async function fetchTrackingCategories(
   });
 
   return categories;
+}
+
+// ─── Tax Rate Operations ───
+
+/**
+ * Fetch all tax rates from Xero that can apply to expenses.
+ * Filters to ACTIVE rates with CanApplyToExpenses = true.
+ * Returns TaxCodeOption[] for dropdown display.
+ */
+export async function fetchTaxRates(
+  supabase: SupabaseAdminClient,
+  orgId: string
+): Promise<TaxCodeOption[]> {
+  const startTime = Date.now();
+
+  const response = await xeroFetch<XeroTaxRatesResponse>(
+    supabase,
+    orgId,
+    "/TaxRates"
+  );
+
+  const taxRates = (response.TaxRates ?? [])
+    .filter(
+      (r: XeroTaxRate) =>
+        r.Status === "ACTIVE" && r.CanApplyToExpenses
+    )
+    .map((r: XeroTaxRate) => ({
+      value: r.TaxType,
+      label: r.Name,
+      rate: r.DisplayTaxRate ?? (parseFloat(r.EffectiveRate) || null),
+    }))
+    .sort((a, b) => a.label.localeCompare(b.label));
+
+  logger.info("xero.tax_rates_fetched", {
+    orgId,
+    count: String(taxRates.length),
+    durationMs: Date.now() - startTime,
+  });
+
+  return taxRates;
 }
 
 // ─── Invoice (Bill) Creation ───

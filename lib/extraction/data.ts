@@ -30,7 +30,7 @@ export async function getExtractedData(invoiceId: string) {
       `
       *,
       extracted_line_items (
-        id, description, quantity, unit_price, amount, gl_account_id, suggested_gl_account_id, gl_suggestion_source, is_user_confirmed, sort_order
+        id, description, quantity, unit_price, amount, gl_account_id, suggested_gl_account_id, gl_suggestion_source, is_user_confirmed, sort_order, tax_code_id
       )
     `
     )
@@ -132,6 +132,7 @@ export const LINE_ITEM_EDITABLE_FIELDS = new Set([
   "amount",
   "gl_account_id",
   "tracking",
+  "tax_code_id",
 ]);
 
 export async function createLineItem(extractedDataId: string) {

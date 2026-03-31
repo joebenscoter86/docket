@@ -186,6 +186,7 @@ export type Database = {
           quantity: number | null
           sort_order: number | null
           suggested_gl_account_id: string | null
+          tax_code_id: string | null
           unit_price: number | null
         }
         Insert: {
@@ -199,6 +200,7 @@ export type Database = {
           quantity?: number | null
           sort_order?: number | null
           suggested_gl_account_id?: string | null
+          tax_code_id?: string | null
           unit_price?: number | null
         }
         Update: {
@@ -212,6 +214,7 @@ export type Database = {
           quantity?: number | null
           sort_order?: number | null
           suggested_gl_account_id?: string | null
+          tax_code_id?: string | null
           unit_price?: number | null
         }
         Relationships: [

@@ -41,6 +41,7 @@ export type {
   TrackingCategory,
   TrackingOption,
   TrackingAssignment,
+  TaxCodeOption,
   SyncLineItem,
   CreateBillInput,
   CreatePurchaseInput,

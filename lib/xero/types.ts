@@ -131,6 +131,28 @@ export interface XeroAccountsResponse {
   Accounts: XeroAccount[];
 }
 
+// ─── Xero Tax Rate Types ───
+
+/** A single tax rate from GET /api.xro/2.0/TaxRates. */
+export interface XeroTaxRate {
+  Name: string;
+  TaxType: string;              // e.g., "INPUT", "NONE", "TAX001"
+  EffectiveRate: string;        // e.g., "10.0000" — string, not number
+  Status: "ACTIVE" | "DELETED" | "ARCHIVED";
+  CanApplyToAssets: boolean;
+  CanApplyToEquity: boolean;
+  CanApplyToExpenses: boolean;
+  CanApplyToLiabilities: boolean;
+  CanApplyToRevenue: boolean;
+  DisplayTaxRate: number;       // effective rate as number
+  ReportTaxType?: string;
+}
+
+/** Response from GET /api.xro/2.0/TaxRates. */
+export interface XeroTaxRatesResponse {
+  TaxRates: XeroTaxRate[];
+}
+
 // ─── Xero Invoice (Bill) Types ───
 
 /** A single line item in a Xero Invoice payload. */
@@ -139,6 +161,7 @@ export interface XeroLineItem {
   Quantity: number;
   UnitAmount: number;
   AccountCode: string;
+  TaxType?: string;
   Tracking?: Array<{
     TrackingCategoryID: string;
     TrackingOptionID: string;
@@ -191,6 +214,7 @@ export interface XeroBankTransactionLineItem {
   Quantity: number;
   UnitAmount: number;
   AccountCode: string;
+  TaxType?: string;
   Tracking?: Array<{
     TrackingCategoryID: string;
     TrackingOptionID: string;

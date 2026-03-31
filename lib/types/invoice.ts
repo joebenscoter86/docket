@@ -73,6 +73,7 @@ export interface ExtractedLineItemRow {
   gl_suggestion_source: string | null;
   is_user_confirmed: boolean;
   tracking: TrackingAssignment[] | null;
+  tax_code_id: string | null;
 }
 
 // ─── Duplicate Detection ───

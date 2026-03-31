@@ -9,7 +9,7 @@ import {
 } from "./line-items-reducer";
 import { formatCurrency, parseCurrencyInput } from "@/lib/utils/currency";
 import type { ExtractedLineItemRow } from "@/lib/types/invoice";
-import type { AccountOption, TrackingCategory, TrackingAssignment } from "@/lib/accounting";
+import type { AccountOption, TrackingCategory, TrackingAssignment, TaxCodeOption } from "@/lib/accounting";
 import GlAccountSelect from "./GlAccountSelect";
 import TrackingCategorySelect from "./TrackingCategorySelect";
 
@@ -25,6 +25,7 @@ interface LineItemEditorProps {
   accountingConnected: boolean;
   disabled?: boolean;
   trackingCategories: TrackingCategory[];
+  taxCodes: TaxCodeOption[];
 }
 
 const STATUS_BORDER: Record<string, string> = {
@@ -46,6 +47,7 @@ export default function LineItemEditor({
   accountingConnected,
   disabled = false,
   trackingCategories,
+  taxCodes,
 }: LineItemEditorProps) {
   const [state, dispatch] = useReducer(lineItemsReducer, lineItems, initLineItemsState);
   const savedTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
@@ -268,6 +270,17 @@ export default function LineItemEditor({
     [saveField, state.items, onMissingGlCountChange]
   );
 
+  const handleTaxCodeSelect = useCallback(
+    async (itemId: string, taxCodeId: string | null) => {
+      dispatch({ type: "SET_ITEM_VALUE", itemId, field: "tax_code_id", value: taxCodeId });
+      const ok = await saveField(itemId, "tax_code_id", taxCodeId);
+      if (ok) {
+        dispatch({ type: "MARK_ITEM_SAVED", itemId, field: "tax_code_id", value: taxCodeId });
+      }
+    },
+    [saveField]
+  );
+
   const pendingAiItems = state.items.filter(
     (i) => i.values.suggested_gl_account_id && !i.values.gl_account_id && i.values.gl_suggestion_source === "ai"
   );
@@ -404,12 +417,15 @@ export default function LineItemEditor({
       </div>
 
       {/* Table header */}
-      <div className="grid grid-cols-[minmax(120px,2fr)_70px_100px_100px_minmax(140px,1.5fr)_32px] gap-x-2 items-center pb-2 mb-2 border-b border-border">
+      <div className={`grid gap-x-2 items-center pb-2 mb-2 border-b border-border ${taxCodes.length > 0 ? "grid-cols-[minmax(120px,2fr)_70px_100px_100px_minmax(140px,1.5fr)_140px_32px]" : "grid-cols-[minmax(120px,2fr)_70px_100px_100px_minmax(140px,1.5fr)_32px]"}`}>
         <span className="text-xs font-medium text-muted uppercase">Description</span>
         <span className="text-xs font-medium text-muted uppercase text-right">Qty</span>
         <span className="text-xs font-medium text-muted uppercase text-right">Unit Price</span>
         <span className="text-xs font-medium text-muted uppercase text-right">Amount</span>
         <span className="text-xs font-medium text-muted uppercase">GL Account</span>
+        {taxCodes.length > 0 && (
+          <span className="text-xs font-medium text-muted uppercase">Tax Code</span>
+        )}
         <span />
       </div>
 
@@ -421,7 +437,7 @@ export default function LineItemEditor({
           return (
           <div key={item.id} className={`py-2.5 transition-colors duration-150 hover:bg-background/60 ${isTrackingExpanded || hasTracking ? "bg-background/40 rounded-md px-2 -mx-2" : ""}`}>
           <div
-            className="grid grid-cols-[minmax(120px,2fr)_70px_100px_100px_minmax(140px,1.5fr)_32px] gap-x-2 items-center"
+            className={`grid gap-x-2 items-center ${taxCodes.length > 0 ? "grid-cols-[minmax(120px,2fr)_70px_100px_100px_minmax(140px,1.5fr)_140px_32px]" : "grid-cols-[minmax(120px,2fr)_70px_100px_100px_minmax(140px,1.5fr)_32px]"}`}
           >
             {/* Description */}
             <div className={STATUS_BORDER[item.fieldStatus.description ?? "idle"]}>
@@ -540,6 +556,25 @@ export default function LineItemEditor({
               suggestedAccountId={item.values.suggested_gl_account_id}
               suggestionSource={item.values.gl_suggestion_source as "ai" | "history" | null}
             />
+
+            {/* Tax Code */}
+            {taxCodes.length > 0 && (
+              <div className="min-w-[140px]">
+                <select
+                  value={item.values.tax_code_id as string ?? ""}
+                  onChange={(e) => handleTaxCodeSelect(item.id, e.target.value || null)}
+                  disabled={disabled}
+                  className="w-full text-xs border border-border rounded-md px-2 py-1.5 bg-white text-text focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary disabled:bg-surface-alt disabled:cursor-not-allowed"
+                >
+                  <option value="">Default</option>
+                  {taxCodes.map((tc) => (
+                    <option key={tc.value} value={tc.value}>
+                      {tc.label}{tc.rate != null ? ` (${tc.rate}%)` : ""}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
 
             {/* Remove button */}
             <div className="flex items-center justify-center">

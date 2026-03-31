@@ -285,11 +285,12 @@ export async function POST(
 
     // 9. Create transaction via provider abstraction
     const syncLineItems: SyncLineItem[] = lineItems.map(
-      (li: { amount: number; gl_account_id: string; description: string | null; tracking: TrackingAssignment[] | null }) => ({
+      (li: { amount: number; gl_account_id: string; description: string | null; tracking: TrackingAssignment[] | null; tax_code_id: string | null }) => ({
         amount: Number(li.amount),
         glAccountId: li.gl_account_id,
         description: li.description,
         ...(li.tracking?.length ? { tracking: li.tracking } : {}),
+        ...(li.tax_code_id ? { taxCodeId: li.tax_code_id } : {}),
       })
     );
 

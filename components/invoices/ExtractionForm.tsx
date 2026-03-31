@@ -667,6 +667,7 @@ export default function ExtractionForm({
           accountingConnected={accountingOptions.connected}
           disabled={currentStatus === "synced"}
           trackingCategories={accountingOptions.trackingCategories}
+          taxCodes={accountingOptions.taxCodes}
         />
       </div>
 

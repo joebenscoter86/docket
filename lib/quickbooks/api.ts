@@ -3,6 +3,8 @@ import { logger } from "@/lib/utils/logger";
 import type {
   QBOVendor,
   QBOAccount,
+  QBOTaxCode,
+  QBOTaxRate,
   QBOBillPayload,
   QBOBillResponse,
   QBOAttachableResponse,
@@ -329,6 +331,62 @@ export async function getAccountOptions(
       accountType: a.AccountType,
     }))
     .sort((a, b) => a.label.localeCompare(b.label));
+}
+
+// ─── Tax Code Operations ───
+
+/**
+ * Fetch all active tax codes from QBO.
+ * Returns raw QBO TaxCode objects.
+ */
+export async function queryTaxCodes(
+  supabase: ReturnType<typeof import("@/lib/supabase/admin").createAdminClient>,
+  orgId: string
+): Promise<QBOTaxCode[]> {
+  const startTime = Date.now();
+
+  const response = await qboFetch<QBOQueryResponse<QBOTaxCode>>(
+    supabase,
+    orgId,
+    `/query?query=${encodeURIComponent("SELECT * FROM TaxCode WHERE Active = true MAXRESULTS 1000")}`
+  );
+
+  const taxCodes = response.QueryResponse.TaxCode ?? [];
+
+  logger.info("qbo.query_tax_codes", {
+    orgId,
+    count: String(taxCodes.length),
+    durationMs: Date.now() - startTime,
+  });
+
+  return taxCodes;
+}
+
+/**
+ * Fetch all active tax rates from QBO.
+ * Used to resolve effective rates for tax codes.
+ */
+export async function queryTaxRates(
+  supabase: ReturnType<typeof import("@/lib/supabase/admin").createAdminClient>,
+  orgId: string
+): Promise<QBOTaxRate[]> {
+  const startTime = Date.now();
+
+  const response = await qboFetch<QBOQueryResponse<QBOTaxRate>>(
+    supabase,
+    orgId,
+    `/query?query=${encodeURIComponent("SELECT * FROM TaxRate WHERE Active = true MAXRESULTS 1000")}`
+  );
+
+  const taxRates = response.QueryResponse.TaxRate ?? [];
+
+  logger.info("qbo.query_tax_rates", {
+    orgId,
+    count: String(taxRates.length),
+    durationMs: Date.now() - startTime,
+  });
+
+  return taxRates;
 }
 
 // ─── Bill Operations ───

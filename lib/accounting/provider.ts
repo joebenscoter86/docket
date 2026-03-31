@@ -3,6 +3,7 @@ import type {
   AccountOption,
   PaymentAccount,
   TrackingCategory,
+  TaxCodeOption,
   CreateBillInput,
   CreatePurchaseInput,
   TransactionResult,
@@ -92,6 +93,19 @@ export interface AccountingProvider {
     supabase: SupabaseAdminClient,
     orgId: string
   ): Promise<TrackingCategory[]>;
+
+  /**
+   * Fetch available tax codes from the accounting system.
+   * QBO: TaxCode entities with PurchaseTaxRateList. Xero: TaxRates with CanApplyToExpenses.
+   * Returns empty array if provider has no tax codes configured or doesn't support them.
+   *
+   * @param supabase - Supabase admin client
+   * @param orgId - The organisation whose connection to use
+   */
+  fetchTaxCodes(
+    supabase: SupabaseAdminClient,
+    orgId: string
+  ): Promise<TaxCodeOption[]>;
 
   /**
    * Create a Bill (accounts payable) in the accounting system.

@@ -35,10 +35,43 @@ export interface QBOAccount {
   CurrencyRef?: { value: string; name: string };
 }
 
+// ─── Tax Code Types ───
+
+export interface QBOTaxRateDetail {
+  TaxRateRef: { value: string; name: string };
+  TaxTypeApplicable: string;
+  TaxOrder: number;
+}
+
+export interface QBOTaxCode {
+  Id: string;
+  Name: string;
+  Active: boolean;
+  Taxable: boolean;
+  TaxGroup: boolean;
+  Hidden?: boolean;
+  TaxCodeConfigType?: string;
+  PurchaseTaxRateList?: {
+    TaxRateDetail: QBOTaxRateDetail[];
+  };
+  SalesTaxRateList?: {
+    TaxRateDetail: QBOTaxRateDetail[];
+  };
+}
+
+export interface QBOTaxRate {
+  Id: string;
+  Name: string;
+  RateValue: number;
+  Active: boolean;
+  SpecialTaxType?: string;
+}
+
 // ─── Bill Creation Types ───
 
 export interface QBOBillLineDetail {
   AccountRef: { value: string };
+  TaxCodeRef?: { value: string };
 }
 
 export interface QBOBillLine {
@@ -148,6 +181,7 @@ export interface QBOPurchaseLine {
   Description?: string;
   AccountBasedExpenseLineDetail: {
     AccountRef: { value: string };
+    TaxCodeRef?: { value: string };
   };
 }
 
