@@ -8,6 +8,8 @@ import {
   VALID_SORTS,
   VALID_DIRECTIONS,
   VALID_OUTPUT_TYPES,
+  VALID_DATE_FIELDS,
+  VALID_DATE_PRESETS,
   DEFAULT_LIMIT,
   MAX_LIMIT,
 } from "./types";
@@ -103,6 +105,49 @@ export function validateListParams(params: InvoiceListParams) {
       ? params.batch_id
       : undefined;
 
+  // Validate date_field
+  const date_field =
+    params.date_field &&
+    VALID_DATE_FIELDS.includes(params.date_field as (typeof VALID_DATE_FIELDS)[number])
+      ? (params.date_field as (typeof VALID_DATE_FIELDS)[number])
+      : "uploaded_at";
+
+  // Validate date_preset
+  const date_preset =
+    params.date_preset &&
+    VALID_DATE_PRESETS.includes(params.date_preset as (typeof VALID_DATE_PRESETS)[number])
+      ? (params.date_preset as (typeof VALID_DATE_PRESETS)[number])
+      : undefined;
+
+  // Resolve preset to date range, or use explicit from/to
+  let date_from: string | undefined;
+  let date_to: string | undefined;
+
+  if (date_preset) {
+    const now = new Date();
+    const todayStr = now.toISOString().slice(0, 10);
+
+    if (date_preset === "today") {
+      date_from = todayStr;
+      date_to = todayStr;
+    } else if (date_preset === "week") {
+      const day = now.getUTCDay();
+      const mondayOffset = day === 0 ? 6 : day - 1;
+      const monday = new Date(now);
+      monday.setUTCDate(now.getUTCDate() - mondayOffset);
+      date_from = monday.toISOString().slice(0, 10);
+      date_to = todayStr;
+    } else if (date_preset === "month") {
+      date_from = `${todayStr.slice(0, 7)}-01`;
+      date_to = todayStr;
+    }
+  } else {
+    // Validate explicit date strings (YYYY-MM-DD)
+    const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
+    date_from = params.date_from && dateRegex.test(params.date_from) ? params.date_from : undefined;
+    date_to = params.date_to && dateRegex.test(params.date_to) ? params.date_to : undefined;
+  }
+
   return {
     status,
     sort,
@@ -111,20 +156,17 @@ export function validateListParams(params: InvoiceListParams) {
     limit,
     output_type,
     batch_id,
+    date_field,
+    date_preset,
+    date_from,
+    date_to,
   };
 }
 
 // --- Sort column mapping ---
-
-const SORT_COLUMN_MAP: Record<
-  string,
-  { column: string; table: "invoices" | "extracted_data" }
-> = {
-  uploaded_at: { column: "uploaded_at", table: "invoices" },
-  invoice_date: { column: "invoice_date", table: "extracted_data" },
-  vendor_name: { column: "vendor_name", table: "extracted_data" },
-  total_amount: { column: "total_amount", table: "extracted_data" },
-};
+// With the invoice_list_view, all sort columns are top-level.
+// No referencedTable needed.
+const VALID_SORT_COLUMNS = ["uploaded_at", "invoice_date", "vendor_name", "total_amount"] as const;
 
 // --- Fetch counts ---
 
@@ -167,16 +209,22 @@ interface ValidatedParams {
   limit: number;
   output_type: string;
   batch_id?: string;
+  date_field: string;
+  date_preset?: string;
+  date_from?: string;
+  date_to?: string;
 }
 
 export async function fetchInvoiceList(
   supabase: SupabaseClient,
   params: ValidatedParams
 ): Promise<{ invoices: InvoiceListItem[]; nextCursor: string | null }> {
-  const { status, sort, direction, cursor, limit, output_type, batch_id } = params;
-  const sortConfig = SORT_COLUMN_MAP[sort] ?? SORT_COLUMN_MAP.uploaded_at;
+  const { status, sort, direction, cursor, limit, output_type, batch_id, date_field, date_from, date_to } = params;
+  const sortColumn = VALID_SORT_COLUMNS.includes(sort as (typeof VALID_SORT_COLUMNS)[number])
+    ? sort
+    : "uploaded_at";
 
-  let query = supabase.from("invoices").select(`
+  let query = supabase.from("invoice_list_view").select(`
       id,
       file_name,
       status,
@@ -185,12 +233,10 @@ export async function fetchInvoiceList(
       batch_id,
       source,
       email_sender,
-      extracted_data (
-        vendor_name,
-        invoice_number,
-        invoice_date,
-        total_amount
-      )
+      vendor_name,
+      invoice_number,
+      invoice_date,
+      total_amount
     `);
 
   // Status filter
@@ -211,36 +257,42 @@ export async function fetchInvoiceList(
     query = query.eq("batch_id", batch_id);
   }
 
-  // Cursor pagination — always keyed on (uploaded_at, id) regardless of display sort.
+  // Date range filter
+  if (date_from) {
+    if (date_field === "invoice_date") {
+      // invoice_date is a DATE column, compare directly
+      query = query.gte("invoice_date", date_from);
+    } else {
+      // uploaded_at is a TIMESTAMPTZ column
+      query = query.gte("uploaded_at", `${date_from}T00:00:00.000Z`);
+    }
+  }
+  if (date_to) {
+    if (date_field === "invoice_date") {
+      query = query.lte("invoice_date", date_to);
+    } else {
+      query = query.lte("uploaded_at", `${date_to}T23:59:59.999Z`);
+    }
+  }
+
+  // Cursor pagination keyed on (sort_column, id)
   const decodedCursor = decodeCursor(cursor);
   if (decodedCursor) {
     const { sortValue, id } = decodedCursor;
     const ascending = direction === "asc";
+    const gt = ascending ? "gt" : "lt";
+    const eq = "eq";
 
-    if (ascending) {
-      query = query.or(
-        `uploaded_at.gt.${sortValue},and(uploaded_at.eq.${sortValue},id.gt.${id})`
-      );
-    } else {
-      query = query.or(
-        `uploaded_at.lt.${sortValue},and(uploaded_at.eq.${sortValue},id.lt.${id})`
-      );
-    }
+    query = query.or(
+      `${sortColumn}.${gt}.${sortValue},and(${sortColumn}.${eq}.${sortValue},id.${gt}.${id})`
+    );
   }
 
-  // Sort order
-  if (sortConfig.table === "invoices") {
-    query = query.order(sortConfig.column, {
-      ascending: direction === "asc",
-    });
-  } else {
-    query = query.order(sortConfig.column, {
-      ascending: direction === "asc",
-      referencedTable: "extracted_data",
-      nullsFirst: direction === "asc",
-    });
-    query = query.order("uploaded_at", { ascending: false });
-  }
+  // Sort order -- all columns are top-level in the view
+  query = query.order(sortColumn, {
+    ascending: direction === "asc",
+    nullsFirst: direction === "asc",
+  });
 
   // Always add id as final tiebreaker for stable ordering
   query = query.order("id", { ascending: direction === "asc" });
@@ -261,9 +313,8 @@ export async function fetchInvoiceList(
 
   const invoices: InvoiceListItem[] = rows.map(
     (row: Record<string, unknown>) => {
-      const extracted = Array.isArray(row.extracted_data)
-        ? (row.extracted_data[0] ?? null)
-        : (row.extracted_data ?? null);
+      const hasExtractedData = row.vendor_name != null || row.invoice_number != null
+        || row.invoice_date != null || row.total_amount != null;
 
       return {
         id: row.id as string,
@@ -274,12 +325,12 @@ export async function fetchInvoiceList(
         batch_id: (row.batch_id as string) ?? null,
         source: (row.source as InvoiceListItem["source"]) ?? "upload",
         email_sender: (row.email_sender as string) ?? null,
-        extracted_data: extracted
+        extracted_data: hasExtractedData
           ? {
-              vendor_name: (extracted as Record<string, unknown>).vendor_name as string | null,
-              invoice_number: (extracted as Record<string, unknown>).invoice_number as string | null,
-              invoice_date: (extracted as Record<string, unknown>).invoice_date as string | null,
-              total_amount: (extracted as Record<string, unknown>).total_amount as number | null,
+              vendor_name: (row.vendor_name as string) ?? null,
+              invoice_number: (row.invoice_number as string) ?? null,
+              invoice_date: (row.invoice_date as string) ?? null,
+              total_amount: (row.total_amount as number) ?? null,
             }
           : null,
       };
@@ -290,7 +341,7 @@ export async function fetchInvoiceList(
   if (hasNextPage) {
     const lastInvoice = rows[rows.length - 1] as Record<string, unknown>;
     nextCursor = encodeCursor(
-      lastInvoice.uploaded_at as string,
+      lastInvoice[sortColumn] as string | number | null,
       lastInvoice.id as string
     );
   }

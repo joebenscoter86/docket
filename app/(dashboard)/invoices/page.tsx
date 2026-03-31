@@ -18,6 +18,10 @@ interface InvoicesPageProps {
     output_type?: string;
     batch_id?: string;
     toast?: string;
+    date_field?: string;
+    date_preset?: string;
+    date_from?: string;
+    date_to?: string;
   }>;
 }
 
@@ -48,6 +52,10 @@ export default async function InvoicesPage({ searchParams }: InvoicesPageProps) 
     limit: resolvedParams.limit ? Number(resolvedParams.limit) : undefined,
     output_type: resolvedParams.output_type,
     batch_id: resolvedParams.batch_id,
+    date_field: resolvedParams.date_field,
+    date_preset: resolvedParams.date_preset,
+    date_from: resolvedParams.date_from,
+    date_to: resolvedParams.date_to,
   });
 
   const [listResult, counts] = await Promise.all([
@@ -97,6 +105,10 @@ export default async function InvoicesPage({ searchParams }: InvoicesPageProps) 
         currentBatchId={resolvedParams.batch_id}
         toastMessage={toastMessage}
         isAccountingConnected={isAccountingConnected}
+        currentDateField={params.date_field}
+        currentDatePreset={params.date_preset}
+        currentDateFrom={params.date_from}
+        currentDateTo={params.date_to}
       />
     </div>
   );
