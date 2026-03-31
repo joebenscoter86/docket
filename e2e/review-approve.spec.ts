@@ -74,7 +74,7 @@ test.describe('Review and edit extracted fields', () => {
     await totalInput.click()
     await totalInput.fill('3000')
     // Click elsewhere to trigger blur/save
-    await page.locator('h3:has-text("Amounts")').click()
+    await page.locator('h3:has-text("Invoice Details")').click()
 
     // Wait for auto-save to complete (saved indicator appears)
     await page.waitForTimeout(1000)
@@ -328,11 +328,10 @@ test.describe('Confidence indicators', () => {
 
     // Low-confidence warning banner should be visible
     await expect(
-      page.getByText('Some fields may need extra attention')
+      page.getByText('Low confidence extraction')
     ).toBeVisible({ timeout: 10_000 })
 
-    // Fields should have warning styling (border-l-2 border-error for low confidence)
-    // Check that the vendor input's parent wrapper has the error border class
+    // Vendor field should still be rendered
     const vendorInput = page.locator('input[value="Low Confidence Vendor"]')
     await expect(vendorInput).toBeVisible()
   })

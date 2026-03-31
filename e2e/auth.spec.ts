@@ -22,6 +22,7 @@ test.describe('Signup', () => {
 
     await page.goto('/signup')
 
+    await page.getByLabel('Full Name').fill('E2E Test User')
     await page.getByLabel('Email Address').fill(email)
     await page.getByLabel('Password', { exact: true }).fill(password)
     await page.getByLabel('Confirm Password').fill(password)
