@@ -403,7 +403,7 @@ describe("XeroAccountingAdapter", () => {
       expect(payload.LineAmountTypes).toBe("Inclusive");
     });
 
-    it("omits LineAmountTypes when taxTreatment is not provided", async () => {
+    it("defaults LineAmountTypes to Exclusive when taxTreatment is not provided", async () => {
       mockCreateInvoice.mockResolvedValue({
         Invoices: [
           {
@@ -432,7 +432,7 @@ describe("XeroAccountingAdapter", () => {
       });
 
       const payload = mockCreateInvoice.mock.calls[0][2];
-      expect(payload.LineAmountTypes).toBeUndefined();
+      expect(payload.LineAmountTypes).toBe("Exclusive");
     });
 
     it("includes memo in Reference when both invoiceNumber and memo provided", async () => {
