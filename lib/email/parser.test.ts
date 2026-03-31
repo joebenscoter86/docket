@@ -98,6 +98,47 @@ describe("parseInboundEmail", () => {
     });
     expect(result.attachmentMetas).toHaveLength(0);
   });
+
+  it("extracts htmlBody and textBody from webhook payload", () => {
+    const result = parseInboundEmail({
+      type: "email.received",
+      data: {
+        from: "vendor@example.com",
+        to: ["invoices-abc@ingest.dockett.app"],
+        subject: "Invoice #5678",
+        html: "<table><tr><td>Total: $500.00</td></tr></table>",
+        text: "Total: $500.00",
+      },
+    });
+    expect(result.htmlBody).toBe("<table><tr><td>Total: $500.00</td></tr></table>");
+    expect(result.textBody).toBe("Total: $500.00");
+  });
+
+  it("sets htmlBody and textBody to undefined when empty or missing", () => {
+    const result = parseInboundEmail({
+      type: "email.received",
+      data: {
+        from: "vendor@example.com",
+        to: ["invoices-abc@ingest.dockett.app"],
+        html: "",
+        text: "   ",
+      },
+    });
+    expect(result.htmlBody).toBeUndefined();
+    expect(result.textBody).toBeUndefined();
+  });
+
+  it("sets htmlBody and textBody to undefined when fields not present", () => {
+    const result = parseInboundEmail({
+      type: "email.received",
+      data: {
+        from: "vendor@example.com",
+        to: ["invoices-abc@ingest.dockett.app"],
+      },
+    });
+    expect(result.htmlBody).toBeUndefined();
+    expect(result.textBody).toBeUndefined();
+  });
 });
 
 describe("validateAttachments", () => {

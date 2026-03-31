@@ -8,7 +8,7 @@ import {
   validateAttachments,
 } from "@/lib/email/parser";
 import { getOrgByInboundAddress } from "@/lib/email/address";
-import { ingestEmailAttachment } from "@/lib/email/ingest";
+import { ingestEmailAttachment, ingestEmailBody } from "@/lib/email/ingest";
 import { checkInvoiceAccess } from "@/lib/billing/access";
 import { checkUsageLimit } from "@/lib/billing/usage";
 import { trackServerEvent, AnalyticsEvents } from "@/lib/analytics/events";
@@ -43,6 +43,58 @@ function verifyWebhookSignature(
     "svix-timestamp": svixTimestamp,
     "svix-signature": svixSignature,
   }) as Record<string, unknown>;
+}
+
+/**
+ * Run billing + usage checks. Returns null if allowed, or a NextResponse if blocked.
+ */
+async function checkBillingAndUsage(params: {
+  orgId: string;
+  ownerId: string;
+  emailSubject: string;
+}): Promise<NextResponse | null> {
+  const { orgId, ownerId, emailSubject } = params;
+
+  const access = await checkInvoiceAccess(ownerId);
+  if (!access.allowed) {
+    logger.warn("email_inbound_billing_blocked", {
+      orgId,
+      userId: ownerId,
+      reason: access.reason,
+      status: "rejected",
+    });
+    if (access.trialExhausted) {
+      sendTrialExhaustedEmail(ownerId, TRIAL_INVOICE_LIMIT);
+    } else {
+      sendIngestionErrorEmail(ownerId, {
+        type: "billing",
+        emailSubject,
+        message:
+          "Your subscription is inactive. Please update your billing to continue processing invoices via email.",
+      });
+    }
+    return NextResponse.json({ received: true }, { status: 200 });
+  }
+
+  const usageCheck = await checkUsageLimit(orgId, ownerId);
+  if (!usageCheck.allowed) {
+    logger.warn("email_inbound_usage_limit", {
+      orgId,
+      userId: ownerId,
+      used: usageCheck.usage.used,
+      limit: usageCheck.usage.limit,
+      status: "rejected",
+    });
+    sendIngestionErrorEmail(ownerId, {
+      type: "usage_limit",
+      emailSubject,
+      message:
+        "Monthly invoice limit reached. Upgrade your plan to process more invoices.",
+    });
+    return NextResponse.json({ received: true }, { status: 200 });
+  }
+
+  return null; // allowed
 }
 
 /**
@@ -171,8 +223,40 @@ export async function POST(request: NextRequest) {
     }
   }
 
-  // No attachment metadata at all?
+  // No attachment metadata -- check if email body can be used as invoice content
   if (parsedEmail.attachmentMetas.length === 0) {
+    const hasBody = !!(parsedEmail.htmlBody || parsedEmail.textBody);
+
+    if (!hasBody) {
+      // Truly empty email -- no attachments, no body content
+      await admin.from("email_ingestion_log").insert({
+        org_id: orgId,
+        message_id: parsedEmail.messageId || `no-id-${Date.now()}`,
+        sender: parsedEmail.from,
+        subject: parsedEmail.subject,
+        total_attachment_count: 0,
+        valid_attachment_count: 0,
+        status: "rejected",
+        rejection_reason: "no_attachments_no_body",
+      });
+
+      logger.info("email_inbound_no_content", {
+        orgId,
+        from: parsedEmail.from,
+        status: "no_content",
+      });
+      sendIngestionNoAttachmentEmail(ownerId, parsedEmail.subject);
+      return NextResponse.json({ received: true }, { status: 200 });
+    }
+
+    // Has body content -- treat as inline invoice
+    const billingBlock = await checkBillingAndUsage({
+      orgId,
+      ownerId,
+      emailSubject: parsedEmail.subject,
+    });
+    if (billingBlock) return billingBlock;
+
     await admin.from("email_ingestion_log").insert({
       org_id: orgId,
       message_id: parsedEmail.messageId || `no-id-${Date.now()}`,
@@ -180,16 +264,37 @@ export async function POST(request: NextRequest) {
       subject: parsedEmail.subject,
       total_attachment_count: 0,
       valid_attachment_count: 0,
-      status: "rejected",
-      rejection_reason: "no_attachments",
+      status: "processed",
+      rejection_reason: null,
     });
 
-    logger.info("email_inbound_no_attachments", {
+    const bodyIngestionPromise = ingestEmailBody({
+      orgId,
+      userId: ownerId,
+      htmlBody: parsedEmail.htmlBody,
+      textBody: parsedEmail.textBody,
+      emailSender: parsedEmail.from,
+      emailSubject: parsedEmail.subject,
+    }).then((result) => {
+      logger.info("email_inbound_body_ingestion_complete", {
+        orgId,
+        from: parsedEmail.from,
+        invoiceId: result.invoiceId,
+        status: result.status,
+        durationMs: Date.now() - startTime,
+      });
+    });
+
+    waitUntil(bodyIngestionPromise);
+
+    logger.info("email_inbound_body_processed", {
       orgId,
       from: parsedEmail.from,
-      status: "no_attachments",
+      hasHtml: !!parsedEmail.htmlBody,
+      durationMs: Date.now() - startTime,
+      status: "body_processed",
     });
-    sendIngestionNoAttachmentEmail(ownerId, parsedEmail.subject);
+
     return NextResponse.json({ received: true }, { status: 200 });
   }
 
@@ -249,44 +354,12 @@ export async function POST(request: NextRequest) {
   }
 
   // Billing checks before ingestion
-  const access = await checkInvoiceAccess(ownerId);
-  if (!access.allowed) {
-    logger.warn("email_inbound_billing_blocked", {
-      orgId,
-      userId: ownerId,
-      reason: access.reason,
-      status: "rejected",
-    });
-    if (access.trialExhausted) {
-      sendTrialExhaustedEmail(ownerId, TRIAL_INVOICE_LIMIT);
-    } else {
-      sendIngestionErrorEmail(ownerId, {
-        type: "billing",
-        emailSubject: parsedEmail.subject,
-        message:
-          "Your subscription is inactive. Please update your billing to continue processing invoices via email.",
-      });
-    }
-    return NextResponse.json({ received: true }, { status: 200 });
-  }
-
-  const usageCheck = await checkUsageLimit(orgId, ownerId);
-  if (!usageCheck.allowed) {
-    logger.warn("email_inbound_usage_limit", {
-      orgId,
-      userId: ownerId,
-      used: usageCheck.usage.used,
-      limit: usageCheck.usage.limit,
-      status: "rejected",
-    });
-    sendIngestionErrorEmail(ownerId, {
-      type: "usage_limit",
-      emailSubject: parsedEmail.subject,
-      message:
-        "Monthly invoice limit reached. Upgrade your plan to process more invoices.",
-    });
-    return NextResponse.json({ received: true }, { status: 200 });
-  }
+  const billingBlock = await checkBillingAndUsage({
+    orgId,
+    ownerId,
+    emailSubject: parsedEmail.subject,
+  });
+  if (billingBlock) return billingBlock;
 
   // Ingest each valid attachment as a separate invoice (async via waitUntil)
   const ingestionPromise = Promise.allSettled(

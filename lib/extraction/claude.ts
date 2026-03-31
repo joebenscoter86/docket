@@ -135,7 +135,16 @@ interface AIResponse {
 function buildContentBlock(
   fileBuffer: Buffer,
   mimeType: string
-): Anthropic.DocumentBlockParam | Anthropic.ImageBlockParam {
+): Anthropic.DocumentBlockParam | Anthropic.ImageBlockParam | Anthropic.TextBlockParam {
+  // Text-based content (email body HTML or plain text) -- send as text block
+  if (mimeType === "text/html" || mimeType === "text/plain") {
+    const textContent = fileBuffer.toString("utf-8");
+    return {
+      type: "text" as const,
+      text: `The following is an invoice received as an email body. Extract the invoice data from this content:\n\n${textContent}`,
+    };
+  }
+
   const base64Data = fileBuffer.toString("base64");
 
   if (mimeType === "application/pdf") {

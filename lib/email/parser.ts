@@ -63,7 +63,11 @@ export function parseInboundEmail(payload: Record<string, unknown>): ParsedEmail
       contentType: String(att.content_type ?? att.contentType ?? "application/octet-stream"),
     }));
 
-  return { emailId, from, to, subject, messageId, receivedAt, attachmentMetas };
+  // Extract email body content (used when no attachments are present)
+  const htmlBody = typeof data.html === "string" && data.html.trim() ? data.html : undefined;
+  const textBody = typeof data.text === "string" && data.text.trim() ? data.text : undefined;
+
+  return { emailId, from, to, subject, messageId, receivedAt, attachmentMetas, htmlBody, textBody };
 }
 
 /**
