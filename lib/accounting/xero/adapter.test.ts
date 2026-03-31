@@ -144,8 +144,8 @@ describe("XeroAccountingAdapter", () => {
   describe("fetchAccounts", () => {
     it("delegates to lib/xero/api.fetchAccounts and returns AccountOption[]", async () => {
       mockFetchAccounts.mockResolvedValue([
-        { value: "500", label: "Advertising", accountType: "EXPENSE" },
-        { value: "600", label: "Office Supplies", accountType: "EXPENSE" },
+        { value: "500", label: "Advertising", accountType: "EXPENSE", classification: "Expense" },
+        { value: "600", label: "Office Supplies", accountType: "EXPENSE", classification: "Expense" },
       ]);
 
       const adapter = await getAdapter();
@@ -153,8 +153,8 @@ describe("XeroAccountingAdapter", () => {
 
       expect(mockFetchAccounts).toHaveBeenCalledWith(mockSupabase, "org-1");
       expect(result).toEqual([
-        { value: "500", label: "Advertising", accountType: "EXPENSE" },
-        { value: "600", label: "Office Supplies", accountType: "EXPENSE" },
+        { value: "500", label: "Advertising", accountType: "EXPENSE", classification: "Expense" },
+        { value: "600", label: "Office Supplies", accountType: "EXPENSE", classification: "Expense" },
       ]);
     });
 

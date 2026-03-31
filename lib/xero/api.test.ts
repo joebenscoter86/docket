@@ -299,14 +299,7 @@ const ACCOUNT_LIABILITY: XeroAccount = {
   Class: "LIABILITY",
 };
 
-const ACCOUNT_ASSET: XeroAccount = {
-  AccountID: "uuid-5",
-  Code: "150",
-  Name: "Prepaid Expenses",
-  Status: "ACTIVE",
-  Type: "PREPAYMENT",
-  Class: "ASSET",
-};
+
 
 const ACCOUNT_BANK: XeroAccount = {
   AccountID: "uuid-6",
