@@ -129,7 +129,7 @@ export async function processBatchSync(
       // 4. Create bill or purchase via provider abstraction
       const taxTreatment = (invoice.tax_treatment === "exclusive" || invoice.tax_treatment === "inclusive" || invoice.tax_treatment === "no_tax")
         ? invoice.tax_treatment
-        : undefined;
+        : "exclusive";
 
       const syncLineItems: SyncLineItem[] = (lineItems ?? []).map(
         (li: { amount: number; gl_account_id: string; description: string | null; tax_code_id: string | null }) => ({
@@ -139,15 +139,6 @@ export async function processBatchSync(
           ...(li.tax_code_id ? { taxCodeId: li.tax_code_id } : {}),
         })
       );
-
-      const taxAmount = Number(extractedData.tax_amount) || 0;
-      if (!taxTreatment && taxAmount > 0 && syncLineItems.length > 0) {
-        syncLineItems.push({
-          amount: taxAmount,
-          glAccountId: syncLineItems[0].glAccountId,
-          description: "Sales Tax",
-        });
-      }
 
       let result: TransactionResult;
       let requestInput: unknown;
