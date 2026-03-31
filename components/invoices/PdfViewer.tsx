@@ -133,6 +133,17 @@ export default function PdfViewer({ signedUrl, fileType }: PdfViewerProps) {
   const isPdf = fileType === "application/pdf";
   const isHtml = fileType === "text/html" || fileType === "text/plain";
 
+  // HTML email body: fetch content and inject via srcdoc so it renders
+  // regardless of Supabase Storage's Content-Disposition header.
+  const [htmlContent, setHtmlContent] = useState<string | null>(null);
+  useEffect(() => {
+    if (!isHtml) return;
+    fetch(signedUrl)
+      .then((res) => res.text())
+      .then((text) => setHtmlContent(text))
+      .catch(() => setLoadingState("error"));
+  }, [isHtml, signedUrl]);
+
   const handleZoomIn = useCallback(() => {
     setScale((s) => Math.min(s + SCALE_STEP, MAX_SCALE));
   }, []);
@@ -274,21 +285,27 @@ export default function PdfViewer({ signedUrl, fileType }: PdfViewerProps) {
           isPdf={false}
         />
         <div ref={containerRef} className="flex-1 overflow-auto bg-background">
-          <div
-            className="flex justify-center p-2"
-            style={{
-              transform: `scale(${scale})`,
-              transformOrigin: "top center",
-            }}
-          >
-            <iframe
-              src={signedUrl}
-              title="Invoice email content"
-              sandbox="allow-same-origin"
-              className="w-full max-w-3xl border border-border rounded bg-white"
-              style={{ minHeight: "80vh" }}
-            />
-          </div>
+          {htmlContent === null ? (
+            <LoadingIndicator />
+          ) : loadingState === "error" ? (
+            <ErrorIndicator />
+          ) : (
+            <div
+              className="flex justify-center p-2"
+              style={{
+                transform: `scale(${scale})`,
+                transformOrigin: "top center",
+              }}
+            >
+              <iframe
+                srcDoc={htmlContent}
+                title="Invoice email content"
+                sandbox="allow-same-origin"
+                className="w-full max-w-3xl border border-border rounded bg-white"
+                style={{ minHeight: "80vh" }}
+              />
+            </div>
+          )}
         </div>
       </div>
     );
