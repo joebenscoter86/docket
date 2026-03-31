@@ -131,26 +131,23 @@ export async function processBatchSync(
         ? invoice.tax_treatment
         : undefined;
 
-      const taxAmount = Number(extractedData.tax_amount) || 0;
-      const shouldDistributeTax = !taxTreatment && taxAmount > 0;
-      const lineItemSubtotal = shouldDistributeTax
-        ? (lineItems ?? []).reduce((sum: number, li: { amount: number }) => sum + Number(li.amount), 0)
-        : 0;
-
       const syncLineItems: SyncLineItem[] = (lineItems ?? []).map(
-        (li: { amount: number; gl_account_id: string; description: string | null; tax_code_id: string | null }) => {
-          let amount = Number(li.amount);
-          if (shouldDistributeTax && lineItemSubtotal > 0) {
-            amount = Math.round((amount + (amount / lineItemSubtotal) * taxAmount) * 100) / 100;
-          }
-          return {
-            amount,
-            glAccountId: li.gl_account_id,
-            description: li.description,
-            ...(li.tax_code_id ? { taxCodeId: li.tax_code_id } : {}),
-          };
-        }
+        (li: { amount: number; gl_account_id: string; description: string | null; tax_code_id: string | null }) => ({
+          amount: Number(li.amount),
+          glAccountId: li.gl_account_id,
+          description: li.description,
+          ...(li.tax_code_id ? { taxCodeId: li.tax_code_id } : {}),
+        })
       );
+
+      const taxAmount = Number(extractedData.tax_amount) || 0;
+      if (!taxTreatment && taxAmount > 0 && syncLineItems.length > 0) {
+        syncLineItems.push({
+          amount: taxAmount,
+          glAccountId: syncLineItems[0].glAccountId,
+          description: "Sales Tax",
+        });
+      }
 
       let result: TransactionResult;
       let requestInput: unknown;
