@@ -42,7 +42,7 @@ vi.mock("@/lib/supabase/server", () => ({
 }));
 
 const mockAdminUpdate = vi.fn();
-const mockAdminUpdateFn = vi.fn((_: Record<string, unknown>) => ({
+const mockAdminUpdateFn = vi.fn(() => ({
   eq: mockAdminUpdate,
 }));
 const mockAdminClient = {
@@ -81,7 +81,7 @@ describe("POST /api/invoices/[id]/approve", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockAdminUpdate.mockResolvedValue({ error: null });
-    mockAdminUpdateFn.mockImplementation((_: Record<string, unknown>) => ({
+    mockAdminUpdateFn.mockImplementation(() => ({
       eq: mockAdminUpdate,
     }));
   });
