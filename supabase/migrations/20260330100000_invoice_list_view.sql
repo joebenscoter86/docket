@@ -2,7 +2,7 @@
 -- so that sorting by extracted fields (vendor_name, invoice_date, total_amount)
 -- works correctly at the query level (fixes PostgREST referencedTable limitation).
 
-CREATE OR REPLACE VIEW invoice_list_view AS
+CREATE OR REPLACE VIEW invoice_list_view WITH (security_invoker = true) AS
 SELECT
   i.id,
   i.org_id,

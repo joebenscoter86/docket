@@ -52,16 +52,28 @@ describe("groupInvoicesByBatch", () => {
     expect(result.every((g) => g.type === "individual")).toBe(true);
   });
 
-  it("sorts groups by earliest uploaded_at descending (most recent first)", () => {
+  it("preserves server sort order based on first appearance", () => {
     const invoices = [
       makeInvoice({ id: "1", batch_id: null, uploaded_at: "2026-03-18T12:00:00Z" }),
       makeInvoice({ id: "2", batch_id: "batch-a", uploaded_at: "2026-03-18T10:00:00Z" }),
       makeInvoice({ id: "3", batch_id: "batch-a", uploaded_at: "2026-03-18T10:01:00Z" }),
     ];
     const result = groupInvoicesByBatch(invoices);
-    // Individual at 12:00 is more recent, so comes first in desc order
+    // Individual appears first in server results, so stays first
     expect(result[0].type).toBe("individual");
     expect(result[1].type).toBe("batch");
+  });
+
+  it("preserves server order when batch appears before individual", () => {
+    const invoices = [
+      makeInvoice({ id: "2", batch_id: "batch-a", uploaded_at: "2026-03-18T10:00:00Z" }),
+      makeInvoice({ id: "3", batch_id: "batch-a", uploaded_at: "2026-03-18T10:01:00Z" }),
+      makeInvoice({ id: "1", batch_id: null, uploaded_at: "2026-03-18T12:00:00Z" }),
+    ];
+    const result = groupInvoicesByBatch(invoices);
+    // Batch appears first in server results, so stays first
+    expect(result[0].type).toBe("batch");
+    expect(result[1].type).toBe("individual");
   });
 
   it("sorts invoices within a batch by uploaded_at ascending", () => {

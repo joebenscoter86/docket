@@ -26,55 +26,69 @@ export interface BatchStatusSummary {
 }
 
 export function groupInvoicesByBatch(invoices: InvoiceListItem[]): InvoiceRow[] {
-  const batchMap = new Map<string, InvoiceListItem[]>();
-  const individuals: InvoiceListItem[] = [];
+  // Track the position of the first invoice in each batch/individual
+  // so we can preserve the server's sort order.
+  const batchMap = new Map<string, { invoices: InvoiceListItem[]; firstIndex: number }>();
+  const rows: { row: InvoiceRow; firstIndex: number }[] = [];
 
-  for (const invoice of invoices) {
+  for (let i = 0; i < invoices.length; i++) {
+    const invoice = invoices[i];
     if (invoice.batch_id) {
-      const existing = batchMap.get(invoice.batch_id) ?? [];
-      existing.push(invoice);
-      batchMap.set(invoice.batch_id, existing);
+      const existing = batchMap.get(invoice.batch_id);
+      if (existing) {
+        existing.invoices.push(invoice);
+      } else {
+        batchMap.set(invoice.batch_id, { invoices: [invoice], firstIndex: i });
+      }
     } else {
-      individuals.push(invoice);
+      rows.push({
+        row: {
+          type: "individual",
+          batchId: null,
+          invoices: [invoice],
+          earliestUploadedAt: invoice.uploaded_at,
+        },
+        firstIndex: i,
+      });
     }
   }
 
-  const rows: InvoiceRow[] = [];
-
-  for (const [batchId, batchInvoices] of Array.from(batchMap)) {
+  for (const [batchId, { invoices: batchInvoices, firstIndex }] of Array.from(batchMap)) {
     if (batchInvoices.length === 1) {
-      individuals.push(batchInvoices[0]);
+      rows.push({
+        row: {
+          type: "individual",
+          batchId: null,
+          invoices: [batchInvoices[0]],
+          earliestUploadedAt: batchInvoices[0].uploaded_at,
+        },
+        firstIndex,
+      });
       continue;
     }
 
+    // Sort within batch by uploaded_at for consistent internal ordering
     batchInvoices.sort(
       (a: InvoiceListItem, b: InvoiceListItem) =>
         new Date(a.uploaded_at).getTime() - new Date(b.uploaded_at).getTime()
     );
 
     rows.push({
-      type: "batch",
-      batchId,
-      invoices: batchInvoices,
-      earliestUploadedAt: batchInvoices[0].uploaded_at,
+      row: {
+        type: "batch",
+        batchId,
+        invoices: batchInvoices,
+        earliestUploadedAt: batchInvoices[0].uploaded_at,
+      },
+      firstIndex,
     });
   }
 
-  for (const invoice of individuals) {
-    rows.push({
-      type: "individual",
-      batchId: null,
-      invoices: [invoice],
-      earliestUploadedAt: invoice.uploaded_at,
-    });
-  }
+  // Preserve server sort order by using the position of each group's
+  // first invoice in the original server-sorted array.
+  rows.sort((a, b) => a.firstIndex - b.firstIndex);
 
-  rows.sort(
-    (a, b) =>
-      new Date(b.earliestUploadedAt).getTime() - new Date(a.earliestUploadedAt).getTime()
-  );
-
-  return rows;
+  return rows.map((r) => r.row);
 }
 
 export function getBatchStatusSummary(invoices: InvoiceListItem[]): BatchStatusSummary {
