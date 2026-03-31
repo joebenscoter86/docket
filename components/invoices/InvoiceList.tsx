@@ -299,8 +299,12 @@ export default function InvoiceList({
           </span>
         </td>
         <td className="py-3.5 px-3 text-[14px] font-medium text-text">
-          {invoice.extracted_data?.vendor_name ?? (
-            <span className="text-muted">Pending</span>
+          {invoice.status === "error" && invoice.error_message ? (
+            <span className="text-error text-[13px]">{invoice.error_message}</span>
+          ) : (
+            invoice.extracted_data?.vendor_name ?? (
+              <span className="text-muted">Pending</span>
+            )
           )}
         </td>
         <td className="py-3.5 px-3 font-mono text-[13px] text-text">
@@ -367,13 +371,19 @@ export default function InvoiceList({
           </span>
         </div>
         <div className="text-sm text-text mb-1">
-          {invoice.extracted_data?.vendor_name ?? (
-            <span className="text-muted">Pending</span>
-          )}
-          {invoice.extracted_data?.invoice_number && (
-            <span className="text-text/70 ml-2 font-mono text-[13px]">
-              #{invoice.extracted_data.invoice_number}
-            </span>
+          {invoice.status === "error" && invoice.error_message ? (
+            <span className="text-error text-[13px]">{invoice.error_message}</span>
+          ) : (
+            <>
+              {invoice.extracted_data?.vendor_name ?? (
+                <span className="text-muted">Pending</span>
+              )}
+              {invoice.extracted_data?.invoice_number && (
+                <span className="text-text/70 ml-2 font-mono text-[13px]">
+                  #{invoice.extracted_data.invoice_number}
+                </span>
+              )}
+            </>
           )}
         </div>
         <div className="flex items-center justify-between text-sm">

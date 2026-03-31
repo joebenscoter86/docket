@@ -15,6 +15,7 @@ function makeInvoice(overrides: Partial<InvoiceListItem> & { id: string }): Invo
     batch_id: null,
     source: "upload",
     email_sender: null,
+    error_message: null,
     extracted_data: null,
     ...overrides,
   };

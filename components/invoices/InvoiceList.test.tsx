@@ -50,6 +50,7 @@ const sampleInvoices: InvoiceListItem[] = [
     batch_id: null,
     source: "upload",
     email_sender: null,
+    error_message: null,
     extracted_data: {
       vendor_name: "Acme Corp",
       invoice_number: "INV-001",
@@ -66,6 +67,7 @@ const sampleInvoices: InvoiceListItem[] = [
     batch_id: null,
     source: "upload",
     email_sender: null,
+    error_message: null,
     extracted_data: null,
   },
 ];

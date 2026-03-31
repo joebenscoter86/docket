@@ -233,6 +233,7 @@ export async function fetchInvoiceList(
       batch_id,
       source,
       email_sender,
+      error_message,
       vendor_name,
       invoice_number,
       invoice_date,
@@ -325,6 +326,7 @@ export async function fetchInvoiceList(
         batch_id: (row.batch_id as string) ?? null,
         source: (row.source as InvoiceListItem["source"]) ?? "upload",
         email_sender: (row.email_sender as string) ?? null,
+        error_message: (row.error_message as string) ?? null,
         extracted_data: hasExtractedData
           ? {
               vendor_name: (row.vendor_name as string) ?? null,
