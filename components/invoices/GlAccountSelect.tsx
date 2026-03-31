@@ -14,6 +14,26 @@ interface GlAccountSelectProps {
   suggestionSource?: "ai" | "history" | null;
 }
 
+const CLASSIFICATION_ORDER = ["Expense", "Liability", "Asset", "Equity", "Revenue"];
+
+function groupByClassification(
+  accounts: AccountOption[]
+): Array<{ classification: string; accounts: AccountOption[] }> {
+  const groups = new Map<string, AccountOption[]>();
+  for (const account of accounts) {
+    const cls = account.classification || "Other";
+    if (!groups.has(cls)) groups.set(cls, []);
+    groups.get(cls)!.push(account);
+  }
+  return CLASSIFICATION_ORDER.filter((cls) => groups.has(cls))
+    .map((cls) => ({ classification: cls, accounts: groups.get(cls)! }))
+    .concat(
+      Array.from(groups.entries())
+        .filter(([cls]) => !CLASSIFICATION_ORDER.includes(cls))
+        .map(([cls, accts]) => ({ classification: cls, accounts: accts }))
+    );
+}
+
 const STATUS_BORDER: Record<string, string> = {
   idle: "border-b-2 border-transparent",
   saving: "border-b-2 border-primary/60",
@@ -82,12 +102,6 @@ export default function GlAccountSelect({
     ? accounts.find((a) => a.value === suggestedAccountId) ?? null
     : null;
 
-  const orderedAccounts = suggestedAccount
-    ? [suggestedAccount, ...accounts.filter((a) => a.value !== suggestedAccountId)]
-    : historyAccount
-      ? [historyAccount, ...accounts.filter((a) => a.value !== suggestedAccountId)]
-      : accounts;
-
   return (
     <div className="flex flex-col gap-1">
       <div className={STATUS_BORDER[saveStatus]}>
@@ -96,17 +110,33 @@ export default function GlAccountSelect({
           value={currentAccountId ?? ""}
           onChange={handleChange}
           disabled={disabled || accounts.length === 0}
-          title={accounts.length === 0 ? "No expense accounts found" : undefined}
+          title={accounts.length === 0 ? "No accounts found" : undefined}
         >
           <option value="">Select account...</option>
-          {orderedAccounts.map((a) => (
-            <option key={a.value} value={a.value}>
-              {a.value === suggestedAccountId && showSuggestion
-                ? `AI · ${a.label}`
-                : a.value === suggestedAccountId && showHistoryBadge
-                  ? `Learned · ${a.label}`
-                  : a.label}
+          {suggestedAccount && showSuggestion && (
+            <option key={`suggested-${suggestedAccount.value}`} value={suggestedAccount.value}>
+              AI · {suggestedAccount.label}
             </option>
+          )}
+          {historyAccount && showHistoryBadge && (
+            <option key={`history-${historyAccount.value}`} value={historyAccount.value}>
+              Learned · {historyAccount.label}
+            </option>
+          )}
+          {groupByClassification(accounts).map((group) => (
+            <optgroup key={group.classification} label={group.classification}>
+              {group.accounts
+                .filter(
+                  (a) =>
+                    !(suggestedAccount && showSuggestion && a.value === suggestedAccountId) &&
+                    !(historyAccount && showHistoryBadge && a.value === suggestedAccountId)
+                )
+                .map((a) => (
+                  <option key={a.value} value={a.value}>
+                    {a.label}
+                  </option>
+                ))}
+            </optgroup>
           ))}
         </select>
       </div>

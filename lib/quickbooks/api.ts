@@ -289,7 +289,7 @@ export async function createVendor(
 // ─── Account Operations ───
 
 /**
- * Fetch all active expense accounts from QBO.
+ * Fetch all active accounts from QBO.
  * Returns raw QBO account objects.
  */
 export async function queryAccounts(
@@ -301,7 +301,7 @@ export async function queryAccounts(
   const response = await qboFetch<QBOQueryResponse<QBOAccount>>(
     supabase,
     orgId,
-    `/query?query=${encodeURIComponent("SELECT * FROM Account WHERE AccountType = 'Expense' AND Active = true MAXRESULTS 1000")}`
+    `/query?query=${encodeURIComponent("SELECT * FROM Account WHERE Active = true MAXRESULTS 1000")}`
   );
 
   const accounts = response.QueryResponse.Account ?? [];
@@ -329,6 +329,7 @@ export async function getAccountOptions(
       value: a.Id,
       label: a.SubAccount ? a.FullyQualifiedName : a.Name,
       accountType: a.AccountType,
+      classification: a.Classification,
     }))
     .sort((a, b) => a.label.localeCompare(b.label));
 }

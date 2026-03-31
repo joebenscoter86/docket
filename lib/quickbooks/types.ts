@@ -256,4 +256,5 @@ export interface AccountOption {
   value: string;
   label: string;
   accountType: string;
+  classification: string;
 }

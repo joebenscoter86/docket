@@ -614,14 +614,42 @@ describe("runExtraction", () => {
 
       mockGetOrgProvider.mockResolvedValue("quickbooks");
       const mockAccounts = [
-        { value: "84", label: "Office Supplies", accountType: "Expense" },
-        { value: "92", label: "Travel:Airfare", accountType: "Expense" },
+        { value: "84", label: "Office Supplies", accountType: "Expense", classification: "Expense" },
+        { value: "92", label: "Travel:Airfare", accountType: "Expense", classification: "Expense" },
       ];
       mockFetchAccounts.mockResolvedValue(mockAccounts);
 
       const { runExtraction } = await import("./run");
       await runExtraction(BASE_PARAMS);
 
+      expect(mockExtractInvoiceData).toHaveBeenCalledWith(
+        expect.any(Buffer),
+        BASE_PARAMS.fileType,
+        {
+          accounts: [
+            { id: "84", name: "Office Supplies" },
+            { id: "92", name: "Travel:Airfare" },
+          ],
+        }
+      );
+    });
+
+    it("only passes Expense-classification accounts to AI context", async () => {
+      setupHappyPath();
+
+      mockGetOrgProvider.mockResolvedValue("quickbooks");
+      const mockAccounts = [
+        { value: "84", label: "Office Supplies", accountType: "Expense", classification: "Expense" },
+        { value: "92", label: "Travel:Airfare", accountType: "Expense", classification: "Expense" },
+        { value: "200", label: "Officers Loans", accountType: "Other Current Liability", classification: "Liability" },
+        { value: "150", label: "Prepaid Insurance", accountType: "Other Current Asset", classification: "Asset" },
+      ];
+      mockFetchAccounts.mockResolvedValue(mockAccounts);
+
+      const { runExtraction } = await import("./run");
+      await runExtraction(BASE_PARAMS);
+
+      // Only Expense accounts should be passed to the AI
       expect(mockExtractInvoiceData).toHaveBeenCalledWith(
         expect.any(Buffer),
         BASE_PARAMS.fileType,
@@ -655,7 +683,7 @@ describe("runExtraction", () => {
       // Only account "84" is real
       mockGetOrgProvider.mockResolvedValue("quickbooks");
       mockFetchAccounts.mockResolvedValue([
-        { value: "84", label: "Office Supplies", accountType: "Expense" },
+        { value: "84", label: "Office Supplies", accountType: "Expense", classification: "Expense" },
       ]);
 
       // Provider returns two line items: one with valid ID, one hallucinated
@@ -706,8 +734,8 @@ describe("runExtraction", () => {
 
       mockGetOrgProvider.mockResolvedValue("quickbooks");
       const mockAccounts = [
-        { value: "84", label: "Office Supplies", accountType: "Expense" },
-        { value: "92", label: "Travel", accountType: "Expense" },
+        { value: "84", label: "Office Supplies", accountType: "Expense", classification: "Expense" },
+        { value: "92", label: "Travel", accountType: "Expense", classification: "Expense" },
       ];
       mockFetchAccounts.mockResolvedValue(mockAccounts);
 
@@ -752,7 +780,7 @@ describe("runExtraction", () => {
       // Only account "92" is valid now
       mockGetOrgProvider.mockResolvedValue("quickbooks");
       const mockAccounts = [
-        { value: "92", label: "Travel", accountType: "Expense" },
+        { value: "92", label: "Travel", accountType: "Expense", classification: "Expense" },
       ];
       mockFetchAccounts.mockResolvedValue(mockAccounts);
 

@@ -1,12 +1,14 @@
 import { describe, it, expect, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import GlAccountSelect from "./GlAccountSelect";
-import type { AccountOption } from "@/lib/types/qbo";
+import type { AccountOption } from "@/lib/accounting";
 
 const MOCK_ACCOUNTS: AccountOption[] = [
-  { value: "acc-1", label: "Office Supplies", accountType: "Expense" },
-  { value: "acc-2", label: "Software & Subscriptions", accountType: "Expense" },
-  { value: "acc-3", label: "Professional Services", accountType: "Expense" },
+  { value: "acc-1", label: "Office Supplies", accountType: "Expense", classification: "Expense" },
+  { value: "acc-2", label: "Software & Subscriptions", accountType: "Expense", classification: "Expense" },
+  { value: "acc-3", label: "Professional Services", accountType: "Expense", classification: "Expense" },
+  { value: "acc-4", label: "Officers Loans", accountType: "Other Current Liability", classification: "Liability" },
+  { value: "acc-5", label: "Prepaid Expenses", accountType: "Other Current Asset", classification: "Asset" },
 ];
 
 const defaultProps = {
@@ -121,6 +123,22 @@ describe("GlAccountSelect", () => {
 
     expect(screen.getByText("Learned")).toBeInTheDocument();
     expect(screen.queryByTitle(/Accept suggestion/i)).toBeNull();
+  });
+
+  it("renders accounts grouped by classification with optgroup labels", () => {
+    render(<GlAccountSelect {...defaultProps} />);
+
+    const select = screen.getByRole("combobox") as HTMLSelectElement;
+    const optgroups = select.querySelectorAll("optgroup");
+
+    expect(optgroups.length).toBeGreaterThanOrEqual(2);
+
+    const groupLabels = Array.from(optgroups).map((g) => g.label);
+    expect(groupLabels).toContain("Expense");
+    expect(groupLabels).toContain("Liability");
+
+    // Expense group should appear before Liability
+    expect(groupLabels.indexOf("Expense")).toBeLessThan(groupLabels.indexOf("Liability"));
   });
 
   it("does not show 'Learned' badge after user changes selection (cleared source)", () => {

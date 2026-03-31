@@ -24,11 +24,13 @@ export interface VendorOption {
   label: string;
 }
 
-/** An expense account formatted for dropdown display. Matches the existing QBO AccountOption shape. */
+/** An account formatted for dropdown display. */
 export interface AccountOption {
   value: string;
   label: string;
   accountType: string;
+  /** Top-level grouping: Expense, Liability, Asset, Equity, Revenue */
+  classification: string;
 }
 
 /** A payment account (Bank or CreditCard) formatted for the payment selector. */

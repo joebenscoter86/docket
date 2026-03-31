@@ -147,7 +147,7 @@ describe("QuickBooksAccountingAdapter", () => {
   describe("fetchAccounts", () => {
     it("delegates to getAccountOptions and returns AccountOption[]", async () => {
       mockGetAccountOptions.mockResolvedValue([
-        { value: "80", label: "Advertising", accountType: "Expense" },
+        { value: "80", label: "Advertising", accountType: "Expense", classification: "Expense" },
       ]);
 
       const adapter = await getAdapter();
@@ -155,7 +155,7 @@ describe("QuickBooksAccountingAdapter", () => {
 
       expect(mockGetAccountOptions).toHaveBeenCalledWith(mockSupabase, "org-1");
       expect(result).toEqual([
-        { value: "80", label: "Advertising", accountType: "Expense" },
+        { value: "80", label: "Advertising", accountType: "Expense", classification: "Expense" },
       ]);
     });
   });
