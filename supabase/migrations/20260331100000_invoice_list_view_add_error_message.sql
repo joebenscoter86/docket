@@ -1,7 +1,11 @@
 -- Add error_message to the flattened invoice list view
 -- so error rows can display the reason in the invoice list UI.
+-- DROP required because adding a column in the middle changes column order,
+-- which CREATE OR REPLACE cannot handle.
 
-CREATE OR REPLACE VIEW invoice_list_view WITH (security_invoker = true) AS
+DROP VIEW IF EXISTS invoice_list_view;
+
+CREATE VIEW invoice_list_view WITH (security_invoker = true) AS
 SELECT
   i.id,
   i.org_id,
