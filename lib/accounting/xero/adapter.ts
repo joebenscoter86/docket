@@ -169,7 +169,6 @@ export class XeroAccountingAdapter implements AccountingProvider {
         return parts.length > 0 ? { Reference: parts.join(" | ") } : {};
       })(),
       ...(input.taxTreatment ? { LineAmountTypes: LINE_AMOUNT_TYPES_MAP[input.taxTreatment] } : {}),
-      ...(input.taxAmount != null && input.taxAmount > 0 ? { TotalTax: input.taxAmount } : {}),
     };
 
     try {
@@ -217,7 +216,6 @@ export class XeroAccountingAdapter implements AccountingProvider {
       ...(input.invoiceDate ? { Date: input.invoiceDate } : {}),
       ...(input.invoiceNumber ? { Reference: input.invoiceNumber } : input.memo ? { Reference: input.memo } : {}),
       ...(input.taxTreatment ? { LineAmountTypes: LINE_AMOUNT_TYPES_MAP[input.taxTreatment] } : {}),
-      ...(input.taxAmount != null && input.taxAmount > 0 ? { TotalTax: input.taxAmount } : {}),
     };
 
     try {

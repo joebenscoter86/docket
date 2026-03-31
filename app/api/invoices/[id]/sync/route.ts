@@ -286,7 +286,7 @@ export async function POST(
     // 9. Create transaction via provider abstraction
     const taxTreatment = (invoice.tax_treatment === "exclusive" || invoice.tax_treatment === "inclusive" || invoice.tax_treatment === "no_tax")
       ? invoice.tax_treatment
-      : "exclusive";
+      : undefined;
 
     const syncLineItems: SyncLineItem[] = lineItems.map(
       (li: { amount: number; gl_account_id: string; description: string | null; tracking: TrackingAssignment[] | null; tax_code_id: string | null }) => ({
@@ -298,9 +298,20 @@ export async function POST(
       })
     );
 
+    // When the tax toggle is OFF and the invoice has tax, add it as a
+    // separate "Sales Tax" line item. This is standard bookkeeping for
+    // vendor bills -- the vendor charged tax, we just need the total to match.
+    const taxAmount = Number(extractedData.tax_amount) || 0;
+    if (!taxTreatment && taxAmount > 0 && syncLineItems.length > 0) {
+      syncLineItems.push({
+        amount: taxAmount,
+        glAccountId: syncLineItems[0].glAccountId,
+        description: "Sales Tax",
+      });
+    }
+
     let result: TransactionResult;
     let requestInput: unknown;
-    const taxAmount = Number(extractedData.tax_amount) || 0;
 
     try {
       if (isBill) {
@@ -315,7 +326,6 @@ export async function POST(
           invoiceNumber: extractedData.invoice_number,
           xeroStatus,
           taxTreatment,
-          taxAmount: taxAmount > 0 ? taxAmount : undefined,
           memo: syncMemo,
         };
         requestInput = input;
@@ -329,7 +339,6 @@ export async function POST(
           invoiceDate: extractedData.invoice_date,
           invoiceNumber: extractedData.invoice_number,
           taxTreatment,
-          taxAmount: taxAmount > 0 ? taxAmount : undefined,
           memo: syncMemo,
         };
         requestInput = input;
