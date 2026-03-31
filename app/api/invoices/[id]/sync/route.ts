@@ -284,22 +284,40 @@ export async function POST(
     }
 
     // 9. Create transaction via provider abstraction
+    //
+    // When the tax toggle is OFF and the invoice has a non-zero tax_amount,
+    // distribute tax proportionally across line items so the bill total in
+    // the accounting system matches the invoice total. Without this, the tax
+    // is silently dropped and the bill only reflects the subtotal.
+    const taxTreatment = (invoice.tax_treatment === "exclusive" || invoice.tax_treatment === "inclusive" || invoice.tax_treatment === "no_tax")
+      ? invoice.tax_treatment
+      : undefined;
+
+    const taxAmount = Number(extractedData.tax_amount) || 0;
+    const shouldDistributeTax = !taxTreatment && taxAmount > 0;
+    const lineItemSubtotal = shouldDistributeTax
+      ? lineItems.reduce((sum: number, li: { amount: number }) => sum + Number(li.amount), 0)
+      : 0;
+
     const syncLineItems: SyncLineItem[] = lineItems.map(
-      (li: { amount: number; gl_account_id: string; description: string | null; tracking: TrackingAssignment[] | null; tax_code_id: string | null }) => ({
-        amount: Number(li.amount),
-        glAccountId: li.gl_account_id,
-        description: li.description,
-        ...(li.tracking?.length ? { tracking: li.tracking } : {}),
-        ...(li.tax_code_id ? { taxCodeId: li.tax_code_id } : {}),
-      })
+      (li: { amount: number; gl_account_id: string; description: string | null; tracking: TrackingAssignment[] | null; tax_code_id: string | null }) => {
+        let amount = Number(li.amount);
+        if (shouldDistributeTax && lineItemSubtotal > 0) {
+          // Gross up each line item proportionally to include its share of tax
+          amount = Math.round((amount + (amount / lineItemSubtotal) * taxAmount) * 100) / 100;
+        }
+        return {
+          amount,
+          glAccountId: li.gl_account_id,
+          description: li.description,
+          ...(li.tracking?.length ? { tracking: li.tracking } : {}),
+          ...(li.tax_code_id ? { taxCodeId: li.tax_code_id } : {}),
+        };
+      }
     );
 
     let result: TransactionResult;
     let requestInput: unknown;
-
-    const taxTreatment = (invoice.tax_treatment === "exclusive" || invoice.tax_treatment === "inclusive" || invoice.tax_treatment === "no_tax")
-      ? invoice.tax_treatment
-      : undefined;
 
     try {
       if (isBill) {
