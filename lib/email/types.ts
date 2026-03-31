@@ -24,6 +24,10 @@ export interface ParsedEmail {
   messageId: string;
   receivedAt: string; // ISO timestamp
   attachmentMetas: AttachmentMeta[];
+  /** HTML body of the email (if present). Preferred over textBody for extraction. */
+  htmlBody?: string;
+  /** Plain text body of the email (fallback when no HTML). */
+  textBody?: string;
 }
 
 export interface ValidatedAttachment extends EmailAttachment {
