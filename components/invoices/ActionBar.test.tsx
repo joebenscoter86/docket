@@ -118,19 +118,12 @@ describe("ActionBar — sync phase (approved)", () => {
     expect(screen.getByText("Sync to QuickBooks")).toBeTruthy();
   });
 
-  it("shows confirm gate on first click, fires on second", async () => {
+  it("single click fires sync immediately", async () => {
     const onStatusChange = vi.fn();
     render(<ActionBar {...baseProps} onStatusChange={onStatusChange} />);
 
-    // First click → confirming
-    fireEvent.click(screen.getByText("Sync to QuickBooks"));
-    expect(screen.getByText("Confirm Sync")).toBeTruthy();
-    expect(screen.getByText("Click again to confirm")).toBeTruthy();
-
-    // Second click → fires sync
     await act(async () => {
-      fireEvent.click(screen.getByText("Confirm Sync"));
-      // Flush microtasks so fetch promise resolves
+      fireEvent.click(screen.getByText("Sync to QuickBooks"));
       await vi.runAllTimersAsync();
     });
 
@@ -140,20 +133,6 @@ describe("ActionBar — sync phase (approved)", () => {
     );
 
     expect(onStatusChange).toHaveBeenCalledWith("synced");
-  });
-
-  it("confirm gate times out after 3s", async () => {
-    render(<ActionBar {...baseProps} />);
-
-    fireEvent.click(screen.getByText("Sync to QuickBooks"));
-    expect(screen.getByText("Confirm Sync")).toBeTruthy();
-
-    // Wait 3 seconds
-    await act(async () => {
-      await vi.advanceTimersByTimeAsync(3000);
-    });
-
-    expect(screen.getByText("Sync to QuickBooks")).toBeTruthy();
   });
 
   it("disables sync button when blockers exist", () => {
@@ -170,11 +149,8 @@ describe("ActionBar — sync phase (approved)", () => {
 
     expect(screen.getByText("Retry Sync to QuickBooks")).toBeTruthy();
 
-    fireEvent.click(screen.getByText("Retry Sync to QuickBooks"));
-    expect(screen.getByText("Confirm Retry")).toBeTruthy();
-
     await act(async () => {
-      fireEvent.click(screen.getByText("Confirm Retry"));
+      fireEvent.click(screen.getByText("Retry Sync to QuickBooks"));
       await vi.runAllTimersAsync();
     });
 
@@ -197,11 +173,8 @@ describe("ActionBar — sync phase (approved)", () => {
 
     render(<ActionBar {...baseProps} />);
 
-    fireEvent.click(screen.getByText("Sync to QuickBooks"));
-    // Second click fires sync — advance just enough to resolve promises but
-    // not the 10s error-clear timer
     await act(async () => {
-      fireEvent.click(screen.getByText("Confirm Sync"));
+      fireEvent.click(screen.getByText("Sync to QuickBooks"));
       // Flush microtasks (fetch + json parse)
       await Promise.resolve();
       await Promise.resolve();
@@ -227,9 +200,8 @@ describe("ActionBar — sync phase (approved)", () => {
 
     render(<ActionBar {...baseProps} />);
 
-    fireEvent.click(screen.getByText("Sync to QuickBooks"));
     await act(async () => {
-      fireEvent.click(screen.getByText("Confirm Sync"));
+      fireEvent.click(screen.getByText("Sync to QuickBooks"));
       await vi.runAllTimersAsync();
     });
 

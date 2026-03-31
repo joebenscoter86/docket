@@ -9,7 +9,6 @@ type ActionBarState =
   | "idle"
   | "approving"
   | "approved"
-  | "confirming"
   | "syncing"
   | "synced"
   | "failed";
@@ -45,13 +44,11 @@ export default function ActionBar({
     message: string;
     duplicates: { invoiceId: string; vendorName: string; invoiceNumber: string | null }[];
   } | null>(null);
-  const confirmTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const errorTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const approvedTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     return () => {
-      if (confirmTimer.current) clearTimeout(confirmTimer.current);
       if (errorTimer.current) clearTimeout(errorTimer.current);
       if (approvedTimer.current) clearTimeout(approvedTimer.current);
     };
@@ -116,70 +113,57 @@ export default function ActionBar({
     }
   }, [canApprove, invoiceId, onStatusChange]);
 
-  // --- Sync handler (with confirm gate) ---
+  // --- Sync handler (fires immediately) ---
   const handleSync = useCallback(async () => {
     if (!canSync) return;
 
-    if (barState === "idle" || barState === "failed") {
-      setBarState("confirming");
-      setErrorMessage(null);
-      setWarning(null);
-      // Revert to idle on timeout
-      confirmTimer.current = setTimeout(() => {
-        setBarState("idle");
-      }, 3000);
-      return;
-    }
+    setBarState("syncing");
+    setErrorMessage(null);
+    setWarning(null);
 
-    if (barState === "confirming") {
-      if (confirmTimer.current) clearTimeout(confirmTimer.current);
-      setBarState("syncing");
-      setErrorMessage(null);
+    try {
+      const endpoint = isRetry
+        ? `/api/invoices/${invoiceId}/sync/retry`
+        : `/api/invoices/${invoiceId}/sync`;
 
-      try {
-        const endpoint = isRetry
-          ? `/api/invoices/${invoiceId}/sync/retry`
-          : `/api/invoices/${invoiceId}/sync`;
-
-        const headers: Record<string, string> = {};
-        if (duplicateConfirm) {
-          headers["x-confirm-duplicate"] = "true";
-          setDuplicateConfirm(null);
-        }
-
-        const res = await fetch(endpoint, { method: "POST", headers });
-        const body = await res.json();
-
-        if (!res.ok) {
-          if (res.status === 409 && body.details?.requiresConfirmation) {
-            setDuplicateConfirm({
-              message: body.error,
-              duplicates: body.details.duplicates,
-            });
-            setBarState("idle");
-            return;
-          }
-          throw new Error(body.error ?? "Failed to sync invoice");
-        }
-
-        setBarState("synced");
-        setSyncedEntityId(body.data?.billId ?? null);
-
-        if (body.data?.warning) {
-          setWarning(body.data.warning);
-        }
-
-        onStatusChange("synced");
-      } catch (err) {
-        setBarState("failed");
-        const message = err instanceof Error ? err.message : "Failed to sync invoice";
-        setErrorMessage(message);
-        errorTimer.current = setTimeout(() => {
-          setErrorMessage(null);
-        }, 10000);
+      const headers: Record<string, string> = {};
+      if (duplicateConfirm) {
+        headers["x-confirm-duplicate"] = "true";
+        setDuplicateConfirm(null);
       }
+
+      const res = await fetch(endpoint, { method: "POST", headers });
+      const body = await res.json();
+
+      if (!res.ok) {
+        if (res.status === 409 && body.details?.requiresConfirmation) {
+          setDuplicateConfirm({
+            message: body.error,
+            duplicates: body.details.duplicates,
+          });
+          setBarState("idle");
+          return;
+        }
+        throw new Error(body.error ?? "Failed to sync invoice");
+      }
+
+      setBarState("synced");
+      setSyncedEntityId(body.data?.billId ?? null);
+
+      if (body.data?.warning) {
+        setWarning(body.data.warning);
+      }
+
+      onStatusChange("synced");
+    } catch (err) {
+      setBarState("failed");
+      const message = err instanceof Error ? err.message : "Failed to sync invoice";
+      setErrorMessage(message);
+      errorTimer.current = setTimeout(() => {
+        setErrorMessage(null);
+      }, 10000);
     }
-  }, [barState, canSync, duplicateConfirm, invoiceId, isRetry, onStatusChange]);
+  }, [canSync, duplicateConfirm, invoiceId, isRetry, onStatusChange]);
 
   // --- Render: pending_review phase (approve) ---
   if (currentStatus === "pending_review") {
@@ -280,7 +264,7 @@ export default function ActionBar({
   if (currentStatus !== "approved") return null;
 
   const syncButtonConfig: Record<
-    "idle" | "confirming" | "syncing" | "synced" | "failed",
+    "idle" | "syncing" | "synced" | "failed",
     { label: string; className: string; disabled: boolean }
   > = {
     idle: {
@@ -291,11 +275,6 @@ export default function ActionBar({
         ? "bg-border text-muted cursor-not-allowed"
         : "bg-primary text-white hover:bg-primary-hover",
       disabled: syncBlockers.length > 0,
-    },
-    confirming: {
-      label: isRetry ? "Confirm Retry" : "Confirm Sync",
-      className: "bg-accent text-white hover:bg-green-700",
-      disabled: false,
     },
     syncing: {
       label: "Syncing...",
@@ -316,7 +295,7 @@ export default function ActionBar({
     },
   };
 
-  const syncState = barState as "idle" | "confirming" | "syncing" | "synced" | "failed";
+  const syncState = barState as "idle" | "syncing" | "synced" | "failed";
   const syncBtn = syncButtonConfig[syncState] ?? syncButtonConfig.idle;
 
   return (
@@ -337,10 +316,7 @@ export default function ActionBar({
               <button
                 type="button"
                 className="px-3 py-1 text-xs font-medium rounded bg-amber-600 text-white hover:bg-amber-700 transition-colors"
-                onClick={() => {
-                  setBarState("confirming");
-                  handleSync();
-                }}
+                onClick={() => handleSync()}
               >
                 Sync Anyway
               </button>
@@ -392,11 +368,6 @@ export default function ActionBar({
             <>
               <span className="h-2 w-2 rounded-full bg-error shrink-0" />
               <span className="text-error truncate">{errorMessage}</span>
-            </>
-          ) : barState === "confirming" ? (
-            <>
-              <span className="h-2 w-2 rounded-full bg-warning shrink-0 animate-pulse" />
-              <span className="text-warning">Click again to confirm</span>
             </>
           ) : (
             <>
