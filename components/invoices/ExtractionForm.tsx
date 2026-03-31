@@ -114,11 +114,11 @@ export default function ExtractionForm({
   );
   const [xeroBillStatusSaving, setXeroBillStatusSaving] = useState(false);
 
-  // Tax treatment (exclusive/inclusive/no_tax). Applies to both Xero and QBO.
-  const [taxTreatment, setTaxTreatment] = useState<"exclusive" | "inclusive" | "no_tax">(
-    initialTaxTreatment === "inclusive" || initialTaxTreatment === "no_tax"
+  // Tax treatment (exclusive/inclusive/no_tax/null). Null = provider default (omit from API call).
+  const [taxTreatment, setTaxTreatment] = useState<"exclusive" | "inclusive" | "no_tax" | null>(
+    initialTaxTreatment === "exclusive" || initialTaxTreatment === "inclusive" || initialTaxTreatment === "no_tax"
       ? initialTaxTreatment
-      : "exclusive"
+      : null
   );
   const [taxTreatmentSaving, setTaxTreatmentSaving] = useState(false);
 
@@ -158,7 +158,7 @@ export default function ExtractionForm({
   );
 
   const handleTaxTreatmentChange = useCallback(
-    async (newTreatment: "exclusive" | "inclusive" | "no_tax") => {
+    async (newTreatment: "exclusive" | "inclusive" | "no_tax" | null) => {
       setTaxTreatment(newTreatment);
       setTaxTreatmentSaving(true);
       try {
@@ -754,10 +754,16 @@ export default function ExtractionForm({
               </svg>
             )}
             <select
-              value={taxTreatment}
-              onChange={(e) => handleTaxTreatmentChange(e.target.value as "exclusive" | "inclusive" | "no_tax")}
+              value={taxTreatment ?? ""}
+              onChange={(e) => {
+                const val = e.target.value;
+                handleTaxTreatmentChange(
+                  val === "exclusive" || val === "inclusive" || val === "no_tax" ? val : null
+                );
+              }}
               className="text-sm border border-border rounded-md px-3 py-1.5 bg-white text-text focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
             >
+              <option value="">Default</option>
               <option value="exclusive">Tax Exclusive</option>
               <option value="inclusive">Tax Inclusive</option>
               <option value="no_tax">No Tax</option>
