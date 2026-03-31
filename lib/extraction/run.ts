@@ -416,8 +416,7 @@ export async function runExtraction(params: {
         invoiceId,
         invoiceMeta?.file_name ?? "invoice",
         result.data.vendorName,
-        result.data.totalAmount?.toString() ?? null,
-        result.data.confidenceScore ?? "medium"
+        result.data.totalAmount?.toString() ?? null
       );
     }
 

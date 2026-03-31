@@ -5,7 +5,6 @@ interface ExtractionCompleteEmailProps {
   invoiceFileName: string;
   vendorName: string | null;
   totalAmount: string | null;
-  confidence: "high" | "medium" | "low";
   reviewUrl: string;
 }
 
@@ -15,16 +14,8 @@ export function ExtractionCompleteEmail({
   invoiceFileName,
   vendorName,
   totalAmount,
-  confidence,
   reviewUrl,
 }: ExtractionCompleteEmailProps) {
-  const confidenceLabel =
-    confidence === "high"
-      ? "High confidence"
-      : confidence === "medium"
-        ? "Medium confidence"
-        : "Low confidence - review recommended";
-
   return (
     <EmailLayout preview={`Invoice extracted: ${vendorName || invoiceFileName}`}>
       <Text style={styles.heading}>Invoice Ready for Review</Text>
@@ -51,10 +42,6 @@ export function ExtractionCompleteEmail({
               <td style={valueCell}>{totalAmount}</td>
             </tr>
           )}
-          <tr>
-            <td style={labelCell}>Confidence</td>
-            <td style={valueCell}>{confidenceLabel}</td>
-          </tr>
         </tbody>
       </table>
 
