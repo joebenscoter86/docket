@@ -43,6 +43,13 @@ async function waitForInvoiceStatus(
 }
 
 test.describe('Upload, Extract, Review flow', () => {
+  // This test requires a real Anthropic API key for extraction.
+  // CI uses a placeholder key, so extraction will always fail.
+  test.skip(
+    process.env.ANTHROPIC_API_KEY === 'sk-ant-placeholder' || !process.env.ANTHROPIC_API_KEY,
+    'Requires real ANTHROPIC_API_KEY for extraction'
+  )
+
   test('upload PDF, extraction completes, review page shows extracted data', async ({
     page,
   }) => {
