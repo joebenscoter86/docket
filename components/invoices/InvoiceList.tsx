@@ -25,6 +25,10 @@ interface InvoiceListProps {
   currentBatchId?: string;
   toastMessage?: string | null;
   isAccountingConnected?: boolean;
+  currentDateField?: string;
+  currentDatePreset?: string;
+  currentDateFrom?: string;
+  currentDateTo?: string;
 }
 
 const FILTER_TABS: { key: keyof InvoiceListCounts; label: string }[] = [
@@ -48,6 +52,18 @@ const TYPE_FILTER_CHIPS: { key: string; label: string }[] = [
   { key: "check", label: "Check" },
   { key: "cash", label: "Expense" },
   { key: "credit_card", label: "Credit Card" },
+];
+
+const DATE_FIELD_OPTIONS: { key: string; label: string }[] = [
+  { key: "uploaded_at", label: "Upload Date" },
+  { key: "invoice_date", label: "Invoice Date" },
+];
+
+const DATE_PRESET_OPTIONS: { key: string; label: string }[] = [
+  { key: "today", label: "Today" },
+  { key: "week", label: "This Week" },
+  { key: "month", label: "This Month" },
+  { key: "custom", label: "Custom" },
 ];
 
 function buildUrl(
@@ -127,6 +143,10 @@ export default function InvoiceList({
   currentBatchId,
   toastMessage,
   isAccountingConnected,
+  currentDateField,
+  currentDatePreset,
+  currentDateFrom,
+  currentDateTo,
 }: InvoiceListProps) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -191,6 +211,16 @@ export default function InvoiceList({
       return next;
     });
   }
+
+  // Date filter state for custom range inputs
+  const [showCustomDates, setShowCustomDates] = useState(
+    !!(currentDateFrom || currentDateTo) && !currentDatePreset
+  );
+  const [customFrom, setCustomFrom] = useState(currentDateFrom ?? "");
+  const [customTo, setCustomTo] = useState(currentDateTo ?? "");
+
+  const activeDateField = currentDateField ?? "uploaded_at";
+  const hasDateFilter = !!(currentDatePreset || currentDateFrom || currentDateTo);
 
   // Delete confirmation state
   const [deleteTarget, setDeleteTarget] = useState<{ id: string; fileName: string } | null>(null);
@@ -538,6 +568,137 @@ export default function InvoiceList({
             </Link>
           );
         })}
+      </div>
+
+      {/* Date Filter */}
+      <div className="flex flex-wrap items-center gap-2 mb-6">
+        {/* Date field toggle */}
+        <div className="flex rounded-full border border-border overflow-hidden">
+          {DATE_FIELD_OPTIONS.map((opt) => (
+            <button
+              key={opt.key}
+              type="button"
+              onClick={() => {
+                router.push(buildUrl(pathname, searchParams, {
+                  date_field: opt.key === "uploaded_at" ? undefined : opt.key,
+                  cursor: undefined,
+                }));
+              }}
+              className={`px-3 py-1.5 text-xs font-medium transition-all duration-150 ${
+                activeDateField === opt.key
+                  ? "bg-primary text-white"
+                  : "bg-surface text-text hover:bg-background"
+              }`}
+            >
+              {opt.label}
+            </button>
+          ))}
+        </div>
+
+        <span className="text-border">|</span>
+
+        {/* Date preset buttons */}
+        {DATE_PRESET_OPTIONS.map((opt) => {
+          const isCustom = opt.key === "custom";
+          const isActive = isCustom
+            ? showCustomDates && !currentDatePreset
+            : currentDatePreset === opt.key;
+
+          return (
+            <button
+              key={opt.key}
+              type="button"
+              onClick={() => {
+                if (isCustom) {
+                  setShowCustomDates(true);
+                  // Clear preset when switching to custom
+                  if (currentDatePreset) {
+                    router.push(buildUrl(pathname, searchParams, {
+                      date_preset: undefined,
+                      date_from: undefined,
+                      date_to: undefined,
+                      cursor: undefined,
+                    }));
+                  }
+                } else {
+                  setShowCustomDates(false);
+                  router.push(buildUrl(pathname, searchParams, {
+                    date_preset: opt.key,
+                    date_from: undefined,
+                    date_to: undefined,
+                    cursor: undefined,
+                  }));
+                }
+              }}
+              className={`inline-flex items-center px-3 py-1.5 rounded-full text-xs font-medium transition-all duration-150 ease-in-out ${
+                isActive
+                  ? "bg-primary text-white shadow-soft"
+                  : "bg-surface text-text border border-border hover:border-primary/30"
+              }`}
+            >
+              {opt.label}
+            </button>
+          );
+        })}
+
+        {/* Clear date filter */}
+        {hasDateFilter && (
+          <button
+            type="button"
+            onClick={() => {
+              setShowCustomDates(false);
+              setCustomFrom("");
+              setCustomTo("");
+              router.push(buildUrl(pathname, searchParams, {
+                date_field: undefined,
+                date_preset: undefined,
+                date_from: undefined,
+                date_to: undefined,
+                cursor: undefined,
+              }));
+            }}
+            className="text-xs text-muted hover:text-error transition-colors"
+          >
+            Clear
+          </button>
+        )}
+
+        {/* Custom date range inputs */}
+        {showCustomDates && (
+          <div className="flex items-center gap-2 ml-1">
+            <input
+              type="date"
+              value={customFrom}
+              onChange={(e) => setCustomFrom(e.target.value)}
+              className="border border-border rounded-md px-2 py-1 text-xs text-text"
+              placeholder="From"
+            />
+            <span className="text-xs text-muted">to</span>
+            <input
+              type="date"
+              value={customTo}
+              onChange={(e) => setCustomTo(e.target.value)}
+              className="border border-border rounded-md px-2 py-1 text-xs text-text"
+              placeholder="To"
+            />
+            <button
+              type="button"
+              onClick={() => {
+                if (customFrom || customTo) {
+                  router.push(buildUrl(pathname, searchParams, {
+                    date_preset: undefined,
+                    date_from: customFrom || undefined,
+                    date_to: customTo || undefined,
+                    cursor: undefined,
+                  }));
+                }
+              }}
+              className="px-3 py-1.5 rounded-md text-xs font-medium bg-primary text-white hover:bg-primary-hover transition-colors"
+            >
+              Apply
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Sort Controls */}

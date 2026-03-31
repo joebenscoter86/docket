@@ -33,6 +33,10 @@ export interface InvoiceListParams {
   limit?: number;
   output_type?: string;
   batch_id?: string;
+  date_field?: string;
+  date_preset?: string;
+  date_from?: string;
+  date_to?: string;
 }
 
 export interface InvoiceListResult {
@@ -46,6 +50,8 @@ export const VALID_STATUSES = ["all", "pending_review", "approved", "synced", "e
 export const VALID_SORTS = ["uploaded_at", "invoice_date", "vendor_name", "total_amount"] as const;
 export const VALID_DIRECTIONS = ["asc", "desc"] as const;
 export const VALID_OUTPUT_TYPES = ["bill", "check", "cash", "credit_card"] as const;
+export const VALID_DATE_FIELDS = ["uploaded_at", "invoice_date"] as const;
+export const VALID_DATE_PRESETS = ["today", "week", "month"] as const;
 
 export const DEFAULT_LIMIT = 25;
 export const MAX_LIMIT = 100;

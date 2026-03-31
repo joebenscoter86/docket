@@ -70,13 +70,17 @@ describe("decodeCursor", () => {
 describe("validateListParams", () => {
   it("returns defaults for empty params", () => {
     const result = validateListParams({});
-    expect(result).toEqual({
+    expect(result).toMatchObject({
       status: "all",
       sort: "uploaded_at",
       direction: "desc",
       cursor: undefined,
       limit: 25,
       output_type: "all",
+      date_field: "uploaded_at",
+      date_preset: undefined,
+      date_from: undefined,
+      date_to: undefined,
     });
   });
 
@@ -87,7 +91,7 @@ describe("validateListParams", () => {
       direction: "asc",
       limit: 10,
     });
-    expect(result).toEqual({
+    expect(result).toMatchObject({
       status: "approved",
       sort: "vendor_name",
       direction: "asc",
@@ -104,7 +108,7 @@ describe("validateListParams", () => {
       direction: "sideways",
       limit: 999,
     });
-    expect(result).toEqual({
+    expect(result).toMatchObject({
       status: "all",
       sort: "uploaded_at",
       direction: "desc",
@@ -183,6 +187,8 @@ function createMockSupabase(
     limit: vi.fn().mockReturnThis(),
     lt: vi.fn().mockReturnThis(),
     gt: vi.fn().mockReturnThis(),
+    gte: vi.fn().mockReturnThis(),
+    lte: vi.fn().mockReturnThis(),
     or: vi.fn().mockReturnThis(),
     is: vi.fn().mockReturnThis(),
     then: vi.fn(),
@@ -232,55 +238,113 @@ describe("fetchInvoiceCounts", () => {
   });
 });
 
+const defaultListParams = {
+  status: "all",
+  sort: "uploaded_at",
+  direction: "desc",
+  limit: 25,
+  output_type: "all",
+  date_field: "uploaded_at",
+};
+
 describe("fetchInvoiceList", () => {
-  it("calls from with invoices table and selects joined fields", async () => {
+  it("calls from with invoice_list_view", async () => {
     const { client, mocks } = createMockSupabase();
-    await fetchInvoiceList(client, {
-      status: "all",
-      sort: "uploaded_at",
-      direction: "desc",
-      limit: 25,
-      output_type: "all",
-    });
-    expect(mocks.from).toHaveBeenCalledWith("invoices");
+    await fetchInvoiceList(client, defaultListParams);
+    expect(mocks.from).toHaveBeenCalledWith("invoice_list_view");
     expect(mocks.query.select).toHaveBeenCalledWith(
-      expect.stringContaining("extracted_data")
+      expect.stringContaining("vendor_name")
     );
   });
 
   it("applies status filter when not 'all'", async () => {
     const { client, mocks } = createMockSupabase();
-    await fetchInvoiceList(client, {
-      status: "approved",
-      sort: "uploaded_at",
-      direction: "desc",
-      limit: 25,
-      output_type: "all",
-    });
+    await fetchInvoiceList(client, { ...defaultListParams, status: "approved" });
     expect(mocks.query.eq).toHaveBeenCalledWith("status", "approved");
   });
 
   it("does not apply status filter for 'all'", async () => {
     const { client, mocks } = createMockSupabase();
-    await fetchInvoiceList(client, {
-      status: "all",
-      sort: "uploaded_at",
-      direction: "desc",
-      limit: 25,
-      output_type: "all",
-    });
+    await fetchInvoiceList(client, defaultListParams);
     expect(mocks.query.eq).not.toHaveBeenCalled();
   });
 
   it("fetches limit + 1 rows to detect next page", async () => {
     const { client, mocks } = createMockSupabase();
-    await fetchInvoiceList(client, {
-      status: "all",
-      sort: "uploaded_at",
-      direction: "desc",
-      limit: 25,
-      output_type: "all",
-    });
+    await fetchInvoiceList(client, defaultListParams);
     expect(mocks.query.limit).toHaveBeenCalledWith(26);
+  });
+
+  it("applies date_from filter on uploaded_at with timestamp", async () => {
+    const { client, mocks } = createMockSupabase();
+    await fetchInvoiceList(client, {
+      ...defaultListParams,
+      date_field: "uploaded_at",
+      date_from: "2026-03-01",
+    });
+    expect(mocks.query.gte).toHaveBeenCalledWith("uploaded_at", "2026-03-01T00:00:00.000Z");
+  });
+
+  it("applies date_to filter on invoice_date directly", async () => {
+    const { client, mocks } = createMockSupabase();
+    await fetchInvoiceList(client, {
+      ...defaultListParams,
+      date_field: "invoice_date",
+      date_to: "2026-03-31",
+    });
+    expect(mocks.query.lte).toHaveBeenCalledWith("invoice_date", "2026-03-31");
+  });
+});
+
+describe("validateListParams date handling", () => {
+  it("resolves today preset to today's date", () => {
+    const result = validateListParams({ date_preset: "today" });
+    const todayStr = new Date().toISOString().slice(0, 10);
+    expect(result.date_from).toBe(todayStr);
+    expect(result.date_to).toBe(todayStr);
+    expect(result.date_preset).toBe("today");
+  });
+
+  it("resolves month preset to first of month", () => {
+    const result = validateListParams({ date_preset: "month" });
+    const todayStr = new Date().toISOString().slice(0, 10);
+    expect(result.date_from).toBe(`${todayStr.slice(0, 7)}-01`);
+    expect(result.date_to).toBe(todayStr);
+  });
+
+  it("accepts valid explicit date_from and date_to", () => {
+    const result = validateListParams({
+      date_from: "2026-01-15",
+      date_to: "2026-02-15",
+    });
+    expect(result.date_from).toBe("2026-01-15");
+    expect(result.date_to).toBe("2026-02-15");
+    expect(result.date_preset).toBeUndefined();
+  });
+
+  it("rejects invalid date format", () => {
+    const result = validateListParams({
+      date_from: "not-a-date",
+      date_to: "03/15/2026",
+    });
+    expect(result.date_from).toBeUndefined();
+    expect(result.date_to).toBeUndefined();
+  });
+
+  it("validates date_field", () => {
+    expect(validateListParams({ date_field: "invoice_date" }).date_field).toBe("invoice_date");
+    expect(validateListParams({ date_field: "uploaded_at" }).date_field).toBe("uploaded_at");
+    expect(validateListParams({ date_field: "hacked" }).date_field).toBe("uploaded_at");
+  });
+
+  it("preset overrides explicit dates", () => {
+    const result = validateListParams({
+      date_preset: "today",
+      date_from: "2026-01-01",
+      date_to: "2026-12-31",
+    });
+    const todayStr = new Date().toISOString().slice(0, 10);
+    expect(result.date_from).toBe(todayStr);
+    expect(result.date_to).toBe(todayStr);
   });
 });
