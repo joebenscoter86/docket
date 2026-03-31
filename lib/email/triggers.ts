@@ -115,8 +115,7 @@ export async function sendExtractionCompleteEmail(
   invoiceId: string,
   invoiceFileName: string,
   vendorName: string | null,
-  totalAmount: string | null,
-  confidence: "high" | "medium" | "low"
+  totalAmount: string | null
 ): Promise<void> {
   try {
     if (!(await checkPreference(userId, "extraction_notifications"))) return;
@@ -132,7 +131,6 @@ export async function sendExtractionCompleteEmail(
         invoiceFileName,
         vendorName,
         totalAmount,
-        confidence,
         reviewUrl: `/invoices/${invoiceId}/review`,
       }),
     });
