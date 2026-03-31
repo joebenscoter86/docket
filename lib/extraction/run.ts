@@ -115,7 +115,6 @@ export async function runExtraction(params: {
           currency: "USD",
           paymentTerms: null,
           confidenceScore: "low",
-          taxTreatment: "exclusive",
           lineItems: [],
         },
         rawResponse: {},

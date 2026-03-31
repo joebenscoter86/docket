@@ -21,7 +21,6 @@ export interface ExtractedInvoice {
   currency: string;
   paymentTerms: string | null;
   confidenceScore: "high" | "medium" | "low";
-  taxTreatment: "exclusive" | "inclusive" | "no_tax";
   lineItems: ExtractedLineItem[];
 }
 

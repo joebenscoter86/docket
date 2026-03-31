@@ -26,7 +26,6 @@ const VALID_RESULT: ExtractionResult = {
     currency: "USD",
     paymentTerms: "Net 30",
     confidenceScore: "high",
-    taxTreatment: "exclusive",
     lineItems: [
       { description: "Widget A", quantity: 10, unitPrice: 90, amount: 900, sortOrder: 0, suggestedGlAccountId: null },
       { description: "Widget B", quantity: 5, unitPrice: 20, amount: 100, sortOrder: 1, suggestedGlAccountId: null },
@@ -205,8 +204,7 @@ describe("mapToExtractedDataRow", () => {
         currency: "USD",
         paymentTerms: null,
         confidenceScore: "low",
-        taxTreatment: "exclusive",
-        lineItems: [],
+            lineItems: [],
       },
     };
 

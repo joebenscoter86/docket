@@ -168,7 +168,6 @@ const MOCK_RESULT: ExtractionResult = {
     currency: "USD",
     paymentTerms: "Net 30",
     confidenceScore: "high",
-    taxTreatment: "exclusive",
     lineItems: [
       {
         description: "Widget A",
