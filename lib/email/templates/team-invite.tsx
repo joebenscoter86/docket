@@ -3,6 +3,7 @@ import { EmailLayout, PrimaryButton, styles } from "./layout";
 
 interface TeamInviteEmailProps {
   inviterEmail: string;
+  inviterName: string | null;
   orgName: string;
   inviteUrl: string;
   expiresAt: string;
@@ -10,6 +11,7 @@ interface TeamInviteEmailProps {
 
 export function TeamInviteEmail({
   inviterEmail,
+  inviterName,
   orgName,
   inviteUrl,
   expiresAt,
@@ -20,11 +22,15 @@ export function TeamInviteEmail({
     year: "numeric",
   });
 
+  const inviterDisplay = inviterName
+    ? `${inviterName} (${inviterEmail})`
+    : inviterEmail;
+
   return (
-    <EmailLayout preview={`${inviterEmail} invited you to join ${orgName} on Dockett`}>
+    <EmailLayout preview={`${inviterName || inviterEmail} invited you to join ${orgName} on Dockett`}>
       <Text style={styles.heading}>You&apos;re invited to {orgName}</Text>
       <Text style={styles.paragraph}>
-        {inviterEmail} invited you to join <strong>{orgName}</strong> on
+        {inviterDisplay} invited you to join <strong>{orgName}</strong> on
         Dockett. You&apos;ll be able to upload invoices, review AI-extracted
         data, and sync bills to your accounting software.
       </Text>

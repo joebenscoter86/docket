@@ -87,13 +87,20 @@ export async function POST(request: Request) {
       .eq("id", orgWithRole.orgId)
       .single();
 
+    const { data: inviterUser } = await adminSupabase
+      .from("users")
+      .select("full_name")
+      .eq("id", user.id)
+      .single();
+
     // Send invite email (fire-and-forget pattern)
     sendTeamInviteEmail(
       user.email!,
       email,
       org?.name ?? "your organization",
       invite.token,
-      invite.expires_at
+      invite.expires_at,
+      inviterUser?.full_name ?? null
     ).catch((err) => {
       logger.error("team_invite_email_failed", {
         inviteId: invite.id,

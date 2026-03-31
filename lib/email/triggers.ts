@@ -668,15 +668,17 @@ export async function sendTeamInviteEmail(
   invitedEmail: string,
   orgName: string,
   token: string,
-  expiresAt: string
+  expiresAt: string,
+  inviterName: string | null
 ): Promise<void> {
   const inviteUrl = `https://dockett.app/invite/${token}`;
-  const subject = `${inviterEmail} invited you to join ${orgName} on Dockett`;
+  const inviterDisplay = inviterName || inviterEmail;
+  const subject = `${inviterDisplay} invited you to join ${orgName} on Dockett`;
 
   await sendEmail({
     to: invitedEmail,
     subject,
-    react: TeamInviteEmail({ inviterEmail, orgName, inviteUrl, expiresAt }),
+    react: TeamInviteEmail({ inviterEmail, inviterName, orgName, inviteUrl, expiresAt }),
   });
 
   logger.info("team_invite_email_sent", {
