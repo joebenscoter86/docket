@@ -62,6 +62,18 @@ export interface TrackingAssignment {
   optionName: string;
 }
 
+// ─── Tax Code Types ───
+
+/** A tax code formatted for dropdown display. Provider-agnostic. */
+export interface TaxCodeOption {
+  /** QBO: TaxCode Id ("TAX", "NON", "3"), Xero: TaxType string ("INPUT", "NONE", "TAX001") */
+  value: string;
+  /** Display name (e.g., "GST on Expenses", "No Tax", "California") */
+  label: string;
+  /** Effective rate % for display (e.g., 10, 0, 7.25). Null if compound/variable. */
+  rate: number | null;
+}
+
 // ─── Transaction Input Types ───
 
 /** A single line item on a bill or purchase. */
@@ -70,6 +82,8 @@ export interface SyncLineItem {
   glAccountId: string;
   description: string | null;
   tracking?: TrackingAssignment[];
+  /** Provider tax code ID. QBO: TaxCodeRef value, Xero: TaxType string. Null = provider default. */
+  taxCodeId?: string | null;
 }
 
 /** Provider-agnostic input for creating a Bill (accounts payable). */

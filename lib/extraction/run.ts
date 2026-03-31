@@ -289,13 +289,13 @@ export async function runExtraction(params: {
       }
     }
 
-    // 8. Update invoice status to pending_review + AI-inferred tax treatment
+    // 8. Update invoice status to pending_review
+    // Tax treatment is NOT set from AI extraction -- user must explicitly enable it via toggle.
     const { error: statusError } = await admin
       .from("invoices")
       .update({
         status: "pending_review",
         error_message: null,
-        tax_treatment: result.data.taxTreatment,
       })
       .eq("id", invoiceId);
 

@@ -20,6 +20,7 @@ const MOCK_ITEMS: ExtractedLineItemRow[] = [
     gl_suggestion_source: null,
     is_user_confirmed: false,
     tracking: null,
+    tax_code_id: null,
   },
   {
     id: "li-2",
@@ -33,6 +34,7 @@ const MOCK_ITEMS: ExtractedLineItemRow[] = [
     gl_suggestion_source: null,
     is_user_confirmed: false,
     tracking: null,
+    tax_code_id: null,
   },
 ];
 
@@ -46,6 +48,7 @@ const defaultProps = {
   accountsLoading: false,
   accountingConnected: false,
   trackingCategories: [],
+  taxCodes: [],
 };
 
 describe("LineItemEditor", () => {

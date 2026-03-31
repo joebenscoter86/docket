@@ -128,10 +128,11 @@ export async function processBatchSync(
 
       // 4. Create bill or purchase via provider abstraction
       const syncLineItems: SyncLineItem[] = (lineItems ?? []).map(
-        (li: { amount: number; gl_account_id: string; description: string | null }) => ({
+        (li: { amount: number; gl_account_id: string; description: string | null; tax_code_id: string | null }) => ({
           amount: Number(li.amount),
           glAccountId: li.gl_account_id,
           description: li.description,
+          ...(li.tax_code_id ? { taxCodeId: li.tax_code_id } : {}),
         })
       );
 

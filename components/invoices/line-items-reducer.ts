@@ -13,6 +13,7 @@ export interface LineItemValues {
   gl_suggestion_source: string | null;
   is_user_confirmed: boolean;
   tracking: TrackingAssignment[] | null;
+  tax_code_id: string | null;
 }
 
 export interface LineItemState {
@@ -46,6 +47,7 @@ function extractValues(item: ExtractedLineItemRow): LineItemValues {
     gl_suggestion_source: item.gl_suggestion_source,
     is_user_confirmed: item.is_user_confirmed,
     tracking: item.tracking,
+    tax_code_id: item.tax_code_id ?? null,
   };
 }
 
@@ -143,6 +145,7 @@ export function lineItemsReducer(
         gl_suggestion_source: null,
         is_user_confirmed: false,
         tracking: null,
+        tax_code_id: null,
       };
       const newItem: LineItemState = {
         id: action.item.id,

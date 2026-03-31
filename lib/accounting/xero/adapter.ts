@@ -4,6 +4,7 @@ import {
   fetchAccounts as xeroFetchAccounts,
   fetchPaymentAccounts as xeroFetchPaymentAccounts,
   fetchTrackingCategories as xeroFetchTrackingCategories,
+  fetchTaxRates as xeroFetchTaxRates,
   createInvoice,
   createBankTransaction,
   attachDocumentToInvoice,
@@ -23,6 +24,7 @@ import {
   type AccountOption,
   type PaymentAccount,
   type TrackingCategory,
+  type TaxCodeOption,
   type CreateBillInput,
   type CreatePurchaseInput,
   type TransactionResult,
@@ -122,6 +124,17 @@ export class XeroAccountingAdapter implements AccountingProvider {
     }
   }
 
+  async fetchTaxCodes(
+    supabase: SupabaseAdminClient,
+    orgId: string
+  ): Promise<TaxCodeOption[]> {
+    try {
+      return await xeroFetchTaxRates(supabase, orgId);
+    } catch (err) {
+      wrapXeroError(err);
+    }
+  }
+
   async createBill(
     supabase: SupabaseAdminClient,
     orgId: string,
@@ -132,6 +145,7 @@ export class XeroAccountingAdapter implements AccountingProvider {
       Quantity: 1,
       UnitAmount: item.amount,
       AccountCode: item.glAccountId,
+      ...(item.taxCodeId ? { TaxType: item.taxCodeId } : {}),
       ...(item.tracking?.length
         ? {
             Tracking: item.tracking.map((t) => ({
@@ -182,6 +196,7 @@ export class XeroAccountingAdapter implements AccountingProvider {
       Quantity: 1,
       UnitAmount: item.amount,
       AccountCode: item.glAccountId,
+      ...(item.taxCodeId ? { TaxType: item.taxCodeId } : {}),
       ...(item.tracking?.length
         ? {
             Tracking: item.tracking.map((t) => ({
