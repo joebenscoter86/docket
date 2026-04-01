@@ -326,6 +326,38 @@ export async function runExtraction(params: {
       }
     }
 
+    // 7.5. Apply org default tax code to line items without one
+    try {
+      const { data: connection } = await admin
+        .from("accounting_connections")
+        .select("default_tax_code_id")
+        .eq("org_id", orgId)
+        .maybeSingle();
+
+      if (connection?.default_tax_code_id) {
+        await admin
+          .from("extracted_line_items")
+          .update({ tax_code_id: connection.default_tax_code_id })
+          .eq("extracted_data_id", extractedRow.id)
+          .is("tax_code_id", null);
+
+        logger.info("extraction_default_tax_code_applied", {
+          action: "run_extraction",
+          invoiceId,
+          orgId,
+          defaultTaxCodeId: connection.default_tax_code_id,
+        });
+      }
+    } catch (err) {
+      // Non-fatal: extraction succeeds even if default tax code fails
+      logger.warn("extraction_default_tax_code_failed", {
+        action: "run_extraction",
+        invoiceId,
+        orgId,
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
+
     // 8. Update invoice status to pending_review
     // Tax treatment is NOT set from AI extraction -- user must explicitly enable it via toggle.
     const { error: statusError } = await admin

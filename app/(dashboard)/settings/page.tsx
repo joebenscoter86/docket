@@ -11,6 +11,7 @@ import { AccountCard } from "@/components/settings/AccountCard";
 import { EmailPreferencesCard } from "@/components/settings/EmailPreferencesCard";
 import { EmailIngestionCard } from "@/components/settings/EmailIngestionCard";
 import { TeamCard } from "@/components/settings/TeamCard";
+import { DefaultsCard } from "@/components/settings/DefaultsCard";
 import { getUsageThisPeriod } from "@/lib/billing/usage";
 import type { SubscriptionTier } from "@/lib/billing/tiers";
 
@@ -85,6 +86,17 @@ export default async function SettingsPage({
         refreshTokenExpiresAt: connection.refreshTokenExpiresAt,
       };
     }
+  }
+
+  let defaultTaxCodeId: string | null = null;
+  if (connectionData.connected && orgId) {
+    const adminSupabase = createAdminClient();
+    const { data: connDefaults } = await adminSupabase
+      .from("accounting_connections")
+      .select("default_tax_code_id")
+      .eq("org_id", orgId)
+      .maybeSingle();
+    defaultTaxCodeId = connDefaults?.default_tax_code_id ?? null;
   }
 
   const connectedProvider = connectionData.connected ? connectionData.provider : null;
@@ -193,6 +205,16 @@ export default async function SettingsPage({
           />
         </div>
       </div>
+
+      {/* Defaults Section */}
+      {connectionData.connected && (
+        <div>
+          <p className="text-[13px] font-bold uppercase tracking-wider text-muted mb-3">
+            Defaults
+          </p>
+          <DefaultsCard initialDefaultTaxCodeId={defaultTaxCodeId} />
+        </div>
+      )}
 
       {/* Email Forwarding Section */}
       <div>
