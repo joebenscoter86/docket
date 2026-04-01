@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useCallback } from "react";
+import { useState, useMemo, useRef, useEffect, useCallback } from "react";
 import type { AccountOption } from "@/lib/accounting";
 
 interface GlAccountSelectProps {
@@ -51,15 +51,50 @@ export default function GlAccountSelect({
   suggestedAccountId,
   suggestionSource,
 }: GlAccountSelectProps) {
+  const [search, setSearch] = useState("");
+  const [isOpen, setIsOpen] = useState(false);
+  const [selectedId, setSelectedId] = useState<string | null>(currentAccountId);
   const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
+  const containerRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
   const savedTimer = useRef<ReturnType<typeof setTimeout>>();
 
-  const handleChange = useCallback(
-    async (e: React.ChangeEvent<HTMLSelectElement>) => {
-      const val = e.target.value || null;
+  // Sync selectedId when prop changes (e.g. parent accepts AI suggestion)
+  useEffect(() => {
+    setSelectedId(currentAccountId);
+  }, [currentAccountId]);
+
+  // Close dropdown on outside click
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+        setIsOpen(false);
+        setSearch("");
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  const filtered = useMemo(() => {
+    if (!search) return accounts;
+    const q = search.toLowerCase();
+    return accounts.filter((a) => a.label.toLowerCase().includes(q));
+  }, [accounts, search]);
+
+  const selectedLabel = useMemo(() => {
+    if (!selectedId) return null;
+    return accounts.find((a) => a.value === selectedId)?.label ?? null;
+  }, [selectedId, accounts]);
+
+  const handleSelect = useCallback(
+    async (accountId: string) => {
+      setSelectedId(accountId);
+      setIsOpen(false);
+      setSearch("");
       setSaveStatus("saving");
 
-      const ok = await onSelect(val);
+      const ok = await onSelect(accountId);
 
       setSaveStatus(ok ? "saved" : "error");
 
@@ -70,6 +105,17 @@ export default function GlAccountSelect({
     },
     [onSelect]
   );
+
+  const handleClear = useCallback(async () => {
+    setSelectedId(null);
+    setSaveStatus("saving");
+    const ok = await onSelect(null);
+    setSaveStatus(ok ? "saved" : "error");
+    if (ok) {
+      if (savedTimer.current) clearTimeout(savedTimer.current);
+      savedTimer.current = setTimeout(() => setSaveStatus("idle"), 2000);
+    }
+  }, [onSelect]);
 
   if (!connected && !loading) {
     return (
@@ -90,57 +136,121 @@ export default function GlAccountSelect({
     );
   }
 
-  const showSuggestion = suggestedAccountId && !currentAccountId && suggestionSource;
+  const showSuggestion = suggestedAccountId && !selectedId && suggestionSource;
   const suggestedAccount = showSuggestion
     ? accounts.find((a) => a.value === suggestedAccountId)
     : null;
 
   const showHistoryBadge =
-    currentAccountId && suggestedAccountId === currentAccountId && suggestionSource === "history";
+    selectedId && suggestedAccountId === selectedId && suggestionSource === "history";
 
   const historyAccount = showHistoryBadge
     ? accounts.find((a) => a.value === suggestedAccountId) ?? null
     : null;
 
   return (
-    <div className="flex flex-col gap-1">
+    <div className="flex flex-col gap-1" ref={containerRef}>
       <div className={STATUS_BORDER[saveStatus]}>
-        <select
-          className="w-full border border-border rounded-md px-2 py-1.5 text-sm focus:outline-none focus-visible:ring-[3px] focus-visible:ring-[#BFDBFE] focus:border-primary bg-white"
-          value={currentAccountId ?? ""}
-          onChange={handleChange}
-          disabled={disabled || accounts.length === 0}
-          title={accounts.length === 0 ? "No accounts found" : undefined}
-        >
-          <option value="">Select account...</option>
-          {suggestedAccount && showSuggestion && (
-            <option key={`suggested-${suggestedAccount.value}`} value={suggestedAccount.value}>
-              AI · {suggestedAccount.label}
-            </option>
+        <div className="relative">
+          {/* Selected display or search input */}
+          {selectedId && !isOpen ? (
+            <div
+              className={`w-full border border-border rounded-md px-2 py-1.5 text-sm flex items-center justify-between ${disabled ? "bg-background cursor-not-allowed" : "cursor-pointer hover:border-muted"}`}
+              onClick={() => {
+                if (!disabled) {
+                  setIsOpen(true);
+                  setTimeout(() => inputRef.current?.focus(), 0);
+                }
+              }}
+            >
+              <span className="flex items-center gap-1.5 truncate">
+                <svg className="h-3 w-3 text-accent shrink-0" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                </svg>
+                <span className="truncate">{selectedLabel}</span>
+              </span>
+              {!disabled && (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleClear();
+                  }}
+                  className="text-muted hover:text-text text-xs ml-1 shrink-0"
+                  aria-label="Clear account selection"
+                >
+                  &times;
+                </button>
+              )}
+            </div>
+          ) : (
+            <input
+              ref={inputRef}
+              type="text"
+              className="w-full border border-border rounded-md px-2 py-1.5 text-sm focus:outline-none focus-visible:ring-[3px] focus-visible:ring-[#BFDBFE] focus:border-primary"
+              placeholder={accounts.length === 0 ? "No accounts found" : "Search accounts..."}
+              value={search}
+              onChange={(e) => {
+                setSearch(e.target.value);
+                setIsOpen(true);
+              }}
+              onFocus={() => setIsOpen(true)}
+              disabled={disabled || accounts.length === 0}
+            />
           )}
-          {historyAccount && showHistoryBadge && (
-            <option key={`history-${historyAccount.value}`} value={historyAccount.value}>
-              Learned · {historyAccount.label}
-            </option>
-          )}
-          {groupByClassification(accounts).map((group) => (
-            <optgroup key={group.classification} label={group.classification}>
-              {group.accounts
-                .filter(
-                  (a) =>
-                    !(suggestedAccount && showSuggestion && a.value === suggestedAccountId) &&
-                    !(historyAccount && showHistoryBadge && a.value === suggestedAccountId)
+
+          {/* Dropdown */}
+          {isOpen && (
+            <div className="absolute z-10 w-full mt-1 bg-white border border-border rounded-md shadow-lg max-h-48 overflow-y-auto">
+              {search ? (
+                // Flat filtered list (no groups)
+                filtered.length > 0 ? (
+                  <ul>
+                    {filtered.map((a) => (
+                      <li
+                        key={a.value}
+                        className={`px-3 py-1.5 text-sm cursor-pointer hover:bg-primary/5 ${a.value === selectedId ? "bg-primary/5 font-medium" : ""}`}
+                        onClick={() => handleSelect(a.value)}
+                      >
+                        {a.label}
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="px-3 py-2 text-sm text-muted">
+                    No accounts match &quot;{search}&quot;
+                  </p>
                 )
-                .map((a) => (
-                  <option key={a.value} value={a.value}>
-                    {a.label}
-                  </option>
-                ))}
-            </optgroup>
-          ))}
-        </select>
+              ) : (
+                // Grouped list (no search)
+                <ul>
+                  {groupByClassification(accounts).map((group) => (
+                    <li key={group.classification}>
+                      <div className="px-3 py-1 text-xs font-semibold text-muted uppercase tracking-wide bg-background sticky top-0">
+                        {group.classification}
+                      </div>
+                      <ul>
+                        {group.accounts.map((a) => (
+                          <li
+                            key={a.value}
+                            className={`px-3 py-1.5 text-sm cursor-pointer hover:bg-primary/5 ${a.value === selectedId ? "bg-primary/5 font-medium" : ""}`}
+                            onClick={() => handleSelect(a.value)}
+                          >
+                            {a.label}
+                          </li>
+                        ))}
+                      </ul>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          )}
+        </div>
       </div>
-      {showHistoryBadge && (
+
+      {/* Learned badge */}
+      {showHistoryBadge && historyAccount && (
         <div className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-green-50 border border-green-200 text-xs text-green-700">
           <svg className="h-3 w-3 flex-shrink-0" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" d="M12 6.042A8.967 8.967 0 006 3.75c-1.052 0-2.062.18-3 .512v14.25A8.987 8.987 0 016 18c2.305 0 4.408.867 6 2.292m0-14.25a8.966 8.966 0 016-2.292c1.052 0 2.062.18 3 .512v14.25A8.987 8.987 0 0018 18a8.967 8.967 0 00-6 2.292m0-14.25v14.25" />
@@ -148,6 +258,8 @@ export default function GlAccountSelect({
           <span className="font-medium">Learned</span>
         </div>
       )}
+
+      {/* AI suggestion pill */}
       {suggestedAccount && showSuggestion && (
         <button
           type="button"
