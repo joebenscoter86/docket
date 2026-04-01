@@ -20,6 +20,7 @@ export type Database = {
           company_id: string
           company_name: string | null
           connected_at: string | null
+          default_tax_code_id: string | null
           id: string
           org_id: string
           provider: string
@@ -31,6 +32,7 @@ export type Database = {
           company_id: string
           company_name?: string | null
           connected_at?: string | null
+          default_tax_code_id?: string | null
           id?: string
           org_id: string
           provider: string
@@ -42,6 +44,7 @@ export type Database = {
           company_id?: string
           company_name?: string | null
           connected_at?: string | null
+          default_tax_code_id?: string | null
           id?: string
           org_id?: string
           provider?: string
