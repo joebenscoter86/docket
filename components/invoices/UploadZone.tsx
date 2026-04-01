@@ -6,8 +6,15 @@ import type { DuplicateWarning } from "@/lib/types/invoice";
 
 type UploadState = "idle" | "dragging" | "uploading" | "success";
 
-const ACCEPTED_TYPES = ["application/pdf", "image/jpeg", "image/png"];
-const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
+const ACCEPTED_TYPES = [
+  "application/pdf",
+  "image/jpeg",
+  "image/png",
+  "application/zip",
+  "application/x-zip-compressed",
+];
+const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB (non-zip)
+const MAX_ZIP_SIZE = 50 * 1024 * 1024;  // 50MB (zip)
 const MAX_FILES = 25;
 
 interface SelectedFile {
@@ -30,10 +37,12 @@ function formatFileSize(bytes: number): string {
 
 function validateFile(file: File): string | null {
   if (!ACCEPTED_TYPES.includes(file.type)) {
-    return "Unsupported file type. Please upload a PDF, JPG, or PNG.";
+    return "Unsupported file type. Please upload a PDF, JPG, PNG, or ZIP.";
   }
-  if (file.size > MAX_FILE_SIZE) {
-    return "File exceeds 10MB limit.";
+  const isZip = file.type === "application/zip" || file.type === "application/x-zip-compressed";
+  const limit = isZip ? MAX_ZIP_SIZE : MAX_FILE_SIZE;
+  if (file.size > limit) {
+    return isZip ? "Zip file exceeds 50MB limit." : "File exceeds 10MB limit.";
   }
   return null;
 }
@@ -175,11 +184,15 @@ export default function UploadZone({ onUploadComplete, onUploadStart }: UploadZo
       const filesToUpload = selectedFiles.filter((f) => f.valid).map((f) => f.file);
       if (filesToUpload.length === 0) return;
 
-      if (filesToUpload.length > 1 && onUploadStart) {
-        // Multiple files: use batch upload flow
+      const hasZip = filesToUpload.some(
+        (f) => f.type === "application/zip" || f.type === "application/x-zip-compressed"
+      );
+
+      if ((filesToUpload.length > 1 || hasZip) && onUploadStart) {
+        // Multiple files or zip: use batch upload flow
         onUploadStart(filesToUpload);
       } else {
-        // Single file: always use inline upload + onUploadComplete path
+        // Single non-zip file: use inline upload + onUploadComplete path
         uploadFile(filesToUpload[0]);
       }
     },
@@ -326,7 +339,7 @@ export default function UploadZone({ onUploadComplete, onUploadStart }: UploadZo
         <input
           ref={inputRef}
           type="file"
-          accept=".pdf,.jpg,.jpeg,.png"
+          accept=".pdf,.jpg,.jpeg,.png,.zip"
           multiple
           className="hidden"
           onChange={handleInputChange}
@@ -352,7 +365,7 @@ export default function UploadZone({ onUploadComplete, onUploadStart }: UploadZo
               Drag & drop invoices here
             </p>
             <p className="font-body text-sm text-muted">
-              PDF, PNG, JPG up to 10MB
+              PDF, PNG, JPG, or ZIP up to 10MB (ZIP up to 50MB)
             </p>
             <p className="font-body text-sm text-muted">
               <span className="font-bold">Upload up to 25 files at a time</span>
