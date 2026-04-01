@@ -2,7 +2,8 @@ import { createHash } from "crypto";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getActiveOrgId } from "@/lib/supabase/helpers";
-import { validateFileMagicBytes, validateFileSize } from "@/lib/upload/validate";
+import { validateFileMagicBytes, validateFileSize, isZipFile, MAX_ZIP_SIZE } from "@/lib/upload/validate";
+import { extractZipFiles } from "@/lib/upload/zip";
 import { checkInvoiceAccess } from "@/lib/billing/access";
 import { checkUsageLimit } from "@/lib/billing/usage";
 import { incrementTrialInvoice } from "@/lib/billing/trial";
@@ -116,6 +117,9 @@ export async function POST(request: Request) {
       });
     }
 
+    // Initialize admin client early — needed for both zip and non-zip paths
+    const admin = createAdminClient();
+
     // 3. Parse form data
     const formData = await request.formData();
     const file = formData.get("file");
@@ -142,11 +146,16 @@ export async function POST(request: Request) {
     const fileSize = file.size;
 
     // 4. Server-side validation
-    if (!validateFileSize(fileSize)) {
+    const buffer = Buffer.from(await file.arrayBuffer());
+    const isZip = isZipFile(buffer);
+
+    if (!isZip && !validateFileSize(fileSize)) {
       return validationError("File exceeds 10MB limit.");
     }
+    if (isZip && fileSize > MAX_ZIP_SIZE) {
+      return validationError("Zip file exceeds 50MB limit.");
+    }
 
-    const buffer = Buffer.from(await file.arrayBuffer());
     const magicResult = validateFileMagicBytes(buffer, fileType);
 
     if (!magicResult.valid) {
@@ -162,11 +171,121 @@ export async function POST(request: Request) {
       );
     }
 
-    // 4b. Compute file hash for duplicate detection
+    // 4b. ZIP UPLOAD PATH — handle before the single-file path
+    if (isZip) {
+      const zipResult = await extractZipFiles(buffer);
+
+      if (zipResult.files.length === 0) {
+        return validationError(
+          "No supported files found in zip. Only PDF, JPG, and PNG files are accepted.",
+          { skippedFiles: zipResult.skipped }
+        );
+      }
+
+      // Enforce batch size cap
+      if (zipResult.files.length > BATCH_SIZE_CAP) {
+        return validationError(
+          `Zip contains ${zipResult.files.length} files. Maximum ${BATCH_SIZE_CAP} per upload.`
+        );
+      }
+
+      // Generate batch ID for the group
+      const zipBatchId = crypto.randomUUID();
+      const invoiceIds: string[] = [];
+
+      for (const extractedFile of zipResult.files) {
+        const fileInvoiceId = crypto.randomUUID();
+        const fileHash = createHash("sha256").update(extractedFile.buffer).digest("hex");
+        const storagePath = `${orgId}/${fileInvoiceId}/${extractedFile.name}`;
+
+        // Upload to storage
+        const { error: fileUploadError } = await admin.storage
+          .from("invoices")
+          .upload(storagePath, extractedFile.buffer, {
+            contentType: extractedFile.mimeType,
+            upsert: false,
+          });
+
+        if (fileUploadError) {
+          logger.error("zip_file_upload_storage_failed", {
+            userId, orgId, invoiceId: fileInvoiceId,
+            fileName: extractedFile.name,
+            error: fileUploadError.message,
+          });
+          continue;
+        }
+
+        // Create invoice row
+        const { error: fileInsertError } = await admin
+          .from("invoices")
+          .insert({
+            id: fileInvoiceId,
+            org_id: orgId,
+            status: "uploaded",
+            file_path: storagePath,
+            file_name: extractedFile.name,
+            file_type: extractedFile.mimeType,
+            file_size_bytes: extractedFile.sizeBytes,
+            file_hash: fileHash,
+            uploaded_by: userId,
+            batch_id: zipBatchId,
+          });
+
+        if (fileInsertError) {
+          logger.error("zip_file_db_insert_failed", {
+            userId, orgId, invoiceId: fileInvoiceId,
+            error: fileInsertError.message,
+          });
+          await admin.storage.from("invoices").remove([storagePath]);
+          continue;
+        }
+
+        invoiceIds.push(fileInvoiceId);
+
+        // Enqueue extraction (fire-and-forget)
+        waitUntil(
+          enqueueExtraction({
+            invoiceId: fileInvoiceId,
+            orgId: orgId!,
+            userId: userId!,
+            filePath: storagePath,
+            fileType: extractedFile.mimeType,
+          }).catch(() => {
+            logger.warn("zip_file_extraction_failed", {
+              userId, orgId, invoiceId: fileInvoiceId,
+            });
+          })
+        );
+      }
+
+      const durationMs = Date.now() - startTime;
+      logger.info("zip_upload_success", {
+        userId, orgId, batchId: zipBatchId,
+        totalFiles: zipResult.files.length + zipResult.skipped.length,
+        processedFiles: invoiceIds.length,
+        skippedFiles: zipResult.skipped.length,
+        durationMs,
+      });
+
+      trackServerEvent(userId!, AnalyticsEvents.INVOICE_UPLOADED, {
+        fileType: "application/zip",
+        fileSizeBytes: fileSize,
+        batchSize: invoiceIds.length,
+      });
+
+      return apiSuccess({
+        batchId: zipBatchId,
+        invoiceIds,
+        totalFiles: zipResult.files.length + zipResult.skipped.length,
+        processedFiles: invoiceIds.length,
+        skippedFiles: zipResult.skipped,
+      });
+    }
+
+    // 4c. Compute file hash for duplicate detection (single-file path)
     const fileHash = createHash("sha256").update(buffer).digest("hex");
 
-    // 4c. Batch size cap enforcement
-    const admin = createAdminClient();
+    // 4d. Batch size cap enforcement
     if (batchId) {
       const { count, error: countError } = await admin
         .from("invoices")
@@ -197,7 +316,7 @@ export async function POST(request: Request) {
       }
     }
 
-    // 4d. Check for file hash duplicates (advisory only, never blocks upload)
+    // 4e. Check for file hash duplicates (advisory only, never blocks upload)
     let duplicateWarning: DuplicateWarning | null = null;
     try {
       const { data: hashMatches } = await admin
