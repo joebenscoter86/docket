@@ -35,11 +35,18 @@ function formatFileSize(bytes: number): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
+function isZipByExtension(name: string): boolean {
+  return name.toLowerCase().endsWith(".zip");
+}
+
 function validateFile(file: File): string | null {
-  if (!ACCEPTED_TYPES.includes(file.type)) {
+  // Some browsers/OSes report empty or unusual MIME types for .zip files.
+  // Fall back to extension check when MIME type is missing or unrecognized.
+  const typeMatch = ACCEPTED_TYPES.includes(file.type) || (!file.type && isZipByExtension(file.name)) || (file.type === "application/octet-stream" && isZipByExtension(file.name));
+  if (!typeMatch) {
     return "Unsupported file type. Please upload a PDF, JPG, PNG, or ZIP.";
   }
-  const isZip = file.type === "application/zip" || file.type === "application/x-zip-compressed";
+  const isZip = file.type === "application/zip" || file.type === "application/x-zip-compressed" || isZipByExtension(file.name);
   const limit = isZip ? MAX_ZIP_SIZE : MAX_FILE_SIZE;
   if (file.size > limit) {
     return isZip ? "Zip file exceeds 50MB limit." : "File exceeds 10MB limit.";
@@ -185,7 +192,7 @@ export default function UploadZone({ onUploadComplete, onUploadStart }: UploadZo
       if (filesToUpload.length === 0) return;
 
       const hasZip = filesToUpload.some(
-        (f) => f.type === "application/zip" || f.type === "application/x-zip-compressed"
+        (f) => f.type === "application/zip" || f.type === "application/x-zip-compressed" || isZipByExtension(f.name)
       );
 
       if ((filesToUpload.length > 1 || hasZip) && onUploadStart) {
