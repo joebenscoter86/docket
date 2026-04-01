@@ -9,6 +9,8 @@ import type {
   SyncLineItem,
   TransactionResult,
 } from "@/lib/accounting";
+import { inferTaxExpenseAccount } from "@/lib/accounting/tax-account-inference";
+import type { AccountOption } from "@/lib/accounting/types";
 import { logger } from "@/lib/utils/logger";
 import type { OutputType, ProviderEntityType } from "@/lib/types/invoice";
 import { OUTPUT_TYPE_TO_PAYMENT_TYPE } from "@/lib/types/invoice";
@@ -73,6 +75,14 @@ export async function processBatchSync(
     batchId,
     invoiceCount: invoices.length,
   });
+
+  // Fetch accounts once for tax GL inference (used across all invoices in batch)
+  let batchAccounts: AccountOption[] = [];
+  try {
+    batchAccounts = await provider.fetchAccounts(adminSupabase, orgId);
+  } catch {
+    // If account fetch fails, tax line items will fall back to first line item's GL
+  }
 
   let i = 0;
   let rateLimitRetryCount = 0;
@@ -142,9 +152,10 @@ export async function processBatchSync(
 
       const batchTaxAmount = Number(extractedData.tax_amount) || 0;
       if (!taxTreatment && batchTaxAmount > 0 && syncLineItems.length > 0) {
+        const inferred = inferTaxExpenseAccount(batchAccounts);
         syncLineItems.push({
           amount: batchTaxAmount,
-          glAccountId: syncLineItems[0].glAccountId,
+          glAccountId: inferred ?? syncLineItems[0].glAccountId,
           description: "Sales Tax",
         });
       }
