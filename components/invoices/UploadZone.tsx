@@ -40,13 +40,13 @@ function isZipByExtension(name: string): boolean {
 }
 
 function validateFile(file: File): string | null {
-  // Some browsers/OSes report empty or unusual MIME types for .zip files.
-  // Fall back to extension check when MIME type is missing or unrecognized.
-  const typeMatch = ACCEPTED_TYPES.includes(file.type) || (!file.type && isZipByExtension(file.name)) || (file.type === "application/octet-stream" && isZipByExtension(file.name));
-  if (!typeMatch) {
+  // For .zip files, always accept regardless of browser-reported MIME type.
+  // macOS drag-and-drop reports inconsistent MIME types for zips.
+  // Server validates by magic bytes anyway.
+  const isZip = isZipByExtension(file.name);
+  if (!isZip && !ACCEPTED_TYPES.includes(file.type)) {
     return "Unsupported file type. Please upload a PDF, JPG, PNG, or ZIP.";
   }
-  const isZip = file.type === "application/zip" || file.type === "application/x-zip-compressed" || isZipByExtension(file.name);
   const limit = isZip ? MAX_ZIP_SIZE : MAX_FILE_SIZE;
   if (file.size > limit) {
     return isZip ? "Zip file exceeds 50MB limit." : "File exceeds 10MB limit.";
