@@ -9,6 +9,7 @@ import {
   AccountingApiError,
 } from "@/lib/accounting";
 import type { CreateBillInput, CreatePurchaseInput, SyncLineItem, TransactionResult, TrackingAssignment } from "@/lib/accounting";
+import { inferTaxExpenseAccount } from "@/lib/accounting/tax-account-inference";
 import { logger } from "@/lib/utils/logger";
 import { trackServerEvent, AnalyticsEvents } from "@/lib/analytics/events";
 import {
@@ -299,13 +300,22 @@ export async function POST(
     );
 
     // When the tax toggle is OFF and the invoice has tax, add it as a
-    // separate "Sales Tax" line item. This is standard bookkeeping for
-    // vendor bills -- the vendor charged tax, we just need the total to match.
+    // separate "Sales Tax" line item with auto-inferred GL account.
     const taxAmount = Number(extractedData.tax_amount) || 0;
     if (!taxTreatment && taxAmount > 0 && syncLineItems.length > 0) {
+      let taxGlAccountId = syncLineItems[0].glAccountId;
+      try {
+        const accounts = await provider.fetchAccounts(adminSupabase, orgId);
+        const inferred = inferTaxExpenseAccount(accounts);
+        if (inferred) {
+          taxGlAccountId = inferred;
+        }
+      } catch {
+        // If account fetch fails, fall back to first line item's GL
+      }
       syncLineItems.push({
         amount: taxAmount,
-        glAccountId: syncLineItems[0].glAccountId,
+        glAccountId: taxGlAccountId,
         description: "Sales Tax",
       });
     }
