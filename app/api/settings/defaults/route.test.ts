@@ -139,14 +139,14 @@ describe("PATCH /api/settings/defaults", () => {
     const res = await PATCH(makePatchRequest({ default_tax_code_id: "3" }));
     expect(res.status).toBe(200);
     const body = await res.json();
-    expect(body.data.updated).toBe(true);
+    expect(body.data.default_tax_code_id).toBe("3");
   });
 
   it("clears default_tax_code_id when null is provided", async () => {
     const res = await PATCH(makePatchRequest({ default_tax_code_id: null }));
     expect(res.status).toBe(200);
     const body = await res.json();
-    expect(body.data.updated).toBe(true);
+    expect(body.data.default_tax_code_id).toBeNull();
   });
 
   it("returns 400 when default_tax_code_id is missing from body", async () => {

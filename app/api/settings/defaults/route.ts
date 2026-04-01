@@ -106,5 +106,5 @@ export async function PATCH(request: Request) {
     status: "success",
   });
 
-  return apiSuccess({ updated: true });
+  return apiSuccess({ default_tax_code_id: taxCodeId });
 }
