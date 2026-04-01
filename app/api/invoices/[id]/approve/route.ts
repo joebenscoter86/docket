@@ -13,10 +13,12 @@ import { logger } from "@/lib/utils/logger";
 import { trackServerEvent, AnalyticsEvents } from "@/lib/analytics/events";
 
 export async function POST(
-  _request: Request,
+  request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id: invoiceId } = await params;
+  const url = new URL(request.url);
+  const wantNext = url.searchParams.get("next") === "true";
   const start = Date.now();
 
   // 1. Auth
@@ -112,6 +114,21 @@ export async function POST(
   // Bust the server component cache so the invoice list shows updated status
   revalidatePath("/invoices");
 
+  // Optionally find the next pending_review invoice in the same org
+  let nextInvoiceId: string | null = null;
+  if (wantNext) {
+    const { data: nextInvoice } = await client
+      .from("invoices")
+      .select("id")
+      .eq("org_id", invoice.org_id)
+      .eq("status", "pending_review")
+      .neq("id", invoiceId)
+      .order("uploaded_at", { ascending: true })
+      .limit(1)
+      .single();
+    nextInvoiceId = nextInvoice?.id ?? null;
+  }
+
   logger.info("invoice.approve.success", {
     invoiceId,
     orgId: invoice.org_id,
@@ -122,5 +139,5 @@ export async function POST(
 
   trackServerEvent(user.id, AnalyticsEvents.INVOICE_APPROVED, { invoiceId });
 
-  return apiSuccess({ status: "approved" });
+  return apiSuccess({ status: "approved", nextInvoiceId });
 }
