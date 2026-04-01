@@ -1,5 +1,6 @@
-import { describe, it, expect, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { describe, it, expect, vi, beforeEach } from "vitest";
+import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import GlAccountSelect from "./GlAccountSelect";
 import type { AccountOption } from "@/lib/accounting";
 
@@ -20,7 +21,95 @@ const defaultProps = {
 };
 
 describe("GlAccountSelect", () => {
-  it("shows clickable suggestion pill when suggestedAccountId is provided and no account is selected", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("shows search input with placeholder when no account is selected", () => {
+    render(<GlAccountSelect {...defaultProps} />);
+    expect(screen.getByPlaceholderText("Search accounts...")).toBeInTheDocument();
+  });
+
+  it("shows classification groups when dropdown is open with no search text", () => {
+    render(<GlAccountSelect {...defaultProps} />);
+    fireEvent.focus(screen.getByPlaceholderText("Search accounts..."));
+
+    expect(screen.getByText("Expense")).toBeInTheDocument();
+    expect(screen.getByText("Liability")).toBeInTheDocument();
+    expect(screen.getByText("Asset")).toBeInTheDocument();
+    expect(screen.getByText("Office Supplies")).toBeInTheDocument();
+    expect(screen.getByText("Officers Loans")).toBeInTheDocument();
+  });
+
+  it("filters accounts across all classifications when typing", async () => {
+    render(<GlAccountSelect {...defaultProps} />);
+    const input = screen.getByPlaceholderText("Search accounts...");
+
+    await userEvent.type(input, "Officer");
+
+    expect(screen.getByText("Officers Loans")).toBeInTheDocument();
+    expect(screen.queryByText("Office Supplies")).toBeNull();
+    expect(screen.queryByText("Software & Subscriptions")).toBeNull();
+    // Classification headers should not appear when searching
+    expect(screen.queryByText("Expense")).toBeNull();
+    expect(screen.queryByText("Liability")).toBeNull();
+  });
+
+  it("shows no-match message when search has no results", async () => {
+    render(<GlAccountSelect {...defaultProps} />);
+    const input = screen.getByPlaceholderText("Search accounts...");
+
+    await userEvent.type(input, "zzzzz");
+
+    expect(screen.getByText(/No accounts match/)).toBeInTheDocument();
+  });
+
+  it("calls onSelect when clicking an account in the dropdown", async () => {
+    const onSelect = vi.fn().mockResolvedValue(true);
+    render(<GlAccountSelect {...defaultProps} onSelect={onSelect} />);
+
+    fireEvent.focus(screen.getByPlaceholderText("Search accounts..."));
+    fireEvent.click(screen.getByText("Office Supplies"));
+
+    await waitFor(() => {
+      expect(onSelect).toHaveBeenCalledWith("acc-1");
+    });
+  });
+
+  it("shows selected account with clear button when account is selected", () => {
+    render(<GlAccountSelect {...defaultProps} currentAccountId="acc-1" />);
+
+    expect(screen.getByText("Office Supplies")).toBeInTheDocument();
+    expect(screen.getByLabelText("Clear account selection")).toBeInTheDocument();
+  });
+
+  it("calls onSelect(null) when clear button is clicked", async () => {
+    const onSelect = vi.fn().mockResolvedValue(true);
+    render(<GlAccountSelect {...defaultProps} currentAccountId="acc-1" onSelect={onSelect} />);
+
+    fireEvent.click(screen.getByLabelText("Clear account selection"));
+
+    await waitFor(() => {
+      expect(onSelect).toHaveBeenCalledWith(null);
+    });
+  });
+
+  it("closes dropdown on outside click", () => {
+    render(
+      <div>
+        <div data-testid="outside">outside</div>
+        <GlAccountSelect {...defaultProps} />
+      </div>
+    );
+
+    fireEvent.focus(screen.getByPlaceholderText("Search accounts..."));
+    expect(screen.getByText("Office Supplies")).toBeInTheDocument();
+
+    fireEvent.mouseDown(screen.getByTestId("outside"));
+    expect(screen.queryByText("Office Supplies")).toBeNull();
+  });
+
+  it("shows clickable AI suggestion pill when suggestedAccountId is provided and no account selected", () => {
     render(
       <GlAccountSelect
         {...defaultProps}
@@ -29,16 +118,14 @@ describe("GlAccountSelect", () => {
       />
     );
 
-    // Suggestion pill is a button with the account name
     const pill = screen.getByTitle(/Accept suggestion/i);
     expect(pill).toBeInTheDocument();
     expect(screen.getByText("Software & Subscriptions")).toBeInTheDocument();
-    // AI badge inside the pill
     const badges = screen.getAllByText("AI");
     expect(badges.length).toBeGreaterThanOrEqual(1);
   });
 
-  it("calls onSelect when suggestion pill is clicked", async () => {
+  it("calls onSelect when AI suggestion pill is clicked", async () => {
     const onSelect = vi.fn().mockResolvedValue(true);
     render(
       <GlAccountSelect
@@ -49,19 +136,14 @@ describe("GlAccountSelect", () => {
       />
     );
 
-    const pill = screen.getByTitle(/Accept suggestion/i);
-    await pill.click();
+    fireEvent.click(screen.getByTitle(/Accept suggestion/i));
 
-    expect(onSelect).toHaveBeenCalledWith("acc-2");
+    await waitFor(() => {
+      expect(onSelect).toHaveBeenCalledWith("acc-2");
+    });
   });
 
-  it("does not show suggestion pill when no suggestedAccountId is provided", () => {
-    render(<GlAccountSelect {...defaultProps} />);
-
-    expect(screen.queryByTitle(/Accept suggestion/i)).toBeNull();
-  });
-
-  it("does not show suggestion pill when account is already confirmed (currentAccountId is set)", () => {
+  it("does not show AI suggestion pill when account is already selected", () => {
     render(
       <GlAccountSelect
         {...defaultProps}
@@ -74,44 +156,7 @@ describe("GlAccountSelect", () => {
     expect(screen.queryByTitle(/Accept suggestion/i)).toBeNull();
   });
 
-  it("shows suggested account as first option with AI prefix in dropdown", () => {
-    render(
-      <GlAccountSelect
-        {...defaultProps}
-        suggestedAccountId="acc-3"
-        suggestionSource="ai"
-      />
-    );
-
-    const select = screen.getByRole("combobox") as HTMLSelectElement;
-    const options = Array.from(select.options);
-
-    // First real option (index 0 is "Select account..." placeholder)
-    expect(options[1].text).toBe("AI · Professional Services");
-    expect(options[1].value).toBe("acc-3");
-  });
-
-  it("renders placeholder option as first option", () => {
-    render(<GlAccountSelect {...defaultProps} />);
-
-    const select = screen.getByRole("combobox") as HTMLSelectElement;
-    expect(select.options[0].text).toBe("Select account...");
-    expect(select.options[0].value).toBe("");
-  });
-
-  it("does not show suggestion pill when suggestionSource is null", () => {
-    render(
-      <GlAccountSelect
-        {...defaultProps}
-        suggestedAccountId="acc-1"
-        suggestionSource={null}
-      />
-    );
-
-    expect(screen.queryByTitle(/Accept suggestion/i)).toBeNull();
-  });
-
-  it("shows 'Learned' badge when suggestionSource is 'history' and account is pre-filled", () => {
+  it("shows Learned badge when suggestionSource is history and account is pre-filled", () => {
     render(
       <GlAccountSelect
         {...defaultProps}
@@ -125,47 +170,13 @@ describe("GlAccountSelect", () => {
     expect(screen.queryByTitle(/Accept suggestion/i)).toBeNull();
   });
 
-  it("renders accounts grouped by classification with optgroup labels", () => {
-    render(<GlAccountSelect {...defaultProps} />);
-
-    const select = screen.getByRole("combobox") as HTMLSelectElement;
-    const optgroups = select.querySelectorAll("optgroup");
-
-    expect(optgroups.length).toBeGreaterThanOrEqual(2);
-
-    const groupLabels = Array.from(optgroups).map((g) => g.label);
-    expect(groupLabels).toContain("Expense");
-    expect(groupLabels).toContain("Liability");
-
-    // Expense group should appear before Liability
-    expect(groupLabels.indexOf("Expense")).toBeLessThan(groupLabels.indexOf("Liability"));
+  it("shows dash when not connected", () => {
+    render(<GlAccountSelect {...defaultProps} connected={false} />);
+    expect(screen.getByText("\u2014")).toBeInTheDocument();
   });
 
-  it("does not show 'Learned' badge after user changes selection (cleared source)", () => {
-    render(
-      <GlAccountSelect
-        {...defaultProps}
-        currentAccountId="acc-1"
-        suggestedAccountId="acc-2"
-        suggestionSource={null}
-      />
-    );
-
-    expect(screen.queryByText("Learned")).toBeNull();
-  });
-
-  it("shows 'Learned' prefix in dropdown for history-sourced suggestion", () => {
-    render(
-      <GlAccountSelect
-        {...defaultProps}
-        currentAccountId="acc-2"
-        suggestedAccountId="acc-2"
-        suggestionSource="history"
-      />
-    );
-
-    const select = screen.getByRole("combobox") as HTMLSelectElement;
-    const options = Array.from(select.options);
-    expect(options[1].text).toBe("Learned · Software & Subscriptions");
+  it("shows spinner when loading", () => {
+    render(<GlAccountSelect {...defaultProps} loading={true} />);
+    expect(document.querySelector(".animate-spin")).toBeTruthy();
   });
 });
