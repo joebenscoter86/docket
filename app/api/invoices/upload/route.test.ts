@@ -67,6 +67,12 @@ vi.mock("@/lib/upload/validate", () => ({
     detectedType: "application/pdf",
   })),
   validateFileSize: vi.fn(() => true),
+  isZipFile: vi.fn(() => false),
+  MAX_ZIP_SIZE: 50 * 1024 * 1024,
+}));
+
+vi.mock("@/lib/upload/zip", () => ({
+  extractZipFiles: vi.fn(),
 }));
 
 const mockEnqueueExtraction = vi.fn();

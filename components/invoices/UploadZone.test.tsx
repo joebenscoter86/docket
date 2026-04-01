@@ -83,7 +83,7 @@ describe("UploadZone", () => {
       expect(screen.getByText("doc.docx")).toBeInTheDocument();
       expect(
         screen.getByText(
-          "Unsupported file type. Please upload a PDF, JPG, or PNG."
+          "Unsupported file type. Please upload a PDF, JPG, PNG, or ZIP."
         )
       ).toBeInTheDocument();
     });
@@ -441,7 +441,7 @@ describe("UploadZone", () => {
       expect(screen.getByText("doc.docx")).toBeInTheDocument();
       expect(
         screen.getByText(
-          "Unsupported file type. Please upload a PDF, JPG, or PNG."
+          "Unsupported file type. Please upload a PDF, JPG, PNG, or ZIP."
         )
       ).toBeInTheDocument();
     });
