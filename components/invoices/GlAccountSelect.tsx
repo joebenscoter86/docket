@@ -136,7 +136,7 @@ export default function GlAccountSelect({
     );
   }
 
-  const showSuggestion = suggestedAccountId && !selectedId && suggestionSource;
+  const showSuggestion = suggestedAccountId && !selectedId && suggestionSource === "ai";
   const suggestedAccount = showSuggestion
     ? accounts.find((a) => a.value === suggestedAccountId)
     : null;
