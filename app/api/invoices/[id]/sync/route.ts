@@ -9,7 +9,6 @@ import {
   AccountingApiError,
 } from "@/lib/accounting";
 import type { CreateBillInput, CreatePurchaseInput, SyncLineItem, TransactionResult, TrackingAssignment } from "@/lib/accounting";
-import { inferTaxExpenseAccount } from "@/lib/accounting/tax-account-inference";
 import { logger } from "@/lib/utils/logger";
 import { trackServerEvent, AnalyticsEvents } from "@/lib/analytics/events";
 import {
@@ -285,10 +284,6 @@ export async function POST(
     }
 
     // 9. Create transaction via provider abstraction
-    const taxTreatment = (invoice.tax_treatment === "exclusive" || invoice.tax_treatment === "inclusive" || invoice.tax_treatment === "no_tax")
-      ? invoice.tax_treatment
-      : undefined;
-
     const syncLineItems: SyncLineItem[] = lineItems.map(
       (li: { amount: number; gl_account_id: string; description: string | null; tracking: TrackingAssignment[] | null; tax_code_id: string | null }) => ({
         amount: Number(li.amount),
@@ -299,37 +294,12 @@ export async function POST(
       })
     );
 
-    // When the tax toggle is OFF and the invoice has tax, add it as a
-    // separate "Sales Tax" line item with auto-inferred GL account.
-    // Skip if the user already added a "Sales Tax" line item manually.
-    const taxAmount = Number(extractedData.tax_amount) || 0;
-    const hasSalesTaxLine = syncLineItems.some(
-      (li) => li.description?.toLowerCase().includes("sales tax")
-    );
-    if (!taxTreatment && taxAmount > 0 && syncLineItems.length > 0 && !hasSalesTaxLine) {
-      let taxGlAccountId = syncLineItems[0].glAccountId;
-      try {
-        const accounts = await provider.fetchAccounts(adminSupabase, orgId);
-        const inferred = inferTaxExpenseAccount(accounts);
-        if (inferred) {
-          taxGlAccountId = inferred;
-        }
-      } catch (err) {
-        logger.warn("accounting.tax_gl_inference_failed", {
-          invoiceId,
-          orgId,
-          error: err instanceof Error ? err.message : "Unknown error",
-        });
-      }
-      syncLineItems.push({
-        amount: taxAmount,
-        glAccountId: taxGlAccountId,
-        description: "Sales Tax",
-      });
-    }
-
     let result: TransactionResult;
     let requestInput: unknown;
+
+    const taxTreatment = (invoice.tax_treatment === "exclusive" || invoice.tax_treatment === "inclusive" || invoice.tax_treatment === "no_tax")
+      ? invoice.tax_treatment
+      : undefined;
 
     try {
       if (isBill) {

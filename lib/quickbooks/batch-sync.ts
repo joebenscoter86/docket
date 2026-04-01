@@ -9,8 +9,6 @@ import type {
   SyncLineItem,
   TransactionResult,
 } from "@/lib/accounting";
-import { inferTaxExpenseAccount } from "@/lib/accounting/tax-account-inference";
-import type { AccountOption } from "@/lib/accounting/types";
 import { logger } from "@/lib/utils/logger";
 import type { OutputType, ProviderEntityType } from "@/lib/types/invoice";
 import { OUTPUT_TYPE_TO_PAYMENT_TYPE } from "@/lib/types/invoice";
@@ -76,18 +74,6 @@ export async function processBatchSync(
     invoiceCount: invoices.length,
   });
 
-  // Fetch accounts once for tax GL inference (used across all invoices in batch)
-  let batchAccounts: AccountOption[] = [];
-  try {
-    batchAccounts = await provider.fetchAccounts(adminSupabase, orgId);
-  } catch (err) {
-    logger.warn("batch_sync.tax_gl_inference_failed", {
-      orgId,
-      batchId,
-      error: err instanceof Error ? err.message : "Unknown error",
-    });
-  }
-
   let i = 0;
   let rateLimitRetryCount = 0;
 
@@ -141,10 +127,6 @@ export async function processBatchSync(
         .order("sort_order", { ascending: true });
 
       // 4. Create bill or purchase via provider abstraction
-      const taxTreatment = (invoice.tax_treatment === "exclusive" || invoice.tax_treatment === "inclusive" || invoice.tax_treatment === "no_tax")
-        ? invoice.tax_treatment
-        : undefined;
-
       const syncLineItems: SyncLineItem[] = (lineItems ?? []).map(
         (li: { amount: number; gl_account_id: string; description: string | null; tax_code_id: string | null }) => ({
           amount: Number(li.amount),
@@ -154,21 +136,12 @@ export async function processBatchSync(
         })
       );
 
-      const batchTaxAmount = Number(extractedData.tax_amount) || 0;
-      const hasSalesTaxLine = syncLineItems.some(
-        (li) => li.description?.toLowerCase().includes("sales tax")
-      );
-      if (!taxTreatment && batchTaxAmount > 0 && syncLineItems.length > 0 && !hasSalesTaxLine) {
-        const inferred = inferTaxExpenseAccount(batchAccounts);
-        syncLineItems.push({
-          amount: batchTaxAmount,
-          glAccountId: inferred ?? syncLineItems[0].glAccountId,
-          description: "Sales Tax",
-        });
-      }
-
       let result: TransactionResult;
       let requestInput: unknown;
+
+      const taxTreatment = (invoice.tax_treatment === "exclusive" || invoice.tax_treatment === "inclusive" || invoice.tax_treatment === "no_tax")
+        ? invoice.tax_treatment
+        : undefined;
 
       if (isBill) {
         const xeroStatus = (invoice.xero_bill_status === "DRAFT" || invoice.xero_bill_status === "AUTHORISED")

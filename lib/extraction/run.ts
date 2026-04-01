@@ -13,8 +13,6 @@ import {
 } from "@/lib/email/triggers";
 import type { ExtractionResult, ExtractionContext } from "./types";
 import { isRetryableError, toUserFriendlyError } from "./errors";
-import { inferTaxExpenseAccount } from "@/lib/accounting/tax-account-inference";
-import type { AccountOption } from "@/lib/accounting/types";
 
 // Minimum resolution for image extraction accuracy.
 // Images below this threshold on their shortest side get upscaled.
@@ -117,6 +115,7 @@ export async function runExtraction(params: {
           currency: "USD",
           paymentTerms: null,
           confidenceScore: "low",
+          taxTreatment: "exclusive",
           lineItems: [],
         },
         rawResponse: {},
@@ -157,14 +156,12 @@ export async function runExtraction(params: {
     // If no QBO connection exists, it throws — the catch block handles it gracefully.
     let accountContext: ExtractionContext | undefined;
     let validAccountIds: Set<string> | undefined;
-    let allAccountOptions: AccountOption[] = [];
     try {
       const providerType = await getOrgProvider(admin, orgId);
       let accounts: Array<{ id: string; name: string }> = [];
       if (providerType) {
         const provider = getAccountingProvider(providerType);
         const accountOptions = await provider.fetchAccounts(admin, orgId);
-        allAccountOptions = accountOptions;
         // AI inference is scoped to Expense accounts only.
         // Full account list is available in the dropdown for manual override.
         const expenseAccounts = accountOptions.filter((a) => a.classification === "Expense");
@@ -326,37 +323,6 @@ export async function runExtraction(params: {
         throw new Error(
           "Failed to store line items: " + lineItemError.message
         );
-      }
-    }
-
-    // 7.5. Add "Sales Tax" line item when tax_amount > 0
-    // This makes tax visible and editable in the review UI with an auto-inferred GL account.
-    const taxAmount = result.data.taxAmount;
-    if (taxAmount != null && taxAmount > 0) {
-      const taxGlAccountId = inferTaxExpenseAccount(allAccountOptions);
-      const nextSortOrder = result.data.lineItems.length;
-      const { error: taxLineError } = await admin
-        .from("extracted_line_items")
-        .insert({
-          extracted_data_id: extractedRow.id,
-          description: "Sales Tax",
-          quantity: 1,
-          unit_price: taxAmount,
-          amount: taxAmount,
-          gl_account_id: taxGlAccountId,
-          suggested_gl_account_id: taxGlAccountId,
-          gl_suggestion_source: taxGlAccountId ? "auto" : null,
-          is_user_confirmed: false,
-          sort_order: nextSortOrder,
-        });
-
-      if (taxLineError) {
-        logger.warn("extraction_tax_line_insert_failed", {
-          action: "run_extraction",
-          invoiceId,
-          orgId,
-          error: taxLineError.message,
-        });
       }
     }
 
