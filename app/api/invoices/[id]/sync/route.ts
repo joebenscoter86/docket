@@ -301,8 +301,12 @@ export async function POST(
 
     // When the tax toggle is OFF and the invoice has tax, add it as a
     // separate "Sales Tax" line item with auto-inferred GL account.
+    // Skip if the user already added a "Sales Tax" line item manually.
     const taxAmount = Number(extractedData.tax_amount) || 0;
-    if (!taxTreatment && taxAmount > 0 && syncLineItems.length > 0) {
+    const hasSalesTaxLine = syncLineItems.some(
+      (li) => li.description?.toLowerCase().includes("sales tax")
+    );
+    if (!taxTreatment && taxAmount > 0 && syncLineItems.length > 0 && !hasSalesTaxLine) {
       let taxGlAccountId = syncLineItems[0].glAccountId;
       try {
         const accounts = await provider.fetchAccounts(adminSupabase, orgId);
@@ -310,8 +314,12 @@ export async function POST(
         if (inferred) {
           taxGlAccountId = inferred;
         }
-      } catch {
-        // If account fetch fails, fall back to first line item's GL
+      } catch (err) {
+        logger.warn("accounting.tax_gl_inference_failed", {
+          invoiceId,
+          orgId,
+          error: err instanceof Error ? err.message : "Unknown error",
+        });
       }
       syncLineItems.push({
         amount: taxAmount,

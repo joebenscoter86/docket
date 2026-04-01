@@ -12,7 +12,7 @@ import type { AccountOption } from "./types";
  */
 export function inferTaxExpenseAccount(accounts: AccountOption[]): string | null {
   const expenseAccounts = accounts.filter(
-    (a) => a.classification === "Expense"
+    (a) => a.classification.toLowerCase() === "expense"
   );
 
   // Priority 1: Xero default

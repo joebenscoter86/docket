@@ -80,8 +80,12 @@ export async function processBatchSync(
   let batchAccounts: AccountOption[] = [];
   try {
     batchAccounts = await provider.fetchAccounts(adminSupabase, orgId);
-  } catch {
-    // If account fetch fails, tax line items will fall back to first line item's GL
+  } catch (err) {
+    logger.warn("batch_sync.tax_gl_inference_failed", {
+      orgId,
+      batchId,
+      error: err instanceof Error ? err.message : "Unknown error",
+    });
   }
 
   let i = 0;
@@ -151,7 +155,10 @@ export async function processBatchSync(
       );
 
       const batchTaxAmount = Number(extractedData.tax_amount) || 0;
-      if (!taxTreatment && batchTaxAmount > 0 && syncLineItems.length > 0) {
+      const hasSalesTaxLine = syncLineItems.some(
+        (li) => li.description?.toLowerCase().includes("sales tax")
+      );
+      if (!taxTreatment && batchTaxAmount > 0 && syncLineItems.length > 0 && !hasSalesTaxLine) {
         const inferred = inferTaxExpenseAccount(batchAccounts);
         syncLineItems.push({
           amount: batchTaxAmount,

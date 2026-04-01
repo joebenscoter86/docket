@@ -183,8 +183,6 @@ export interface XeroInvoicePayload {
   CurrencyCode?: string;
   Status?: "DRAFT" | "SUBMITTED" | "AUTHORISED";
   LineAmountTypes?: "Exclusive" | "Inclusive" | "NoTax";
-  SubTotal?: number;
-  TotalTax?: number;
 }
 
 /** A Xero Invoice as returned by the API. */
@@ -237,7 +235,6 @@ export interface XeroBankTransactionPayload {
   Reference?: string;
   Status?: "AUTHORISED" | "DRAFT";
   LineAmountTypes?: "Exclusive" | "Inclusive" | "NoTax";
-  TotalTax?: number;
 }
 
 /** A Xero Bank Transaction as returned by the API. */
