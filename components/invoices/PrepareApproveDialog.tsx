@@ -83,8 +83,8 @@ export default function PrepareApproveDialog({
   const approveCount = preview.willApprove - declinedCount;
 
   // Count that will be sync-ready after auto-actions
-  const syncReadyAfter =
-    preview.fullyReady + preview.vendorAutoMatchable + selectedVendorCreates.length;
+  // fullyReady already includes invoices with auto-matchable vendors (no manual review needed)
+  const syncReadyAfter = preview.fullyReady + selectedVendorCreates.length;
 
   // Other manual review items (non-vendor issues like missing GL)
   const nonVendorManualReview = preview.needsManualReview.filter(

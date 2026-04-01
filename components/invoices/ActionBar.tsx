@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef, useCallback, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import type { InvoiceStatus, OutputType } from "@/lib/types/invoice";
 import { getTransactionUrl, getProviderLabel } from "@/lib/accounting/links";
 import type { AccountingProviderType } from "@/lib/accounting/types";
@@ -36,6 +37,7 @@ export default function ActionBar({
   provider,
   onStatusChange,
 }: ActionBarProps) {
+  const router = useRouter();
   const [barState, setBarState] = useState<ActionBarState>("idle");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [warning, setWarning] = useState<string | null>(null);
@@ -112,6 +114,51 @@ export default function ActionBar({
       }, 5000);
     }
   }, [canApprove, invoiceId, onStatusChange]);
+
+  // --- Approve & Next handler ---
+  const handleApproveAndNext = useCallback(async () => {
+    if (!canApprove) return;
+
+    // Blur active element to trigger pending auto-saves
+    if (document.activeElement instanceof HTMLElement) {
+      document.activeElement.blur();
+    }
+    await new Promise((resolve) => setTimeout(resolve, 500));
+
+    setBarState("approving");
+    setErrorMessage(null);
+
+    try {
+      const res = await fetch(`/api/invoices/${invoiceId}/approve?next=true`, {
+        method: "POST",
+      });
+
+      if (!res.ok) {
+        const body = await res.json();
+        throw new Error(body.error ?? "Failed to approve invoice");
+      }
+
+      const body = await res.json();
+      const nextId = body.data?.nextInvoiceId;
+
+      if (nextId) {
+        router.push(`/invoices/${nextId}/review`);
+      } else {
+        // No more pending invoices -- fall back to normal approve behavior
+        setBarState("approved");
+        approvedTimer.current = setTimeout(() => {
+          onStatusChange("approved");
+        }, 500);
+      }
+    } catch (err) {
+      setBarState("idle");
+      const message = err instanceof Error ? err.message : "Failed to approve invoice";
+      setErrorMessage(message);
+      errorTimer.current = setTimeout(() => {
+        setErrorMessage(null);
+      }, 5000);
+    }
+  }, [canApprove, invoiceId, onStatusChange, router]);
 
   // --- Sync handler (fires immediately) ---
   const handleSync = useCallback(async () => {
@@ -218,16 +265,30 @@ export default function ActionBar({
             </>
           )}
         </div>
-        <button
-          type="button"
-          onClick={handleApprove}
-          disabled={btn.disabled}
-          className={`${btn.className} px-6 py-2.5 rounded-md font-medium text-sm shrink-0 flex items-center gap-2 transition-colors`}
-        >
-          {barState === "approving" && <SpinnerIcon />}
-          {barState === "approved" && <CheckIcon />}
-          {btn.label}
-        </button>
+        <div className="flex items-center gap-2 shrink-0">
+          <button
+            type="button"
+            onClick={handleApprove}
+            disabled={btn.disabled}
+            className={`${btn.className} px-6 py-2.5 rounded-md font-medium text-sm flex items-center gap-2 transition-colors`}
+          >
+            {barState === "approving" && <SpinnerIcon />}
+            {barState === "approved" && <CheckIcon />}
+            {btn.label}
+          </button>
+          {barState === "idle" && canApprove && (
+            <button
+              type="button"
+              onClick={handleApproveAndNext}
+              className="border border-primary text-primary hover:bg-primary/5 px-4 py-2.5 rounded-md font-medium text-sm flex items-center gap-1.5 transition-colors"
+            >
+              Approve & Next
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="h-3.5 w-3.5">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
+              </svg>
+            </button>
+          )}
+        </div>
       </div>
     );
   }

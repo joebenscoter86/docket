@@ -2,7 +2,14 @@ import { render, screen, fireEvent, act } from "@testing-library/react";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import ActionBar from "./ActionBar";
 
+// Mock next/navigation
+const mockPush = vi.fn();
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({ push: mockPush }),
+}));
+
 beforeEach(() => {
+  mockPush.mockClear();
   vi.useFakeTimers();
   vi.stubGlobal(
     "fetch",
@@ -98,6 +105,72 @@ describe("ActionBar — approve phase (pending_review)", () => {
 
     // Button returns to idle (approve button visible again)
     expect(screen.getByText("Approve Invoice")).toBeTruthy();
+  });
+
+  it("renders Approve & Next button when canApprove is true", () => {
+    render(<ActionBar {...baseProps} />);
+    expect(screen.getByText("Approve & Next")).toBeTruthy();
+  });
+
+  it("hides Approve & Next button when canApprove is false", () => {
+    render(<ActionBar {...baseProps} vendorName="" />);
+    expect(screen.queryByText("Approve & Next")).toBeNull();
+  });
+
+  it("Approve & Next navigates to next invoice when available", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(() =>
+        Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve({ data: { status: "approved", nextInvoiceId: "inv-2" } }),
+        })
+      )
+    );
+
+    render(<ActionBar {...baseProps} />);
+
+    fireEvent.click(screen.getByText("Approve & Next"));
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(500);
+    });
+
+    expect(global.fetch).toHaveBeenCalledWith(
+      "/api/invoices/inv-1/approve?next=true",
+      { method: "POST" }
+    );
+    expect(mockPush).toHaveBeenCalledWith("/invoices/inv-2/review");
+  });
+
+  it("Approve & Next falls back to normal approve when no next invoice", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(() =>
+        Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve({ data: { status: "approved", nextInvoiceId: null } }),
+        })
+      )
+    );
+
+    const onStatusChange = vi.fn();
+    render(<ActionBar {...baseProps} onStatusChange={onStatusChange} />);
+
+    fireEvent.click(screen.getByText("Approve & Next"));
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(500);
+    });
+
+    expect(mockPush).not.toHaveBeenCalled();
+
+    // Advance past approved flash
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(500);
+    });
+
+    expect(onStatusChange).toHaveBeenCalledWith("approved");
   });
 });
 
