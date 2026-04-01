@@ -251,9 +251,14 @@ export default function UploadQueue({ files, onComplete }: UploadQueueProps) {
           return;
         }
 
+        // Zip uploads return invoiceIds (array), single files return invoiceId
+        const primaryInvoiceId = body.data.invoiceIds
+          ? body.data.invoiceIds[0]
+          : body.data.invoiceId;
+
         updateEntry(entry.id, {
           status: "uploaded",
-          invoiceId: body.data.invoiceId,
+          invoiceId: primaryInvoiceId,
         });
       } catch {
         updateEntry(entry.id, {
@@ -296,9 +301,12 @@ export default function UploadQueue({ files, onComplete }: UploadQueueProps) {
             });
             return;
           }
+          const primaryId = body.data.invoiceIds
+            ? body.data.invoiceIds[0]
+            : body.data.invoiceId;
           updateEntry(entryId, {
             status: "uploaded",
-            invoiceId: body.data.invoiceId,
+            invoiceId: primaryId,
           });
         })
         .catch(() => {
