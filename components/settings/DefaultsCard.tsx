@@ -29,18 +29,26 @@ export function DefaultsCard({ initialDefaultTaxCodeId }: DefaultsCardProps) {
   }, []);
 
   async function handleChange(value: string) {
+    const previousValue = selectedValue;
     setSelectedValue(value);
     setSaveState("saving");
 
     try {
-      await fetch("/api/settings/defaults", {
+      const res = await fetch("/api/settings/defaults", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ default_tax_code_id: value || null }),
       });
-      setSaveState("saved");
-      setTimeout(() => setSaveState("idle"), 2000);
+
+      if (res.ok) {
+        setSaveState("saved");
+        setTimeout(() => setSaveState("idle"), 2000);
+      } else {
+        setSelectedValue(previousValue);
+        setSaveState("idle");
+      }
     } catch {
+      setSelectedValue(previousValue);
       setSaveState("idle");
     }
   }
