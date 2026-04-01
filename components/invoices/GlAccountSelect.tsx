@@ -263,15 +263,7 @@ export default function GlAccountSelect({
       {suggestedAccount && showSuggestion && (
         <button
           type="button"
-          onClick={async () => {
-            setSaveStatus("saving");
-            const ok = await onSelect(suggestedAccountId!);
-            setSaveStatus(ok ? "saved" : "error");
-            if (ok) {
-              if (savedTimer.current) clearTimeout(savedTimer.current);
-              savedTimer.current = setTimeout(() => setSaveStatus("idle"), 2000);
-            }
-          }}
+          onClick={() => handleSelect(suggestedAccountId!)}
           disabled={disabled || saveStatus === "saving"}
           className="group flex items-center gap-1.5 px-2 py-1 rounded-md bg-blue-50 border border-blue-200 hover:bg-blue-100 hover:border-blue-300 transition-colors text-xs text-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
           title={`Accept suggestion: ${suggestedAccount.label}`}
