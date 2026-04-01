@@ -122,6 +122,10 @@ export default function ExtractionForm({
   );
   const taxEnabled = taxTreatment !== null;
   const [taxTreatmentSaving, setTaxTreatmentSaving] = useState(false);
+  const [pendingTaxTreatment, setPendingTaxTreatment] = useState<"exclusive" | "inclusive" | "no_tax" | null>(null);
+  const [showTaxConfirmDialog, setShowTaxConfirmDialog] = useState(false);
+
+  const hasTaxAmount = Number(state.values.tax_amount) > 0;
 
   const handleVendorSelect = useCallback(
     async (vendorRefValue: string | null): Promise<boolean> => {
@@ -757,7 +761,14 @@ export default function ExtractionForm({
                 type="button"
                 role="switch"
                 aria-checked={taxEnabled}
-                onClick={() => handleTaxTreatmentChange(taxEnabled ? null : "exclusive")}
+                onClick={() => {
+                  if (!taxEnabled && hasTaxAmount) {
+                    setPendingTaxTreatment("exclusive");
+                    setShowTaxConfirmDialog(true);
+                  } else {
+                    handleTaxTreatmentChange(taxEnabled ? null : "exclusive");
+                  }
+                }}
                 className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${taxEnabled ? "bg-primary" : "bg-gray-300"}`}
               >
                 <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${taxEnabled ? "translate-x-6" : "translate-x-1"}`} />
@@ -815,6 +826,43 @@ export default function ExtractionForm({
             invoiceStatus={currentStatus}
           />
         </>
+      )}
+
+      {/* Tax treatment confirmation dialog */}
+      {showTaxConfirmDialog && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+          <div className="bg-white rounded-brand-md shadow-lg p-6 max-w-sm mx-4">
+            <h3 className="text-base font-semibold text-text">Change tax treatment?</h3>
+            <p className="text-sm text-muted mt-2">
+              This will remove the Sales Tax line item. Tax will be calculated from the tax codes on each line item instead.
+            </p>
+            <div className="flex justify-end gap-2 mt-4">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowTaxConfirmDialog(false);
+                  setPendingTaxTreatment(null);
+                }}
+                className="px-4 py-2 text-sm font-medium text-text border border-border rounded-md hover:bg-background"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowTaxConfirmDialog(false);
+                  if (pendingTaxTreatment) {
+                    handleTaxTreatmentChange(pendingTaxTreatment);
+                  }
+                  setPendingTaxTreatment(null);
+                }}
+                className="px-4 py-2 text-sm font-medium text-white bg-primary rounded-md hover:bg-primary/90"
+              >
+                Change
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
