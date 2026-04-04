@@ -6,7 +6,7 @@ import type { InvoiceStatus } from "@/lib/types/invoice";
 const STATUSES: { status: InvoiceStatus; label: string }[] = [
   { status: "uploading", label: "Uploading" },
   { status: "extracting", label: "Extracting" },
-  { status: "pending_review", label: "Pending Review" },
+  { status: "pending_review", label: "Review" },
   { status: "approved", label: "Approved" },
   { status: "synced", label: "Synced" },
   { status: "error", label: "Error" },
@@ -18,43 +18,42 @@ describe("InvoiceStatusBadge", () => {
     expect(screen.getByText(label)).toBeDefined();
   });
 
-  it("extracting status has a pulsing dot with animate-ping class", () => {
+  it("extracting status has a pulsing dot with animate-pulse class", () => {
     const { container } = render(<InvoiceStatusBadge status="extracting" />);
-    const pingEl = container.querySelector(".animate-ping");
-    expect(pingEl).not.toBeNull();
+    const pulseEl = container.querySelector(".animate-pulse");
+    expect(pulseEl).not.toBeNull();
   });
 
-  it("non-extracting statuses do not have animate-ping class", () => {
-    const nonPingStatuses: InvoiceStatus[] = [
-      "uploading",
+  it("non-animated statuses do not have an animated dot", () => {
+    const staticStatuses: InvoiceStatus[] = [
       "pending_review",
       "approved",
       "synced",
       "error",
     ];
-    for (const status of nonPingStatuses) {
+    for (const status of staticStatuses) {
       const { container } = render(<InvoiceStatusBadge status={status} />);
-      const pingEl = container.querySelector(".animate-ping");
-      expect(pingEl, `Expected no animate-ping for status: ${status}`).toBeNull();
+      const animatedEl = container.querySelector(".animate-pulse, .animate-ping");
+      expect(animatedEl, `Expected no animated dot for status: ${status}`).toBeNull();
     }
   });
 
   it("synced status has green background", () => {
     const { container } = render(<InvoiceStatusBadge status="synced" />);
     const pill = container.firstChild as HTMLElement;
-    expect(pill.className).toContain("bg-[#D1FAE5]");
+    expect(pill.className).toContain("bg-[#ECFDF5]");
   });
 
   it("error status has red background", () => {
     const { container } = render(<InvoiceStatusBadge status="error" />);
     const pill = container.firstChild as HTMLElement;
-    expect(pill.className).toContain("bg-[#FEE2E2]");
+    expect(pill.className).toContain("bg-[#FEF2F2]");
   });
 
-  it("pending_review status has amber background", () => {
+  it("pending_review status has orange background", () => {
     const { container } = render(<InvoiceStatusBadge status="pending_review" />);
     const pill = container.firstChild as HTMLElement;
-    expect(pill.className).toContain("bg-[#FEF3C7]");
+    expect(pill.className).toContain("bg-[#FFF7ED]");
   });
 
   it("extracting status has purple background", () => {
@@ -66,12 +65,20 @@ describe("InvoiceStatusBadge", () => {
   it("approved status has blue background", () => {
     const { container } = render(<InvoiceStatusBadge status="approved" />);
     const pill = container.firstChild as HTMLElement;
-    expect(pill.className).toContain("bg-[#DBEAFE]");
+    expect(pill.className).toContain("bg-[#EFF6FF]");
   });
 
-  it("uploading status has amber background", () => {
+  it("uploading status has orange background", () => {
     const { container } = render(<InvoiceStatusBadge status="uploading" />);
     const pill = container.firstChild as HTMLElement;
-    expect(pill.className).toContain("bg-[#FEF3C7]");
+    expect(pill.className).toContain("bg-[#FFF7ED]");
+  });
+
+  it("badge uses rounded-lg and font-semibold", () => {
+    const { container } = render(<InvoiceStatusBadge status="approved" />);
+    const pill = container.firstChild as HTMLElement;
+    expect(pill.className).toContain("rounded-lg");
+    expect(pill.className).toContain("font-semibold");
+    expect(pill.className).toContain("px-3");
   });
 });

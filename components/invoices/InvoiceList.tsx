@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { InvoiceListItem, InvoiceListCounts } from "@/lib/invoices/types";
@@ -31,19 +31,20 @@ interface InvoiceListProps {
   currentDateTo?: string;
 }
 
-const FILTER_TABS: { key: keyof InvoiceListCounts; label: string }[] = [
-  { key: "all", label: "All" },
-  { key: "pending_review", label: "Pending Review" },
-  { key: "approved", label: "Approved" },
-  { key: "synced", label: "Synced" },
-  { key: "error", label: "Error" },
+const STAT_PILLS: { status: keyof InvoiceListCounts; label: (count: number) => string; dot: string; bg: string; border: string; text: string }[] = [
+  { status: "pending_review", label: (n) => `${n} need review`, dot: "bg-[#EA580C]", bg: "bg-[#FFF7ED]", border: "border-[#FED7AA]", text: "text-[#EA580C]" },
+  { status: "approved", label: (n) => `${n} ready to sync`, dot: "bg-[#2563EB]", bg: "bg-[#EFF6FF]", border: "border-[#BFDBFE]", text: "text-[#2563EB]" },
+  { status: "error", label: (n) => `${n} error${n !== 1 ? "s" : ""}`, dot: "bg-[#DC2626]", bg: "bg-[#FEF2F2]", border: "border-[#FECACA]", text: "text-[#DC2626]" },
+  { status: "synced", label: (n) => `${n} synced`, dot: "bg-[#059669]", bg: "bg-[#F0FDF4]", border: "border-[#BBF7D0]", text: "text-[#059669]" },
 ];
 
-const SORT_OPTIONS = [
-  { value: "uploaded_at", label: "Uploaded Date" },
-  { value: "invoice_date", label: "Invoice Date" },
-  { value: "vendor_name", label: "Vendor" },
-  { value: "total_amount", label: "Amount" },
+const SORT_LABELS: { value: string; label: string; sort: string; direction: string }[] = [
+  { value: "newest", label: "Newest", sort: "uploaded_at", direction: "desc" },
+  { value: "oldest", label: "Oldest", sort: "uploaded_at", direction: "asc" },
+  { value: "vendor-az", label: "Vendor A-Z", sort: "vendor_name", direction: "asc" },
+  { value: "vendor-za", label: "Vendor Z-A", sort: "vendor_name", direction: "desc" },
+  { value: "amount-high", label: "Amount: High-Low", sort: "total_amount", direction: "desc" },
+  { value: "amount-low", label: "Amount: Low-High", sort: "total_amount", direction: "asc" },
 ];
 
 const TYPE_FILTER_CHIPS: { key: string; label: string }[] = [
@@ -86,7 +87,7 @@ function buildUrl(
 function formatDate(dateString: string | null): string {
   if (!dateString) return "\u2014";
   // Append T00:00:00 so date-only strings (YYYY-MM-DD) are parsed as local time,
-  // not UTC — prevents off-by-one day in US timezones.
+  // not UTC -- prevents off-by-one day in US timezones.
   const date = new Date(dateString.includes("T") ? dateString : `${dateString}T00:00:00`);
   return date.toLocaleDateString("en-US", {
     month: "short",
@@ -165,8 +166,27 @@ export default function InvoiceList({
     [invoices, statusOverrides]
   );
 
+  // Client-side search filtering
+  const [searchQuery, setSearchQuery] = useState("");
+  const [showFilters, setShowFilters] = useState(false);
+  const [showSort, setShowSort] = useState(false);
+  const filtersRef = useRef<HTMLDivElement>(null);
+  const sortRef = useRef<HTMLDivElement>(null);
+  const [retryingId, setRetryingId] = useState<string | null>(null);
+
+  const filteredInvoices = useMemo(() => {
+    if (!searchQuery.trim()) return mergedInvoices;
+    const q = searchQuery.toLowerCase();
+    return mergedInvoices.filter((inv) => {
+      const vendor = inv.extracted_data?.vendor_name?.toLowerCase() ?? "";
+      const invNum = inv.extracted_data?.invoice_number?.toLowerCase() ?? "";
+      const fileName = inv.file_name.toLowerCase();
+      return vendor.includes(q) || invNum.includes(q) || fileName.includes(q);
+    });
+  }, [mergedInvoices, searchQuery]);
+
   // Group into batch rows
-  const rows = useMemo(() => groupInvoicesByBatch(mergedInvoices), [mergedInvoices]);
+  const rows = useMemo(() => groupInvoicesByBatch(filteredInvoices), [filteredInvoices]);
 
   // Collect IDs needing Realtime subscription (uploaded/extracting)
   const realtimeIds = useMemo(
@@ -220,7 +240,6 @@ export default function InvoiceList({
   const [customTo, setCustomTo] = useState(currentDateTo ?? "");
 
   const activeDateField = currentDateField ?? "uploaded_at";
-  const hasDateFilter = !!(currentDatePreset || currentDateFrom || currentDateTo);
 
   // Delete confirmation state
   const [deleteTarget, setDeleteTarget] = useState<{ id: string; fileName: string } | null>(null);
@@ -257,6 +276,25 @@ export default function InvoiceList({
     }
   }
 
+  const activeFilterCount = (currentOutputType !== "all" ? 1 : 0)
+    + (currentDatePreset || currentDateFrom || currentDateTo ? 1 : 0);
+
+  const currentSortLabel = SORT_LABELS.find(
+    (opt) => opt.sort === currentSort && opt.direction === currentDirection
+  )?.label ?? "Newest";
+
+  async function handleRetry(invoiceId: string) {
+    setRetryingId(invoiceId);
+    try {
+      await fetch(`/api/invoices/${invoiceId}/retry`, { method: "POST" });
+      router.refresh();
+    } catch {
+      // Silently fail -- user can retry again
+    } finally {
+      setRetryingId(null);
+    }
+  }
+
   // Empty state: no invoices at all
   if (counts.all === 0) {
     return (
@@ -271,26 +309,47 @@ export default function InvoiceList({
     );
   }
 
+  /** Row background by status */
+  function rowBg(status: string): string {
+    if (status === "pending_review") return "bg-[#FFFBF5]";
+    if (status === "error") return "bg-[#FEF8F8]";
+    return "bg-surface";
+  }
+
   /** Render a single invoice as a desktop table row */
   function renderDesktopInvoiceRow(invoice: InvoiceListItem, indented?: boolean) {
+    const isProcessing = invoice.status === "extracting" || invoice.status === "uploaded";
+    const isError = invoice.status === "error";
+    const vendorName = invoice.extracted_data?.vendor_name;
+    const invoiceNum = invoice.extracted_data?.invoice_number;
+
     return (
       <tr
         key={invoice.id}
         className={`border-b border-[#F1F5F9] transition-all duration-150 ease-in-out hover:bg-background group cursor-pointer ${
-          indented ? "bg-white" : ""
+          indented ? "bg-white" : rowBg(invoice.status)
         }`}
         onClick={() => router.push(`/invoices/${invoice.id}/review`)}
       >
-        <td className="py-3.5 px-3 text-[14px] text-text truncate max-w-[200px]">
-          <span className="inline-flex items-center gap-1.5">
-            {invoice.file_name}
+        {/* Invoice (vendor + file) */}
+        <td className="py-3.5 px-4 max-w-[280px]">
+          <div className="flex items-center gap-1.5">
+            <span className="text-[14px] font-semibold text-text truncate">
+              {isProcessing ? (
+                <span className="text-muted italic">Processing...</span>
+              ) : isError ? (
+                vendorName || invoice.file_name
+              ) : (
+                vendorName ?? <span className="text-muted">Unknown vendor</span>
+              )}
+            </span>
             {invoice.source === "email" && (
               <span
-                className="inline-flex items-center gap-0.5 px-1.5 py-0.5 text-[11px] font-medium bg-blue-50 text-blue-600 rounded-full"
+                className="inline-flex items-center gap-0.5 px-1.5 py-0.5 text-[11px] font-medium bg-blue-50 text-blue-600 rounded-full shrink-0"
                 title={invoice.email_sender ? `From: ${invoice.email_sender}` : "Received via email"}
               >
                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" className="w-3 h-3">
-                  <path d="M2.5 3A1.5 1.5 0 001 4.5v.793c.026.009.051.02.076.032L7.674 8.51c.206.1.446.1.652 0l6.598-3.185A.755.755 0 0115 5.293V4.5A1.5 1.5 0 0013.5 3h-11z" />
+                  <path d="M2.5 3A1.5 1.5 0 001 4.5v.793c.026.009.051.02.076.032L7.674 8.51c.206.1.446.1.652 0l6.598-3.185A.755.755 0 0015 5.293V4.5A1.5 1.5 0 0013.5 3h-11z" />
                   <path d="M15 6.954L8.978 9.86a2.25 2.25 0 01-1.956 0L1 6.954V11.5A1.5 1.5 0 002.5 13h11a1.5 1.5 0 001.5-1.5V6.954z" />
                 </svg>
                 Email
@@ -298,7 +357,7 @@ export default function InvoiceList({
             )}
             {invoice.source === "sms" && (
               <span
-                className="inline-flex items-center gap-0.5 px-1.5 py-0.5 text-[11px] font-medium bg-green-50 text-green-600 rounded-full"
+                className="inline-flex items-center gap-0.5 px-1.5 py-0.5 text-[11px] font-medium bg-green-50 text-green-600 rounded-full shrink-0"
                 title={invoice.sms_body_context ? `Note: ${invoice.sms_body_context}` : "Received via SMS"}
               >
                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" className="w-3 h-3">
@@ -307,54 +366,81 @@ export default function InvoiceList({
                 SMS
               </span>
             )}
-          </span>
-        </td>
-        <td className="py-3.5 px-3 text-[14px] font-medium text-text">
-          {invoice.status === "error" && invoice.error_message ? (
-            <span className="text-error text-[13px]">{invoice.error_message}</span>
+          </div>
+          {isError && invoice.error_message ? (
+            <div className="text-[12px] text-[#DC2626] truncate mt-0.5">{invoice.error_message}</div>
           ) : (
-            invoice.extracted_data?.vendor_name ?? (
-              <span className="text-muted">Pending</span>
-            )
+            <div className="text-[12px] text-muted truncate mt-0.5">
+              {invoiceNum && <><span className="font-mono">#{invoiceNum}</span> &middot; </>}
+              {invoice.file_name}
+            </div>
           )}
         </td>
-        <td className="py-3.5 px-3 font-mono text-[13px] text-text">
-          {invoice.extracted_data?.invoice_number ?? "\u2014"}
-        </td>
-        <td className="py-3.5 px-3 font-mono text-[13px] text-text">
+        {/* Date */}
+        <td className="py-3.5 px-4 text-[13px] text-text">
           {formatDate(invoice.extracted_data?.invoice_date ?? null)}
         </td>
-        <td className="py-3.5 px-3 text-[14px] text-right font-mono font-medium">
+        {/* Amount */}
+        <td className="py-3.5 px-4 text-[14px] text-right font-mono font-semibold tabular-nums">
           {invoice.extracted_data?.total_amount != null
             ? formatCurrency(invoice.extracted_data.total_amount, null)
             : "\u2014"}
         </td>
-        <td className="py-3.5 px-3">
-          <span className="inline-flex items-center gap-2">
+        {/* Status */}
+        <td className="py-3.5 px-4 text-center">
+          <span className="inline-flex items-center gap-1.5">
             <InvoiceStatusBadge status={invoice.status} />
             {invoice.status === "synced" && invoice.output_type && (
-              <span className="text-xs text-muted">
+              <span className="text-[11px] text-muted">
                 {TRANSACTION_TYPE_SHORT_LABELS[invoice.output_type as OutputType]}
               </span>
             )}
           </span>
         </td>
-        <td className="py-3.5 px-3 text-[14px] text-muted">
-          {formatRelativeTime(invoice.uploaded_at)}
-        </td>
-        <td className="py-3.5 px-3 text-right">
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              setDeleteTarget({ id: invoice.id, fileName: invoice.file_name });
-            }}
-            className="p-1.5 rounded-md text-muted hover:text-error hover:bg-red-50 opacity-0 group-hover:opacity-100 transition-all duration-150"
-            title="Delete invoice"
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="h-4 w-4">
-              <path strokeLinecap="round" strokeLinejoin="round" d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0" />
-            </svg>
-          </button>
+        {/* Action */}
+        <td className="py-3.5 px-4 text-right">
+          <div className="flex items-center justify-end gap-2">
+            {invoice.status === "pending_review" && (
+              <button
+                onClick={(e) => { e.stopPropagation(); router.push(`/invoices/${invoice.id}/review`); }}
+                className="inline-flex items-center px-3 py-1.5 text-[13px] font-medium bg-[#0F172A] text-white rounded-lg hover:bg-[#1E293B] transition-colors"
+              >
+                Review &rarr;
+              </button>
+            )}
+            {invoice.status === "approved" && (
+              <button
+                onClick={(e) => { e.stopPropagation(); router.push(`/invoices/${invoice.id}/review`); }}
+                className="inline-flex items-center px-3 py-1.5 text-[13px] font-medium border border-border text-text rounded-lg hover:bg-background transition-colors"
+              >
+                Sync &rarr;
+              </button>
+            )}
+            {invoice.status === "error" && (
+              <button
+                onClick={(e) => { e.stopPropagation(); handleRetry(invoice.id); }}
+                disabled={retryingId === invoice.id}
+                className="inline-flex items-center px-3 py-1.5 text-[13px] font-medium border border-[#FECACA] text-[#DC2626] rounded-lg hover:bg-[#FEF2F2] transition-colors disabled:opacity-50"
+              >
+                {retryingId === invoice.id ? "Retrying..." : "Retry"}
+              </button>
+            )}
+            {(invoice.status === "synced" || isProcessing) && (
+              <span className="text-[12px] text-muted">{formatRelativeTime(invoice.uploaded_at)}</span>
+            )}
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                setDeleteTarget({ id: invoice.id, fileName: invoice.file_name });
+              }}
+              className="p-1.5 rounded-md text-muted hover:text-error hover:bg-red-50 opacity-0 group-hover:opacity-100 transition-all duration-150"
+              title="Delete invoice"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="h-4 w-4">
+                <path strokeLinecap="round" strokeLinejoin="round" d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0" />
+              </svg>
+            </button>
+          </div>
         </td>
       </tr>
     );
@@ -362,15 +448,32 @@ export default function InvoiceList({
 
   /** Render a single invoice as a mobile card */
   function renderMobileInvoiceCard(invoice: InvoiceListItem) {
+    const isProcessing = invoice.status === "extracting" || invoice.status === "uploaded";
+    const isError = invoice.status === "error";
+    const vendorName = invoice.extracted_data?.vendor_name;
+    const invoiceNum = invoice.extracted_data?.invoice_number;
+
+    const mobileBg = invoice.status === "pending_review"
+      ? "bg-[#FFFBF5] border-[#FED7AA]/50"
+      : isError
+        ? "bg-[#FEF8F8] border-[#FECACA]/50"
+        : "bg-surface border-border";
+
     return (
       <Link
         key={invoice.id}
         href={`/invoices/${invoice.id}/review`}
-        className="block bg-surface border border-border rounded-lg p-4 hover:border-primary/30 transition-all duration-150"
+        className={`block rounded-lg p-4 border hover:border-primary/30 transition-all duration-150 ${mobileBg}`}
       >
         <div className="flex items-center justify-between mb-1">
-          <span className="text-sm font-medium text-text truncate max-w-[200px]">
-            {invoice.file_name}
+          <span className="text-sm font-semibold text-text truncate max-w-[200px]">
+            {isProcessing ? (
+              <span className="text-muted italic">Processing...</span>
+            ) : isError ? (
+              vendorName || invoice.file_name
+            ) : (
+              vendorName ?? <span className="text-muted">Unknown vendor</span>
+            )}
           </span>
           <span className="inline-flex items-center gap-2">
             <InvoiceStatusBadge status={invoice.status} />
@@ -381,24 +484,18 @@ export default function InvoiceList({
             )}
           </span>
         </div>
-        <div className="text-sm text-text mb-1">
-          {invoice.status === "error" && invoice.error_message ? (
-            <span className="text-error text-[13px]">{invoice.error_message}</span>
+        <div className="text-[12px] text-muted mb-1.5">
+          {isError && invoice.error_message ? (
+            <span className="text-[#DC2626]">{invoice.error_message}</span>
           ) : (
             <>
-              {invoice.extracted_data?.vendor_name ?? (
-                <span className="text-muted">Pending</span>
-              )}
-              {invoice.extracted_data?.invoice_number && (
-                <span className="text-text/70 ml-2 font-mono text-[13px]">
-                  #{invoice.extracted_data.invoice_number}
-                </span>
-              )}
+              {invoiceNum && <><span className="font-mono">#{invoiceNum}</span> &middot; </>}
+              {invoice.file_name}
             </>
           )}
         </div>
         <div className="flex items-center justify-between text-sm">
-          <span className="font-mono">
+          <span className="font-mono font-semibold tabular-nums">
             {invoice.extracted_data?.total_amount != null
               ? formatCurrency(invoice.extracted_data.total_amount, null)
               : "\u2014"}
@@ -452,24 +549,25 @@ export default function InvoiceList({
     const isExpanded = expandedBatches.has(row.batchId);
     return (
       <tr key={`batch-${row.batchId}`}>
-        <td colSpan={8} className="p-0">
+        <td colSpan={5} className="p-0">
           <BatchHeader
             batchId={row.batchId}
             invoices={row.invoices}
             isExpanded={isExpanded}
             onToggle={() => toggleBatch(row.batchId)}
             isAccountingConnected={isAccountingConnected}
-          />
-          {isExpanded && (
-            <div className="border-l-2 border-blue-200 ml-3">
-              <table className="w-full">
-                <tbody>
-                  {row.invoices.map((inv) => renderDesktopInvoiceRow(inv, true))}
-                </tbody>
-              </table>
-              {renderBatchEmptyState(row.invoices)}
-            </div>
-          )}
+          >
+            {isExpanded && (
+              <div className="border-l-2 border-blue-200 ml-4">
+                <table className="w-full">
+                  <tbody>
+                    {row.invoices.map((inv) => renderDesktopInvoiceRow(inv, true))}
+                  </tbody>
+                </table>
+                {renderBatchEmptyState(row.invoices)}
+              </div>
+            )}
+          </BatchHeader>
         </td>
       </tr>
     );
@@ -491,13 +589,14 @@ export default function InvoiceList({
           isExpanded={isExpanded}
           onToggle={() => toggleBatch(row.batchId)}
           isAccountingConnected={isAccountingConnected}
-        />
-        {isExpanded && (
-          <div className="border-l-2 border-blue-200 ml-3 space-y-2 pb-2">
-            {row.invoices.map((inv) => renderMobileInvoiceCard(inv))}
-            {renderBatchEmptyState(row.invoices)}
-          </div>
-        )}
+        >
+          {isExpanded && (
+            <div className="border-l-2 border-blue-200 ml-4 space-y-2 pb-2">
+              {row.invoices.map((inv) => renderMobileInvoiceCard(inv))}
+              {renderBatchEmptyState(row.invoices)}
+            </div>
+          )}
+        </BatchHeader>
       </div>
     );
   }
@@ -506,7 +605,7 @@ export default function InvoiceList({
     <div>
       {/* Toast Message */}
       {toastMessage && (
-        <div className="mb-4 px-4 py-3 rounded-md bg-[#D1FAE5] text-[#065F46] text-sm font-medium flex items-center gap-2">
+        <div className="mb-4 px-4 py-3 rounded-lg bg-[#D1FAE5] text-[#065F46] text-sm font-medium flex items-center gap-2">
           <svg
             xmlns="http://www.w3.org/2000/svg"
             fill="none"
@@ -525,291 +624,383 @@ export default function InvoiceList({
         </div>
       )}
 
-      {/* Filter Tabs */}
-      <div className="flex gap-2 mb-6">
-        {FILTER_TABS.map((tab) => {
-          const isActive = currentStatus === tab.key;
-          const count = counts[tab.key];
-
-          // Dot color per status
-          const dotColors: Record<string, string> = {
-            pending_review: 'bg-warning',
-            approved: 'bg-primary',
-            synced: 'bg-accent',
-            error: 'bg-error',
-          };
-
+      {/* Stat Pills */}
+      <div className="flex flex-wrap items-center gap-2 mb-4">
+        {STAT_PILLS.filter((pill) => counts[pill.status] > 0).map((pill) => {
+          const count = counts[pill.status];
+          const isActive = currentStatus === pill.status;
           return (
             <Link
-              key={tab.key}
+              key={pill.status}
               href={buildUrl(pathname, searchParams, {
-                status: tab.key === "all" ? undefined : tab.key,
+                status: isActive ? undefined : pill.status,
                 cursor: undefined,
               })}
-              className={`inline-flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium transition-all duration-150 ease-in-out ${
+              className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-[10px] text-[13px] font-semibold border transition-all duration-150 ${
                 isActive
-                  ? "bg-primary text-white shadow-soft"
-                  : "bg-surface text-text border border-border hover:border-primary/30"
+                  ? `${pill.bg} ${pill.border} ${pill.text} ring-2 ring-offset-1 ring-current/20`
+                  : `${pill.bg} ${pill.border} ${pill.text} hover:shadow-sm`
               }`}
             >
-              {tab.key !== 'all' && (
-                <span className={`h-2 w-2 rounded-full ${
-                  isActive ? 'bg-white/70' : (dotColors[tab.key] || 'bg-muted')
-                }`} />
-              )}
-              {tab.label}
-              <span className={`text-xs font-bold ${
-                isActive ? "text-white/80" : "text-muted"
-              }`}>
-                {count}
-              </span>
+              <span className={`h-2 w-2 rounded-full ${pill.dot}`} />
+              {pill.label(count)}
             </Link>
           );
         })}
+        {currentStatus !== "all" && (
+          <Link
+            href={buildUrl(pathname, searchParams, { status: undefined, cursor: undefined })}
+            className="text-[13px] text-muted hover:text-text transition-colors ml-1"
+          >
+            Clear filter
+          </Link>
+        )}
       </div>
 
-      {/* Type Filter Chips */}
-      <div className="flex gap-2 mb-6">
-        {TYPE_FILTER_CHIPS.map((chip) => {
-          const isActive = currentOutputType === chip.key;
-          return (
-            <Link
-              key={chip.key}
-              href={buildUrl(pathname, searchParams, {
-                output_type: chip.key === "all" ? undefined : chip.key,
-                cursor: undefined,
-              })}
-              className={`inline-flex items-center px-3 py-1.5 rounded-full text-xs font-medium transition-all duration-150 ease-in-out ${
-                isActive
-                  ? "bg-primary text-white shadow-soft"
-                  : "bg-surface text-text border border-border hover:border-primary/30"
-              }`}
-            >
-              {chip.label}
-            </Link>
-          );
-        })}
-      </div>
-
-      {/* Date Filter */}
-      <div className="flex flex-wrap items-center gap-2 mb-6">
-        {/* Date field toggle */}
-        <div className="flex rounded-full border border-border overflow-hidden">
-          {DATE_FIELD_OPTIONS.map((opt) => (
+      {/* Toolbar: Search + Filters + Sort */}
+      <div className="flex items-center gap-2 mb-4">
+        {/* Search Input */}
+        <div className="relative flex-1">
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            fill="none"
+            viewBox="0 0 24 24"
+            strokeWidth={1.5}
+            stroke="currentColor"
+            className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted"
+          >
+            <path strokeLinecap="round" strokeLinejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z" />
+          </svg>
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Search vendors, invoice numbers..."
+            className="w-full pl-9 pr-8 py-2 rounded-[10px] bg-surface border border-border text-sm text-text placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
+          />
+          {searchQuery && (
             <button
-              key={opt.key}
-              type="button"
-              onClick={() => {
-                router.push(buildUrl(pathname, searchParams, {
-                  date_field: opt.key === "uploaded_at" ? undefined : opt.key,
-                  cursor: undefined,
-                }));
-              }}
-              className={`px-3 py-1.5 text-xs font-medium transition-all duration-150 ${
-                activeDateField === opt.key
-                  ? "bg-primary text-white"
-                  : "bg-surface text-text hover:bg-background"
-              }`}
+              onClick={() => setSearchQuery("")}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-muted hover:text-text"
             >
-              {opt.label}
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="h-4 w-4">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
+              </svg>
             </button>
-          ))}
+          )}
         </div>
 
-        <span className="text-border">|</span>
-
-        {/* Date preset buttons */}
-        {DATE_PRESET_OPTIONS.map((opt) => {
-          const isCustom = opt.key === "custom";
-          const isActive = isCustom
-            ? showCustomDates && !currentDatePreset
-            : currentDatePreset === opt.key;
-
-          return (
-            <button
-              key={opt.key}
-              type="button"
-              onClick={() => {
-                if (isCustom) {
-                  setShowCustomDates(true);
-                  // Clear preset when switching to custom
-                  if (currentDatePreset) {
-                    router.push(buildUrl(pathname, searchParams, {
-                      date_preset: undefined,
-                      date_from: undefined,
-                      date_to: undefined,
-                      cursor: undefined,
-                    }));
-                  }
-                } else {
-                  setShowCustomDates(false);
-                  router.push(buildUrl(pathname, searchParams, {
-                    date_preset: opt.key,
-                    date_from: undefined,
-                    date_to: undefined,
-                    cursor: undefined,
-                  }));
-                }
-              }}
-              className={`inline-flex items-center px-3 py-1.5 rounded-full text-xs font-medium transition-all duration-150 ease-in-out ${
-                isActive
-                  ? "bg-primary text-white shadow-soft"
-                  : "bg-surface text-text border border-border hover:border-primary/30"
-              }`}
-            >
-              {opt.label}
-            </button>
-          );
-        })}
-
-        {/* Clear date filter */}
-        {hasDateFilter && (
+        {/* Filters Button */}
+        <div className="relative" ref={filtersRef}>
           <button
-            type="button"
-            onClick={() => {
-              setShowCustomDates(false);
-              setCustomFrom("");
-              setCustomTo("");
-              router.push(buildUrl(pathname, searchParams, {
-                date_field: undefined,
-                date_preset: undefined,
-                date_from: undefined,
-                date_to: undefined,
-                cursor: undefined,
-              }));
-            }}
-            className="text-xs text-muted hover:text-error transition-colors"
+            onClick={() => { setShowFilters(!showFilters); setShowSort(false); }}
+            className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-[10px] bg-surface border text-sm font-medium transition-all ${
+              activeFilterCount > 0
+                ? "border-primary text-primary"
+                : "border-border text-text hover:border-primary/30"
+            }`}
           >
-            Clear
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="h-4 w-4">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 3c2.755 0 5.455.232 8.083.678.533.09.917.556.917 1.096v1.044a2.25 2.25 0 0 1-.659 1.591l-5.432 5.432a2.25 2.25 0 0 0-.659 1.591v2.927a2.25 2.25 0 0 1-1.244 2.013L9.75 21v-6.568a2.25 2.25 0 0 0-.659-1.591L3.659 7.409A2.25 2.25 0 0 1 3 5.818V4.774c0-.54.384-1.006.917-1.096A48.32 48.32 0 0 1 12 3Z" />
+            </svg>
+            Filters
+            {activeFilterCount > 0 && (
+              <span className="inline-flex items-center justify-center h-5 w-5 rounded-full bg-primary text-white text-[11px] font-bold">
+                {activeFilterCount}
+              </span>
+            )}
           </button>
-        )}
 
-        {/* Custom date range inputs */}
-        {showCustomDates && (
-          <div className="flex items-center gap-2 ml-1">
-            <input
-              type="date"
-              value={customFrom}
-              onChange={(e) => setCustomFrom(e.target.value)}
-              className="border border-border rounded-md px-2 py-1 text-xs text-text"
-              placeholder="From"
-            />
-            <span className="text-xs text-muted">to</span>
-            <input
-              type="date"
-              value={customTo}
-              onChange={(e) => setCustomTo(e.target.value)}
-              className="border border-border rounded-md px-2 py-1 text-xs text-text"
-              placeholder="To"
-            />
-            <button
-              type="button"
-              onClick={() => {
-                if (customFrom || customTo) {
-                  router.push(buildUrl(pathname, searchParams, {
-                    date_preset: undefined,
-                    date_from: customFrom || undefined,
-                    date_to: customTo || undefined,
-                    cursor: undefined,
-                  }));
-                }
-              }}
-              className="px-3 py-1.5 rounded-md text-xs font-medium bg-primary text-white hover:bg-primary-hover transition-colors"
-            >
-              Apply
-            </button>
-          </div>
-        )}
-      </div>
+          {/* Filters Popover */}
+          {showFilters && (
+            <>
+              <div className="fixed inset-0 z-20" onClick={() => setShowFilters(false)} />
+              <div className="absolute right-0 top-full mt-2 w-80 bg-surface border border-border rounded-xl shadow-float z-30 p-4">
+                {/* Type section */}
+                <div className="mb-4">
+                  <div className="text-[12px] font-semibold text-muted mb-2">Type</div>
+                  <div className="flex flex-wrap gap-1.5">
+                    {TYPE_FILTER_CHIPS.map((chip) => {
+                      const isActive = currentOutputType === chip.key;
+                      return (
+                        <button
+                          key={chip.key}
+                          onClick={() => {
+                            router.push(buildUrl(pathname, searchParams, {
+                              output_type: chip.key === "all" ? undefined : chip.key,
+                              cursor: undefined,
+                            }));
+                          }}
+                          className={`px-3 py-1.5 rounded-[10px] text-[13px] font-medium transition-all ${
+                            isActive
+                              ? "bg-[#0F172A] text-white"
+                              : "bg-background text-text hover:bg-border"
+                          }`}
+                        >
+                          {chip.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
 
-      {/* Sort Controls */}
-      <div className="flex items-center gap-2 mb-4">
-        <label htmlFor="sort-select" className="text-sm text-muted">
-          Sort by:
-        </label>
-        <select
-          id="sort-select"
-          value={currentSort}
-          onChange={(e) => {
-            router.push(buildUrl(pathname, searchParams, {
-              sort: e.target.value,
-              cursor: undefined,
-            }));
-          }}
-          className="border border-border rounded-md px-2 py-1 text-sm text-text"
-        >
-          {SORT_OPTIONS.map((opt) => (
-            <option key={opt.value} value={opt.value}>
-              {opt.label}
-            </option>
-          ))}
-        </select>
-        <Link
-          href={buildUrl(pathname, searchParams, {
-            direction: currentDirection === "desc" ? "asc" : "desc",
-            cursor: undefined,
-          })}
-          className="p-1 text-muted hover:text-text"
-          aria-label={`Sort ${currentDirection === "desc" ? "ascending" : "descending"}`}
-        >
-          {currentDirection === "desc" ? "\u2193" : "\u2191"}
-        </Link>
+                {/* Date Range section */}
+                <div className="mb-3">
+                  <div className="text-[12px] font-semibold text-muted mb-2">Date Range</div>
+                  {/* Date field toggle */}
+                  <div className="flex rounded-[10px] border border-border overflow-hidden mb-2">
+                    {DATE_FIELD_OPTIONS.map((opt) => (
+                      <button
+                        key={opt.key}
+                        type="button"
+                        onClick={() => {
+                          router.push(buildUrl(pathname, searchParams, {
+                            date_field: opt.key === "uploaded_at" ? undefined : opt.key,
+                            cursor: undefined,
+                          }));
+                        }}
+                        className={`flex-1 px-3 py-1.5 text-[13px] font-medium transition-all ${
+                          activeDateField === opt.key
+                            ? "bg-[#0F172A] text-white"
+                            : "bg-surface text-text hover:bg-background"
+                        }`}
+                      >
+                        {opt.label}
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* Date preset buttons */}
+                  <div className="flex flex-wrap gap-1.5 mb-2">
+                    {DATE_PRESET_OPTIONS.map((opt) => {
+                      const isCustom = opt.key === "custom";
+                      const isActive = isCustom
+                        ? showCustomDates && !currentDatePreset
+                        : currentDatePreset === opt.key;
+
+                      return (
+                        <button
+                          key={opt.key}
+                          type="button"
+                          onClick={() => {
+                            if (isCustom) {
+                              setShowCustomDates(true);
+                              if (currentDatePreset) {
+                                router.push(buildUrl(pathname, searchParams, {
+                                  date_preset: undefined,
+                                  date_from: undefined,
+                                  date_to: undefined,
+                                  cursor: undefined,
+                                }));
+                              }
+                            } else {
+                              setShowCustomDates(false);
+                              router.push(buildUrl(pathname, searchParams, {
+                                date_preset: opt.key,
+                                date_from: undefined,
+                                date_to: undefined,
+                                cursor: undefined,
+                              }));
+                            }
+                          }}
+                          className={`px-3 py-1.5 rounded-[10px] text-[13px] font-medium transition-all ${
+                            isActive
+                              ? "bg-[#0F172A] text-white"
+                              : "bg-background text-text hover:bg-border"
+                          }`}
+                        >
+                          {opt.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  {/* Custom date range inputs */}
+                  {showCustomDates && (
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="date"
+                        value={customFrom}
+                        onChange={(e) => setCustomFrom(e.target.value)}
+                        className="flex-1 border border-border rounded-[10px] px-2 py-1.5 text-[13px] text-text"
+                      />
+                      <span className="text-[12px] text-muted">to</span>
+                      <input
+                        type="date"
+                        value={customTo}
+                        onChange={(e) => setCustomTo(e.target.value)}
+                        className="flex-1 border border-border rounded-[10px] px-2 py-1.5 text-[13px] text-text"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (customFrom || customTo) {
+                            router.push(buildUrl(pathname, searchParams, {
+                              date_preset: undefined,
+                              date_from: customFrom || undefined,
+                              date_to: customTo || undefined,
+                              cursor: undefined,
+                            }));
+                          }
+                        }}
+                        className="px-3 py-1.5 rounded-[10px] text-[13px] font-medium bg-[#0F172A] text-white hover:bg-[#1E293B] transition-colors"
+                      >
+                        Apply
+                      </button>
+                    </div>
+                  )}
+                </div>
+
+                {/* Clear all */}
+                {activeFilterCount > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowCustomDates(false);
+                      setCustomFrom("");
+                      setCustomTo("");
+                      router.push(buildUrl(pathname, searchParams, {
+                        output_type: undefined,
+                        date_field: undefined,
+                        date_preset: undefined,
+                        date_from: undefined,
+                        date_to: undefined,
+                        cursor: undefined,
+                      }));
+                    }}
+                    className="text-[13px] text-muted hover:text-error transition-colors"
+                  >
+                    Clear all filters
+                  </button>
+                )}
+              </div>
+            </>
+          )}
+        </div>
+
+        {/* Sort Button */}
+        <div className="relative" ref={sortRef}>
+          <button
+            onClick={() => { setShowSort(!showSort); setShowFilters(false); }}
+            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-[10px] bg-surface border border-border text-sm font-medium text-text hover:border-primary/30 transition-all"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="h-4 w-4">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M3 7.5 7.5 3m0 0L12 7.5M7.5 3v13.5m13.5-4.5L16.5 16.5m0 0L12 12m4.5 4.5V3" />
+            </svg>
+            {currentSortLabel}
+          </button>
+
+          {/* Sort Dropdown */}
+          {showSort && (
+            <>
+              <div className="fixed inset-0 z-20" onClick={() => setShowSort(false)} />
+              <div className="absolute right-0 top-full mt-2 w-48 bg-surface border border-border rounded-xl shadow-float z-30 py-1">
+                {SORT_LABELS.map((opt) => {
+                  const isActive = opt.sort === currentSort && opt.direction === currentDirection;
+                  return (
+                    <button
+                      key={opt.value}
+                      onClick={() => {
+                        router.push(buildUrl(pathname, searchParams, {
+                          sort: opt.sort,
+                          direction: opt.direction,
+                          cursor: undefined,
+                        }));
+                        setShowSort(false);
+                      }}
+                      className={`w-full text-left px-4 py-2 text-[13px] font-medium transition-colors flex items-center justify-between ${
+                        isActive ? "text-primary bg-primary/5" : "text-text hover:bg-background"
+                      }`}
+                    >
+                      {opt.label}
+                      {isActive && (
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="h-4 w-4 text-primary">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="m4.5 12.75 6 6 9-13.5" />
+                        </svg>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            </>
+          )}
+        </div>
       </div>
 
       {/* Filter empty state */}
-      {invoices.length === 0 ? (
+      {filteredInvoices.length === 0 ? (
         <div className="text-center py-16">
-          <p className="text-muted text-sm">No invoices match this filter.</p>
+          <p className="text-muted text-sm">
+            {searchQuery ? "No invoices match your search." : "No invoices match this filter."}
+          </p>
         </div>
       ) : (
         <>
-          {/* Desktop Table */}
+          {/* Desktop Table (card-wrapped) */}
           <div className="hidden md:block">
-            <table className="w-full">
-              <thead>
-                <tr className="border-b border-[#F1F5F9]">
-                  <th className="text-left text-[11px] font-bold uppercase tracking-wider text-muted py-2.5 px-3">File Name</th>
-                  <th className="text-left text-[11px] font-bold uppercase tracking-wider text-muted py-2.5 px-3">Vendor</th>
-                  <th className="text-left text-[11px] font-bold uppercase tracking-wider text-muted py-2.5 px-3">Invoice #</th>
-                  <th className="text-left text-[11px] font-bold uppercase tracking-wider text-muted py-2.5 px-3">Invoice Date</th>
-                  <th className="text-right text-[11px] font-bold uppercase tracking-wider text-muted py-2.5 px-3">Amount</th>
-                  <th className="text-left text-[11px] font-bold uppercase tracking-wider text-muted py-2.5 px-3">Status</th>
-                  <th className="text-left text-[11px] font-bold uppercase tracking-wider text-muted py-2.5 px-3">Uploaded</th>
-                  <th className="w-12"></th>
-                </tr>
-              </thead>
-              <tbody>
-                {rows.map((row) => renderDesktopRow(row))}
-              </tbody>
-            </table>
+            <div className="bg-surface border border-border rounded-xl shadow-sm overflow-hidden">
+              <table className="w-full">
+                <thead>
+                  <tr className="bg-[#F8FAFC] border-b border-[#F1F5F9]">
+                    <th className="text-left text-[12px] font-semibold text-muted py-2.5 px-4">Invoice</th>
+                    <th className="text-left text-[12px] font-semibold text-muted py-2.5 px-4">Date</th>
+                    <th className="text-right text-[12px] font-semibold text-muted py-2.5 px-4">Amount</th>
+                    <th className="text-center text-[12px] font-semibold text-muted py-2.5 px-4">Status</th>
+                    <th className="text-right text-[12px] font-semibold text-muted py-2.5 px-4 w-[160px]">Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {rows.map((row) => renderDesktopRow(row))}
+                </tbody>
+              </table>
+
+              {/* Pagination (inside card footer) */}
+              <div className="flex items-center justify-between px-4 py-3 border-t border-[#F1F5F9] bg-[#FAFBFC]">
+                <div className="text-[13px] text-muted">
+                  Showing {filteredInvoices.length} of {counts[currentStatus as keyof InvoiceListCounts] ?? counts.all} invoices
+                  {hasCursor && " \u00b7 Page 2+"}
+                </div>
+                <div className="flex gap-2">
+                  {hasCursor && (
+                    <Link
+                      href={buildUrl(pathname, searchParams, { cursor: undefined })}
+                    >
+                      <Button variant="outline">Previous</Button>
+                    </Link>
+                  )}
+                  {nextCursor && (
+                    <Link
+                      href={buildUrl(pathname, searchParams, { cursor: nextCursor })}
+                    >
+                      <Button variant="outline">Next</Button>
+                    </Link>
+                  )}
+                </div>
+              </div>
+            </div>
           </div>
 
           {/* Mobile Cards */}
           <div className="md:hidden space-y-3">
             {rows.map((row) => renderMobileRow(row))}
-          </div>
 
-          {/* Pagination */}
-          <div className="flex items-center justify-between mt-6 pt-4 border-t border-[#F1F5F9]">
-            <div className="text-[13px] text-muted">
-              Showing {invoices.length} of {counts[currentStatus as keyof InvoiceListCounts] ?? counts.all} invoices
-              {hasCursor && " \u00b7 Page 2+"}
-            </div>
-            <div className="flex gap-2">
-              {hasCursor && (
-                <Link
-                  href={buildUrl(pathname, searchParams, { cursor: undefined })}
-                >
-                  <Button variant="outline">Previous</Button>
-                </Link>
-              )}
-              {nextCursor && (
-                <Link
-                  href={buildUrl(pathname, searchParams, { cursor: nextCursor })}
-                >
-                  <Button variant="outline">Next</Button>
-                </Link>
-              )}
+            {/* Mobile Pagination */}
+            <div className="flex items-center justify-between pt-3">
+              <div className="text-[13px] text-muted">
+                Showing {filteredInvoices.length} of {counts[currentStatus as keyof InvoiceListCounts] ?? counts.all}
+              </div>
+              <div className="flex gap-2">
+                {hasCursor && (
+                  <Link href={buildUrl(pathname, searchParams, { cursor: undefined })}>
+                    <Button variant="outline">Previous</Button>
+                  </Link>
+                )}
+                {nextCursor && (
+                  <Link href={buildUrl(pathname, searchParams, { cursor: nextCursor })}>
+                    <Button variant="outline">Next</Button>
+                  </Link>
+                )}
+              </div>
             </div>
           </div>
         </>

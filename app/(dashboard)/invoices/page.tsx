@@ -71,17 +71,17 @@ export default async function InvoicesPage({ searchParams }: InvoicesPageProps) 
 
   return (
     <div className="p-6">
-      <div className="flex items-center justify-between mb-8">
+      <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="font-headings font-bold text-[32px] text-text tracking-tight">Invoices</h1>
-          <p className="font-body text-[15px] text-muted mt-1">Manage and sync extracted document data.</p>
+          <h1 className="font-headings font-extrabold text-[26px] text-text tracking-tight">Invoices</h1>
+          <p className="font-body text-[13px] text-muted mt-0.5">{counts.all} documents</p>
         </div>
         <Link href="/upload">
-          <Button variant="primary">
-            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="h-4 w-4 mr-2">
+          <Button variant="primary" className="!bg-[#0F172A] hover:!bg-[#1E293B] !rounded-[10px] !h-10 !px-5 !text-sm gap-1.5">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className="h-3.5 w-3.5">
               <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
             </svg>
-            Upload New
+            Upload
           </Button>
         </Link>
       </div>
