@@ -18,9 +18,9 @@ describe("AccountCard", () => {
     expect(screen.getByText("Acme Inc")).toBeTruthy();
   });
 
-  it("enters edit mode when org name is clicked", () => {
+  it("enters edit mode when Edit button is clicked", () => {
     render(<AccountCard email="test@example.com" orgName="Acme Inc" orgId="org-1" />);
-    fireEvent.click(screen.getByText("Acme Inc"));
+    fireEvent.click(screen.getByText("Edit"));
     expect(screen.getByDisplayValue("Acme Inc")).toBeTruthy();
     expect(screen.getByText("Save")).toBeTruthy();
     expect(screen.getByText("Cancel")).toBeTruthy();
@@ -28,7 +28,7 @@ describe("AccountCard", () => {
 
   it("cancels edit mode without API call", () => {
     render(<AccountCard email="test@example.com" orgName="Acme Inc" orgId="org-1" />);
-    fireEvent.click(screen.getByText("Acme Inc"));
+    fireEvent.click(screen.getByText("Edit"));
     fireEvent.click(screen.getByText("Cancel"));
     expect(screen.getByText("Acme Inc")).toBeTruthy();
     expect(mockFetch).not.toHaveBeenCalled();
@@ -41,7 +41,7 @@ describe("AccountCard", () => {
     });
 
     render(<AccountCard email="test@example.com" orgName="Acme Inc" orgId="org-1" />);
-    fireEvent.click(screen.getByText("Acme Inc"));
+    fireEvent.click(screen.getByText("Edit"));
 
     const input = screen.getByDisplayValue("Acme Inc");
     fireEvent.change(input, { target: { value: "New Name" } });
@@ -66,7 +66,7 @@ describe("AccountCard", () => {
     fireEvent.click(screen.getByText("Change password"));
 
     await waitFor(() => {
-      expect(screen.getByText("Password reset email sent to test@example.com.")).toBeTruthy();
+      expect(screen.getByText("Reset email sent")).toBeTruthy();
     });
   });
 
@@ -77,7 +77,7 @@ describe("AccountCard", () => {
     });
 
     render(<AccountCard email="test@example.com" orgName="Acme Inc" orgId="org-1" />);
-    fireEvent.click(screen.getByText("Acme Inc"));
+    fireEvent.click(screen.getByText("Edit"));
 
     const input = screen.getByDisplayValue("Acme Inc");
     fireEvent.change(input, { target: { value: "Enter Name" } });
@@ -90,7 +90,7 @@ describe("AccountCard", () => {
 
   it("cancels on Escape key", () => {
     render(<AccountCard email="test@example.com" orgName="Acme Inc" orgId="org-1" />);
-    fireEvent.click(screen.getByText("Acme Inc"));
+    fireEvent.click(screen.getByText("Edit"));
 
     const input = screen.getByDisplayValue("Acme Inc");
     fireEvent.keyDown(input, { key: "Escape" });
@@ -100,11 +100,9 @@ describe("AccountCard", () => {
     expect(mockFetch).not.toHaveBeenCalled();
   });
 
-  it("does not show edit affordance when no orgId", () => {
+  it("does not show Edit button when no orgId", () => {
     render(<AccountCard email="test@example.com" orgName="" orgId="" />);
-    expect(screen.getByText("—")).toBeTruthy();
-    // The dash element should not have role="button"
-    const dashElement = screen.getByText("—").closest("div");
-    expect(dashElement?.getAttribute("role")).toBeNull();
+    expect(screen.getByText("\u2014")).toBeTruthy();
+    expect(screen.queryByText("Edit")).toBeNull();
   });
 });

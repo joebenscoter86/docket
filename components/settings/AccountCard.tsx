@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect } from "react";
 import Button from "@/components/ui/Button";
 import Input from "@/components/ui/Input";
+import { SettingsRow } from "@/components/settings/SettingsRow";
 
 interface AccountCardProps {
   email: string;
@@ -110,98 +111,93 @@ export function AccountCard({ email, orgName, orgId }: AccountCardProps) {
   }
 
   return (
-    <div className="bg-surface rounded-brand-lg shadow-soft px-6 py-6">
-      <div className="space-y-4">
-        {/* Email (read-only) */}
-        <div>
-          <label className="text-sm font-medium text-muted block mb-1.5">
-            Email
-          </label>
-          <div className="bg-background rounded-brand-md px-3.5 py-2.5 text-[14px] text-text">
-            {email}
-          </div>
-        </div>
+    <div className="bg-surface rounded-brand-lg shadow-soft overflow-hidden">
+      {/* Email row */}
+      <SettingsRow title="Email" description="Your login email address">
+        <span className="text-[13px] text-text">{email}</span>
+      </SettingsRow>
 
-        {/* Organization (inline edit) */}
-        <div>
-          <label className="text-sm font-medium text-muted block mb-1.5">
-            Organization
-          </label>
-          {editing ? (
-            <div>
-              <Input
-                ref={inputRef}
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                onKeyDown={handleKeyDown}
-                maxLength={100}
-                error={!!error}
-                disabled={saving}
-              />
-              {error && (
-                <p className="text-sm text-error mt-1.5">{error}</p>
-              )}
-              <div className="flex justify-end gap-2 mt-2">
-                <Button
-                  variant="outline"
-                  onClick={handleCancel}
+      {/* Organization row */}
+      <div className="border-t border-gray-50">
+        {editing ? (
+          <div className="px-6 py-4">
+            <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2 sm:gap-6">
+              <div className="min-w-0 sm:max-w-[48%]">
+                <p className="text-[13px] font-semibold text-text">Organization</p>
+                <p className="text-[12px] text-muted mt-0.5">Your business name</p>
+              </div>
+              <div className="flex-1 sm:max-w-[48%]">
+                <Input
+                  ref={inputRef}
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  onKeyDown={handleKeyDown}
+                  maxLength={100}
+                  error={!!error}
                   disabled={saving}
-                  className="h-9 px-3 text-[13px]"
-                >
-                  Cancel
-                </Button>
-                <Button
-                  variant="primary"
-                  onClick={handleSave}
-                  disabled={saving}
-                  className="h-9 px-3 text-[13px]"
-                >
-                  {saving ? "Saving..." : "Save"}
-                </Button>
+                />
+                {error && (
+                  <p className="text-sm text-error mt-1.5">{error}</p>
+                )}
+                <div className="flex justify-end gap-2 mt-2">
+                  <Button
+                    variant="outline"
+                    onClick={handleCancel}
+                    disabled={saving}
+                    className="h-9 px-3 text-[13px]"
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    variant="primary"
+                    onClick={handleSave}
+                    disabled={saving}
+                    className="h-9 px-3 text-[13px]"
+                  >
+                    {saving ? "Saving..." : "Save"}
+                  </Button>
+                </div>
               </div>
             </div>
-          ) : (
-            <div
-              className={`bg-background rounded-brand-md px-3.5 py-2.5 text-[14px] text-text flex items-center justify-between${orgId ? " cursor-pointer group hover:border hover:border-primary/30" : ""}`}
-              onClick={orgId ? () => setEditing(true) : undefined}
-              role={orgId ? "button" : undefined}
-              tabIndex={orgId ? 0 : undefined}
-              onKeyDown={orgId ? (e) => { if (e.key === "Enter") setEditing(true); } : undefined}
-            >
-              <span>{name || "\u2014"}</span>
-              {orgId && (
-                <svg className="h-4 w-4 text-muted opacity-0 group-hover:opacity-100 transition-opacity" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L6.832 19.82a4.5 4.5 0 0 1-1.897 1.13l-2.685.8.8-2.685a4.5 4.5 0 0 1 1.13-1.897L16.863 4.487Zm0 0L19.5 7.125" />
-                </svg>
-              )}
-              {saved && (
-                <span className="text-accent text-[13px] font-medium">Saved</span>
-              )}
-            </div>
-          )}
-        </div>
+          </div>
+        ) : (
+          <SettingsRow title="Organization" description="Your business name">
+            <span className="text-[13px] text-text">{name || "\u2014"}</span>
+            {saved && (
+              <span className="text-accent text-[13px] font-medium">Saved</span>
+            )}
+            {orgId && (
+              <button
+                onClick={() => setEditing(true)}
+                className="text-[12px] text-primary hover:underline"
+              >
+                Edit
+              </button>
+            )}
+          </SettingsRow>
+        )}
+      </div>
 
-        {/* Change Password */}
-        <div className="pt-1">
+      {/* Password row */}
+      <div className="border-t border-gray-50">
+        <SettingsRow title="Password" description="Send a reset link to your email">
           {passwordSent ? (
-            <p className="text-sm text-accent">
-              Password reset email sent to {email}.
-            </p>
+            <span className="text-sm text-accent">Reset email sent</span>
           ) : (
             <>
               <button
                 onClick={handleChangePassword}
                 disabled={passwordSending}
-                className="text-sm text-primary hover:text-primary-hover underline cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                className="text-[12px] text-primary hover:underline disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {passwordSending ? "Sending..." : "Change password"}
               </button>
               {passwordError && (
-                <p className="text-sm text-error mt-1">{passwordError}</p>
+                <span className="text-sm text-error">{passwordError}</span>
               )}
             </>
           )}
-        </div>
+        </SettingsRow>
       </div>
     </div>
   );

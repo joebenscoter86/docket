@@ -8,11 +8,10 @@ import { ConnectionHealthBanner } from "@/components/settings/ConnectionHealthBa
 import { SettingsAlert } from "@/components/settings/SettingsAlert";
 import { BillingCard } from "@/components/settings/BillingCard";
 import { AccountCard } from "@/components/settings/AccountCard";
-import { EmailPreferencesCard } from "@/components/settings/EmailPreferencesCard";
+import { PreferencesCard } from "@/components/settings/PreferencesCard";
 import { EmailIngestionCard } from "@/components/settings/EmailIngestionCard";
 import { SmsIngestionCard } from "@/components/settings/SmsIngestionCard";
 import { TeamCard } from "@/components/settings/TeamCard";
-import { DefaultsCard } from "@/components/settings/DefaultsCard";
 import { getUsageThisPeriod } from "@/lib/billing/usage";
 import type { SubscriptionTier } from "@/lib/billing/tiers";
 
@@ -148,7 +147,7 @@ export default async function SettingsPage({
     : null;
 
   return (
-    <div className="max-w-[600px] mx-auto space-y-9">
+    <div className="max-w-[680px] mx-auto space-y-8">
       <div>
         <h1 className="font-headings font-bold text-[32px] text-text tracking-tight">
           Settings
@@ -178,9 +177,9 @@ export default async function SettingsPage({
         <SettingsAlert type="success" message="Subscription activated!" />
       )}
 
-      {/* Connections Section */}
+      {/* 1. Connections */}
       <div>
-        <p className="text-[13px] font-bold uppercase tracking-wider text-muted mb-3">
+        <p className="text-[11px] font-bold uppercase tracking-wider text-muted mb-3">
           Connections
         </p>
         {connectionData.connected && connectionData.provider && (
@@ -193,7 +192,7 @@ export default async function SettingsPage({
             />
           </div>
         )}
-        <div className="space-y-3">
+        <div className="space-y-2">
           <QBOConnectionCard
             connection={qboConnection}
             disabled={connectedProvider === "xero" || !isOwner}
@@ -207,62 +206,50 @@ export default async function SettingsPage({
         </div>
       </div>
 
-      {/* Defaults Section */}
-      {connectionData.connected && (
-        <div>
-          <p className="text-[13px] font-bold uppercase tracking-wider text-muted mb-3">
-            Defaults
-          </p>
-          <DefaultsCard initialDefaultTaxCodeId={defaultTaxCodeId} />
+      {/* 2. Ingestion */}
+      <div>
+        <p className="text-[11px] font-bold uppercase tracking-wider text-muted mb-3">
+          Ingestion
+        </p>
+        <div className="space-y-2">
+          <EmailIngestionCard />
+          <SmsIngestionCard />
         </div>
-      )}
-
-      {/* Email Forwarding Section */}
-      <div>
-        <p className="text-[13px] font-bold uppercase tracking-wider text-muted mb-3">
-          Email Forwarding
-        </p>
-        <EmailIngestionCard />
       </div>
 
-      {/* SMS Ingestion Section */}
+      {/* 3. Billing */}
       <div>
-        <p className="text-[13px] font-bold uppercase tracking-wider text-muted mb-3">
-          SMS Ingestion
+        <p className="text-[11px] font-bold uppercase tracking-wider text-muted mb-3">
+          Billing
         </p>
-        <SmsIngestionCard />
+        <BillingCard user={billingUser} usage={usage} />
       </div>
 
-      {/* Team Section */}
+      {/* 4. Team */}
       <div>
-        <p className="text-[13px] font-bold uppercase tracking-wider text-muted mb-3">
+        <p className="text-[11px] font-bold uppercase tracking-wider text-muted mb-3">
           Team
         </p>
         <TeamCard isOwner={isOwner} />
       </div>
 
-      {/* Account Section */}
+      {/* 5. Account */}
       <div>
-        <p className="text-[13px] font-bold uppercase tracking-wider text-muted mb-3">
+        <p className="text-[11px] font-bold uppercase tracking-wider text-muted mb-3">
           Account
         </p>
         <AccountCard email={user?.email ?? ""} orgName={orgName} orgId={orgId} />
       </div>
 
-      {/* Email Notifications Section */}
+      {/* 6. Preferences */}
       <div>
-        <p className="text-[13px] font-bold uppercase tracking-wider text-muted mb-3">
-          Email Notifications
+        <p className="text-[11px] font-bold uppercase tracking-wider text-muted mb-3">
+          Preferences
         </p>
-        <EmailPreferencesCard />
-      </div>
-
-      {/* Billing Section */}
-      <div>
-        <p className="text-[13px] font-bold uppercase tracking-wider text-muted mb-3">
-          Billing
-        </p>
-        <BillingCard user={billingUser} usage={usage} />
+        <PreferencesCard
+          isConnected={connectionData.connected}
+          initialDefaultTaxCodeId={defaultTaxCodeId}
+        />
       </div>
     </div>
   );
