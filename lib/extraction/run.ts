@@ -24,13 +24,18 @@ const MIN_IMAGE_DIMENSION = 1500;
  * PDFs are vector-based and don't need this. Returns the original buffer if
  * no upscaling is needed.
  */
+interface ResolutionResult {
+  buffer: Buffer;
+  mimeType: string;
+}
+
 async function ensureMinimumResolution(
   fileBuffer: Buffer,
   mimeType: string
-): Promise<Buffer> {
+): Promise<ResolutionResult> {
   // Only process raster images, not PDFs
   if (!mimeType.startsWith("image/")) {
-    return fileBuffer;
+    return { buffer: fileBuffer, mimeType };
   }
 
   try {
@@ -38,12 +43,12 @@ async function ensureMinimumResolution(
     const metadata = await sharp(fileBuffer).metadata();
 
     if (!metadata.width || !metadata.height) {
-      return fileBuffer;
+      return { buffer: fileBuffer, mimeType };
     }
 
     const shortSide = Math.min(metadata.width, metadata.height);
     if (shortSide >= MIN_IMAGE_DIMENSION) {
-      return fileBuffer;
+      return { buffer: fileBuffer, mimeType };
     }
 
     const scale = Math.ceil(MIN_IMAGE_DIMENSION / shortSide);
@@ -59,17 +64,18 @@ async function ensureMinimumResolution(
       scale,
     });
 
-    return await sharp(fileBuffer)
+    const upscaled = await sharp(fileBuffer)
       .resize(newWidth, newHeight, { kernel: "lanczos3" })
       .png()
       .toBuffer();
+    return { buffer: upscaled, mimeType: "image/png" };
   } catch (err) {
     // Non-fatal: if sharp fails, proceed with original image
     logger.warn("image_upscale_failed", {
       action: "run_extraction",
       error: err instanceof Error ? err.message : String(err),
     });
-    return fileBuffer;
+    return { buffer: fileBuffer, mimeType };
   }
 }
 
@@ -149,7 +155,7 @@ export async function runExtraction(params: {
     // 2.5. Upscale small images for extraction accuracy
     // Receipt images at low resolution (<1500px) cause digit misreads.
     // PDFs are unaffected (vector-based rendering).
-    const fileBuffer = await ensureMinimumResolution(rawFileBuffer, fileType);
+    const { buffer: fileBuffer, mimeType: resolvedMimeType } = await ensureMinimumResolution(rawFileBuffer, fileType);
 
     // 3. Fetch QBO accounts for GL suggestions (non-fatal)
     // queryAccounts() internally handles connection lookup and token decryption.
@@ -190,7 +196,7 @@ export async function runExtraction(params: {
 
     for (let attempt = 0; attempt <= RETRY_DELAYS.length; attempt++) {
       try {
-        result = await provider.extractInvoiceData(fileBuffer, fileType, accountContext);
+        result = await provider.extractInvoiceData(fileBuffer, resolvedMimeType, accountContext);
         lastError = null;
         break;
       } catch (err) {
