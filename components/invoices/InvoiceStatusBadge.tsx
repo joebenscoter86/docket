@@ -12,42 +12,41 @@ const statusConfig: Record<InvoiceStatus, {
 }> = {
   synced: {
     label: 'Synced',
-    textColor: 'text-[#065F46]',
-    bgColor: 'bg-[#D1FAE5]',
+    textColor: 'text-[#059669]',
+    bgColor: 'bg-[#ECFDF5]',
   },
   approved: {
     label: 'Approved',
-    textColor: 'text-[#1D4ED8]',
-    bgColor: 'bg-[#DBEAFE]',
+    textColor: 'text-[#2563EB]',
+    bgColor: 'bg-[#EFF6FF]',
   },
   pending_review: {
-    label: 'Pending Review',
-    textColor: 'text-[#92400E]',
-    bgColor: 'bg-[#FEF3C7]',
-    dotAnimation: 'animate-pulse',
+    label: 'Review',
+    textColor: 'text-[#EA580C]',
+    bgColor: 'bg-[#FFF7ED]',
   },
   extracting: {
     label: 'Extracting',
-    textColor: 'text-[#5B21B6]',
+    textColor: 'text-[#7C3AED]',
     bgColor: 'bg-[#EDE9FE]',
-    dotAnimation: 'animate-ping',
+    dotAnimation: 'animate-pulse',
   },
   uploaded: {
     label: 'Uploaded',
-    textColor: 'text-[#1E40AF]',
-    bgColor: 'bg-[#DBEAFE]',
+    textColor: 'text-[#2563EB]',
+    bgColor: 'bg-[#EFF6FF]',
     dotAnimation: 'animate-pulse',
   },
   uploading: {
     label: 'Uploading',
-    textColor: 'text-[#92400E]',
-    bgColor: 'bg-[#FEF3C7]',
+    textColor: 'text-[#EA580C]',
+    bgColor: 'bg-[#FFF7ED]',
     dotAnimation: 'animate-pulse',
   },
   error: {
     label: 'Error',
-    textColor: 'text-[#991B1B]',
-    bgColor: 'bg-[#FEE2E2]',
+    textColor: 'text-[#DC2626]',
+    bgColor: 'bg-[#FEF2F2]',
   },
   archived: {
     label: 'Archived',
@@ -62,21 +61,14 @@ export default function InvoiceStatusBadge({ status }: InvoiceStatusBadgeProps) 
 
   return (
     <span
-      className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 font-body text-xs font-medium ${config.textColor} ${config.bgColor}`}
+      className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1 font-body text-xs font-semibold ${config.textColor} ${config.bgColor}`}
     >
-      {/* Leading dot */}
-      <span className="relative flex h-1.5 w-1.5">
-        {config.dotAnimation && (
-          <span
-            className={`absolute inline-flex h-full w-full rounded-full opacity-75 ${config.dotAnimation}`}
-            style={{ backgroundColor: 'currentColor' }}
-          />
-        )}
+      {config.dotAnimation && (
         <span
-          className="relative inline-flex h-1.5 w-1.5 rounded-full"
+          className={`inline-block h-1.5 w-1.5 rounded-full ${config.dotAnimation}`}
           style={{ backgroundColor: 'currentColor' }}
         />
-      </span>
+      )}
       {config.label}
     </span>
   )
