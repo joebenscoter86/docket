@@ -10,6 +10,7 @@ import { BillingCard } from "@/components/settings/BillingCard";
 import { AccountCard } from "@/components/settings/AccountCard";
 import { EmailPreferencesCard } from "@/components/settings/EmailPreferencesCard";
 import { EmailIngestionCard } from "@/components/settings/EmailIngestionCard";
+import { SmsIngestionCard } from "@/components/settings/SmsIngestionCard";
 import { TeamCard } from "@/components/settings/TeamCard";
 import { DefaultsCard } from "@/components/settings/DefaultsCard";
 import { getUsageThisPeriod } from "@/lib/billing/usage";
@@ -222,6 +223,14 @@ export default async function SettingsPage({
           Email Forwarding
         </p>
         <EmailIngestionCard />
+      </div>
+
+      {/* SMS Ingestion Section */}
+      <div>
+        <p className="text-[13px] font-bold uppercase tracking-wider text-muted mb-3">
+          SMS Ingestion
+        </p>
+        <SmsIngestionCard />
       </div>
 
       {/* Team Section */}
