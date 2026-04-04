@@ -60,7 +60,7 @@ export async function fetchSmsMedia(params: {
         continue;
       }
 
-      let buffer = Buffer.from(await response.arrayBuffer());
+      let buffer: Buffer = Buffer.from(new Uint8Array(await response.arrayBuffer()));
       const sizeBytes = buffer.length;
 
       if (!validateFileSize(sizeBytes)) {

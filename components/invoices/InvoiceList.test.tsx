@@ -51,6 +51,7 @@ const sampleInvoices: InvoiceListItem[] = [
     source: "upload",
     email_sender: null,
     error_message: null,
+    sms_body_context: null,
     extracted_data: {
       vendor_name: "Acme Corp",
       invoice_number: "INV-001",
@@ -68,6 +69,7 @@ const sampleInvoices: InvoiceListItem[] = [
     source: "upload",
     email_sender: null,
     error_message: null,
+    sms_body_context: null,
     extracted_data: null,
   },
 ];
