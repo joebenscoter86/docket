@@ -13,7 +13,7 @@ export default function TermsOfServicePage() {
     <article className="space-y-8">
       <header>
         <h1 className="font-headings text-2xl font-bold text-text">Terms of Service</h1>
-        <p className="mt-1 text-sm text-muted">Last updated: March 18, 2026</p>
+        <p className="mt-1 text-sm text-muted">Last updated: April 3, 2026</p>
       </header>
 
       <section className="space-y-3">
@@ -104,7 +104,49 @@ export default function TermsOfServicePage() {
       </section>
 
       <section className="space-y-3">
-        <h2 className="font-headings text-lg font-semibold text-text">8. Billing &amp; Subscription</h2>
+        <h2 className="font-headings text-lg font-semibold text-text">8. SMS Communications</h2>
+        <p className="text-sm leading-relaxed text-text">
+          Dockett offers an optional SMS/MMS ingestion feature that allows you to text photos of invoices
+          and receipts to a Dockett phone number for automated processing.
+        </p>
+        <ul className="list-disc space-y-2 pl-5 text-sm leading-relaxed text-text">
+          <li>
+            <strong>Opt-in:</strong> You opt in to SMS communications by registering and verifying your
+            phone number in your Dockett account settings. Verification requires entering a one-time code
+            sent to your phone via SMS.
+          </li>
+          <li>
+            <strong>Message types:</strong> Dockett will send you: (a) a one-time verification code when
+            you register your phone number, and (b) brief confirmation messages when your texted invoices
+            are received and queued for processing.
+          </li>
+          <li>
+            <strong>Message frequency:</strong> Message frequency varies based on your usage. You will
+            receive one confirmation reply per MMS message you send to Dockett.
+          </li>
+          <li>
+            <strong>Opt-out:</strong> You may opt out of SMS communications at any time by removing your
+            phone number in your account settings or by texting STOP to the Dockett phone number. After
+            opting out, invoices sent via SMS will not be processed.
+          </li>
+          <li>
+            <strong>Costs:</strong> Message and data rates may apply depending on your mobile carrier and
+            plan. Dockett does not charge separately for SMS/MMS ingestion.
+          </li>
+          <li>
+            <strong>Privacy:</strong> Your phone number is used solely for invoice ingestion and
+            verification. We do not sell or share your phone number with third parties. See our{' '}
+            <a href="/privacy" className="text-accent hover:underline">Privacy Policy</a> for details.
+          </li>
+          <li>
+            For help with SMS features, contact{' '}
+            <a href="mailto:support@dockett.app" className="text-accent hover:underline">support@dockett.app</a>.
+          </li>
+        </ul>
+      </section>
+
+      <section className="space-y-3">
+        <h2 className="font-headings text-lg font-semibold text-text">9. Billing &amp; Subscription</h2>
         <ul className="list-disc space-y-2 pl-5 text-sm leading-relaxed text-text">
           <li>Paid plans are billed monthly via Stripe.</li>
           <li>
@@ -117,7 +159,7 @@ export default function TermsOfServicePage() {
       </section>
 
       <section className="space-y-3">
-        <h2 className="font-headings text-lg font-semibold text-text">9. Limitation of Liability</h2>
+        <h2 className="font-headings text-lg font-semibold text-text">10. Limitation of Liability</h2>
         <ul className="list-disc space-y-2 pl-5 text-sm leading-relaxed text-text">
           <li>Dockett is provided &ldquo;as is&rdquo; and &ldquo;as available&rdquo; without warranties of any kind.</li>
           <li>
@@ -132,7 +174,7 @@ export default function TermsOfServicePage() {
       </section>
 
       <section className="space-y-3">
-        <h2 className="font-headings text-lg font-semibold text-text">10. Indemnification</h2>
+        <h2 className="font-headings text-lg font-semibold text-text">11. Indemnification</h2>
         <p className="text-sm leading-relaxed text-text">
           You agree to indemnify and hold harmless JB Technologies LLC from any claims, damages, or expenses
           arising from: (a) your use of the service, (b) data you approve and sync to QuickBooks,
@@ -141,7 +183,7 @@ export default function TermsOfServicePage() {
       </section>
 
       <section className="space-y-3">
-        <h2 className="font-headings text-lg font-semibold text-text">11. Termination</h2>
+        <h2 className="font-headings text-lg font-semibold text-text">12. Termination</h2>
         <ul className="list-disc space-y-2 pl-5 text-sm leading-relaxed text-text">
           <li>Either party may terminate your account at any time.</li>
           <li>On termination, you may request deletion of your data by contacting us.</li>
@@ -150,7 +192,7 @@ export default function TermsOfServicePage() {
       </section>
 
       <section className="space-y-3">
-        <h2 className="font-headings text-lg font-semibold text-text">12. Dispute Resolution</h2>
+        <h2 className="font-headings text-lg font-semibold text-text">13. Dispute Resolution</h2>
         <ul className="list-disc space-y-2 pl-5 text-sm leading-relaxed text-text">
           <li>
             Any disputes arising from these terms or your use of Dockett will be resolved by binding
@@ -162,7 +204,7 @@ export default function TermsOfServicePage() {
       </section>
 
       <section className="space-y-3">
-        <h2 className="font-headings text-lg font-semibold text-text">13. Changes to Terms</h2>
+        <h2 className="font-headings text-lg font-semibold text-text">14. Changes to Terms</h2>
         <p className="text-sm leading-relaxed text-text">
           We may update these Terms of Service from time to time. We will notify you of material changes by
           sending an email to the address associated with your account. Your continued use of Dockett after
@@ -171,7 +213,7 @@ export default function TermsOfServicePage() {
       </section>
 
       <section className="space-y-3">
-        <h2 className="font-headings text-lg font-semibold text-text">14. Contact</h2>
+        <h2 className="font-headings text-lg font-semibold text-text">15. Contact</h2>
         <p className="text-sm leading-relaxed text-text">
           If you have questions about these Terms of Service, contact us at{' '}
           <a href="mailto:support@dockett.app" className="text-accent hover:underline">support@dockett.app</a>.

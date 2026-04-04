@@ -15,6 +15,10 @@ export const AnalyticsEvents = {
   EMAIL_FORWARDING_ENABLED: "email_forwarding_enabled",
   EMAIL_FORWARDING_DISABLED: "email_forwarding_disabled",
   EMAIL_FORWARDING_PREFIX_UPDATED: "email_forwarding_prefix_updated",
+  SMS_INGESTION_RECEIVED: "sms_ingestion_received",
+  SMS_INGESTION_PROCESSED: "sms_ingestion_processed",
+  SMS_PHONE_VERIFIED: "sms_phone_verified",
+  SMS_PHONE_REMOVED: "sms_phone_removed",
 } as const;
 
 export type AnalyticsEvent = (typeof AnalyticsEvents)[keyof typeof AnalyticsEvents];

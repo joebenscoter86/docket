@@ -709,6 +709,17 @@ All four checks must pass before a PR can be merged. No exceptions.
 - **Domain DNS is on Vercel, not GoDaddy.** MX records for `ingest.dockett.app` configured via `vercel dns add`. DKIM TXT record at `resend._domainkey.ingest`.
 - **Webhook signing secret:** Stored as `RESEND_INBOUND_WEBHOOK_SECRET` in `.env.local` and Vercel (Production + Preview). Uses Svix under the hood.
 
+**Twilio (SMS/MMS ingestion, validated 2026-04-03):**
+- **Toll-free number:** +1 (855) 507-3460. One number serves all users; sender phone identifies the user.
+- **Media URLs expire in ~24 hours.** Fetch immediately in the webhook handler, don't defer.
+- **Twilio sends form-encoded POST, not JSON.** Parse with `URLSearchParams`, not `request.json()`.
+- **Signature validation requires the exact public URL.** Must match what Twilio sees including protocol and path. Use `NEXT_PUBLIC_APP_URL` + `/api/sms/inbound`.
+- **HEIC is common from iPhones.** Converted to JPEG (quality 95) at ingest time via sharp. The existing `ensureMinimumResolution` pipeline handles upscaling during extraction.
+- **Always return 200 with TwiML XML.** Non-200 causes Twilio retry loops (same pattern as Resend webhooks).
+- **`waitUntil` for extraction must await the promise.** Same lesson as DOC-62 email forwarding.
+- **Reply messages must be under 160 chars** to avoid multi-segment SMS charges.
+- **Toll-free verification takes 3-5 business days.** Inbound MMS works immediately; outbound SMS replies may be limited until verified.
+
 **General:**
 - Resend has a direct GoDaddy integration for auto-configuring DNS records.
 - Fire-and-forget for non-critical operations: email failures must never fail the parent operation.
@@ -878,6 +889,11 @@ SENTRY_AUTH_TOKEN=
 # PostHog Analytics
 NEXT_PUBLIC_POSTHOG_KEY=
 NEXT_PUBLIC_POSTHOG_HOST=https://us.i.posthog.com
+
+# Twilio (SMS/MMS ingestion)
+TWILIO_ACCOUNT_SID=
+TWILIO_AUTH_TOKEN=
+TWILIO_PHONE_NUMBER=
 ```
 
 ---

@@ -327,6 +327,7 @@ export async function fetchInvoiceList(
         source: (row.source as InvoiceListItem["source"]) ?? "upload",
         email_sender: (row.email_sender as string) ?? null,
         error_message: (row.error_message as string) ?? null,
+        sms_body_context: (row.sms_body_context as string) ?? null,
         extracted_data: hasExtractedData
           ? {
               vendor_name: (row.vendor_name as string) ?? null,
