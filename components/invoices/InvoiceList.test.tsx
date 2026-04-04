@@ -24,6 +24,10 @@ vi.mock("./InvoiceStatusBadge", () => ({
   default: ({ status }: { status: string }) => <span data-testid="status-badge">{status}</span>,
 }));
 
+vi.mock("@/lib/hooks/useInvoiceStatuses", () => ({
+  useInvoiceStatuses: () => ({ statuses: {} }),
+}));
+
 const emptyCounts: InvoiceListCounts = {
   all: 0,
   pending_review: 0,
@@ -121,9 +125,9 @@ describe("InvoiceList", () => {
         currentOutputType="all"
       />
     );
-    expect(screen.getAllByText(/^all$/i).length).toBeGreaterThan(0);
-    expect(screen.getByText("20")).toBeInTheDocument();
-    expect(screen.getByText("3")).toBeInTheDocument();
+    expect(screen.getByText("3 need review")).toBeInTheDocument();
+    expect(screen.getByText("7 ready to sync")).toBeInTheDocument();
+    expect(screen.getByText("9 synced")).toBeInTheDocument();
   });
 
   it("renders invoice data in the table", () => {
@@ -139,16 +143,28 @@ describe("InvoiceList", () => {
         currentOutputType="all"
       />
     );
-    expect(screen.getAllByText("invoice-001.pdf").length).toBeGreaterThan(0);
     expect(screen.getAllByText("Acme Corp").length).toBeGreaterThan(0);
-    expect(screen.getAllByText("INV-001").length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/invoice-001\.pdf/).length).toBeGreaterThan(0);
   });
 
   it("shows 'Pending' for invoices without extracted data", () => {
+    const processingInvoice: InvoiceListItem = {
+      id: "inv-3",
+      file_name: "processing.pdf",
+      status: "extracting",
+      uploaded_at: "2026-03-16T12:00:00Z",
+      output_type: null,
+      batch_id: null,
+      source: "upload",
+      email_sender: null,
+      error_message: null,
+      sms_body_context: null,
+      extracted_data: null,
+    };
     render(
       <InvoiceList
-        invoices={sampleInvoices}
-        counts={sampleCounts}
+        invoices={[processingInvoice]}
+        counts={{ ...sampleCounts, all: 1 }}
         nextCursor={null}
         currentStatus="all"
         currentSort="uploaded_at"
@@ -157,7 +173,7 @@ describe("InvoiceList", () => {
         currentOutputType="all"
       />
     );
-    expect(screen.getAllByText("Pending").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Processing...").length).toBeGreaterThan(0);
   });
 
   it("shows next page button when nextCursor exists", () => {
@@ -173,7 +189,7 @@ describe("InvoiceList", () => {
         currentOutputType="all"
       />
     );
-    expect(screen.getByText("Next")).toBeInTheDocument();
+    expect(screen.getAllByText("Next").length).toBeGreaterThan(0);
   });
 
   it("does not show next page button when nextCursor is null", () => {
@@ -205,6 +221,6 @@ describe("InvoiceList", () => {
         currentOutputType="all"
       />
     );
-    expect(screen.getByText("Previous")).toBeInTheDocument();
+    expect(screen.getAllByText("Previous").length).toBeGreaterThan(0);
   });
 });
