@@ -19,7 +19,7 @@ export async function ingestSmsAttachment(params: {
   fromNumber: string;
   bodyText: string | null;
 }): Promise<SmsIngestionResult> {
-  const { orgId, userId, attachment, fromNumber, bodyText } = params;
+  const { orgId, userId, attachment, bodyText } = params;
   const admin = createAdminClient();
 
   const invoiceId = crypto.randomUUID();
