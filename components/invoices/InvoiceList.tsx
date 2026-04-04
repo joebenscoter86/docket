@@ -556,17 +556,18 @@ export default function InvoiceList({
             isExpanded={isExpanded}
             onToggle={() => toggleBatch(row.batchId)}
             isAccountingConnected={isAccountingConnected}
-          />
-          {isExpanded && (
-            <div className="border-l-2 border-blue-200 ml-3">
-              <table className="w-full">
-                <tbody>
-                  {row.invoices.map((inv) => renderDesktopInvoiceRow(inv, true))}
-                </tbody>
-              </table>
-              {renderBatchEmptyState(row.invoices)}
-            </div>
-          )}
+          >
+            {isExpanded && (
+              <div className="border-l-2 border-blue-200 ml-4">
+                <table className="w-full">
+                  <tbody>
+                    {row.invoices.map((inv) => renderDesktopInvoiceRow(inv, true))}
+                  </tbody>
+                </table>
+                {renderBatchEmptyState(row.invoices)}
+              </div>
+            )}
+          </BatchHeader>
         </td>
       </tr>
     );
@@ -588,13 +589,14 @@ export default function InvoiceList({
           isExpanded={isExpanded}
           onToggle={() => toggleBatch(row.batchId)}
           isAccountingConnected={isAccountingConnected}
-        />
-        {isExpanded && (
-          <div className="border-l-2 border-blue-200 ml-3 space-y-2 pb-2">
-            {row.invoices.map((inv) => renderMobileInvoiceCard(inv))}
-            {renderBatchEmptyState(row.invoices)}
-          </div>
-        )}
+        >
+          {isExpanded && (
+            <div className="border-l-2 border-blue-200 ml-4 space-y-2 pb-2">
+              {row.invoices.map((inv) => renderMobileInvoiceCard(inv))}
+              {renderBatchEmptyState(row.invoices)}
+            </div>
+          )}
+        </BatchHeader>
       </div>
     );
   }

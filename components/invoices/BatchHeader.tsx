@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo, useCallback, useTransition } from "react";
+import { useState, useEffect, useMemo, useCallback, useTransition, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { getBatchStatusSummary, getNextReviewableInvoice } from "@/lib/invoices/batch-utils";
 import type { InvoiceListItem } from "@/lib/invoices/types";
@@ -17,6 +17,7 @@ interface BatchHeaderProps {
   isExpanded: boolean;
   onToggle: () => void;
   isAccountingConnected?: boolean;
+  children?: ReactNode;
 }
 
 interface RetryResult {
@@ -51,6 +52,20 @@ function Spinner() {
   );
 }
 
+/** Tiny colored dot + count for collapsed status indicators */
+function StatusDot({ color, count }: { color: string; count: number }) {
+  if (count === 0) return null;
+  return (
+    <span className="inline-flex items-center gap-1">
+      <span
+        className="inline-block h-[5px] w-[5px] rounded-full"
+        style={{ backgroundColor: color }}
+      />
+      <span className="text-[12px]" style={{ color }}>{count}</span>
+    </span>
+  );
+}
+
 export default function BatchHeader({
   batchId,
   invoices,
@@ -58,6 +73,7 @@ export default function BatchHeader({
   isExpanded,
   onToggle,
   isAccountingConnected,
+  children,
 }: BatchHeaderProps) {
   const router = useRouter();
   const [, startTransition] = useTransition();
@@ -328,12 +344,28 @@ export default function BatchHeader({
     syncButtonLabel = `Sync ${summary.approved} to accounting`;
   }
 
+  // --- Footer text summary ---
+  const footerSummaryParts: string[] = [];
+  if (summary.processing > 0) footerSummaryParts.push(`${summary.processing} processing`);
+  if (summary.readyForReview > 0) footerSummaryParts.push(`${summary.readyForReview} need review`);
+  if (summary.approved > 0) footerSummaryParts.push(`${summary.approved} approved`);
+  if (summary.synced > 0) footerSummaryParts.push(`${summary.synced} synced`);
+  if (summary.failed > 0) footerSummaryParts.push(`${summary.failed} failed`);
+  const footerSummaryText = footerSummaryParts.join(" \u00b7 ");
+
+  // Does the footer have any action buttons to show?
+  const hasFooterActions =
+    summary.failed > 0 ||
+    summary.readyForReview > 0 ||
+    (summary.approved > 0 && isAccountingConnected) ||
+    nextReviewableId !== null;
+
   return (
-    <div className="mb-1">
+    <div>
       {/* Batch completion banner */}
       {allSynced && (
         <div
-          className="mb-2 flex items-center gap-2 rounded-md px-4 py-3 text-sm font-medium"
+          className="mb-1 flex items-center gap-2 rounded-md px-4 py-3 text-sm font-medium"
           style={{ color: "#065F46", backgroundColor: "#D1FAE5" }}
         >
           <svg
@@ -348,14 +380,14 @@ export default function BatchHeader({
               clipRule="evenodd"
             />
           </svg>
-          Batch complete &mdash; {invoices.length} invoice{invoices.length !== 1 ? "s" : ""} synced
+          Batch complete - {invoices.length} invoice{invoices.length !== 1 ? "s" : ""} synced
         </div>
       )}
 
       {/* Retry result banner */}
       {retryResult !== null && (
         <div
-          className="mb-2 rounded-md px-4 py-2 text-sm font-medium"
+          className="mb-1 rounded-md px-4 py-2 text-sm font-medium"
           style={{ color: "#92400E", backgroundColor: "#FEF3C7" }}
         >
           Retried {retryResult.retried} invoice{retryResult.retried !== 1 ? "s" : ""}.
@@ -368,7 +400,7 @@ export default function BatchHeader({
       {/* Approve result banner */}
       {approveResult !== null && (
         <div
-          className="mb-2 rounded-md px-4 py-2 text-sm font-medium"
+          className="mb-1 rounded-md px-4 py-2 text-sm font-medium"
           style={{ color: "#065F46", backgroundColor: "#D1FAE5" }}
         >
           {approveResult.approved} approved
@@ -415,7 +447,7 @@ export default function BatchHeader({
       {/* Sync result banner */}
       {syncResult !== null && (
         <div
-          className="mb-2 rounded-md px-4 py-2 text-sm font-medium"
+          className="mb-1 rounded-md px-4 py-2 text-sm font-medium"
           style={
             syncResult.failed > 0
               ? { color: "#92400E", backgroundColor: "#FEF3C7" }
@@ -427,29 +459,29 @@ export default function BatchHeader({
         </div>
       )}
 
-      {/* Main header row */}
+      {/* Slim header row */}
       <div
         role="button"
         aria-expanded={isExpanded}
         onClick={onToggle}
-        className="flex cursor-pointer flex-col gap-3 rounded-lg px-4 py-3 transition-colors md:flex-row md:items-center"
-        style={{ backgroundColor: "#F8FAFC" }}
-        onMouseEnter={(e) => {
-          (e.currentTarget as HTMLDivElement).style.backgroundColor = "#F1F5F9";
-        }}
-        onMouseLeave={(e) => {
-          (e.currentTarget as HTMLDivElement).style.backgroundColor = "#F8FAFC";
-        }}
+        className={`flex cursor-pointer items-center py-2.5 px-5 transition-colors ${
+          isExpanded ? "bg-[#FAFBFC]" : "bg-white hover:bg-[#FAFBFC]"
+        }`}
       >
-        {/* Left: chevron + label */}
-        <div className="flex items-center gap-2">
+        {/* Left: chevron + text */}
+        <div className="flex items-center gap-1.5 min-w-0">
           {/* Chevron */}
           <svg
             xmlns="http://www.w3.org/2000/svg"
             viewBox="0 0 16 16"
             fill="currentColor"
-            className="h-4 w-4 flex-shrink-0 text-gray-500 transition-transform duration-200"
-            style={{ transform: isExpanded ? "rotate(90deg)" : "rotate(0deg)" }}
+            className="flex-shrink-0 transition-transform duration-200"
+            style={{
+              width: "14px",
+              height: "14px",
+              color: "#94A3B8",
+              transform: isExpanded ? "rotate(90deg)" : "rotate(0deg)",
+            }}
             aria-hidden="true"
           >
             <path
@@ -459,152 +491,123 @@ export default function BatchHeader({
             />
           </svg>
 
-          {/* Batch label */}
-          <span className="text-sm font-medium text-gray-800">
-            Batch uploaded {formatRelativeTime(earliestUploadedAt)} &mdash;{" "}
-            {invoices.length} invoice{invoices.length !== 1 ? "s" : ""}
-            {showViewAll && (
-              <>
-                {" "}
-                <span className="text-gray-500">(showing {invoices.length} of {totalCount} &mdash; </span>
-                <button
-                  type="button"
-                  onClick={handleViewAll}
-                  className="text-blue-600 underline hover:text-blue-700"
-                >
-                  View all
-                </button>
-                <span className="text-gray-500">)</span>
-              </>
-            )}
+          <span className={`text-[13px] ${isExpanded ? "font-semibold text-gray-800" : "font-medium text-gray-500"}`}>
+            Batch
           </span>
-        </div>
-
-        {/* Status pills */}
-        <div className="flex flex-wrap gap-2 md:ml-auto">
-          {summary.processing > 0 && (
-            <span
-              className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium"
-              style={{ color: "#1E40AF", backgroundColor: "#DBEAFE" }}
-            >
-              <span className="relative flex h-1.5 w-1.5">
-                <span
-                  className="absolute inline-flex h-full w-full animate-pulse rounded-full opacity-75"
-                  style={{ backgroundColor: "#1E40AF" }}
-                />
-                <span
-                  className="relative inline-flex h-1.5 w-1.5 rounded-full"
-                  style={{ backgroundColor: "#1E40AF" }}
-                />
-              </span>
-              {summary.processing} processing
-            </span>
-          )}
-
-          {summary.readyForReview > 0 && (
-            <span
-              className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium"
-              style={{ color: "#92400E", backgroundColor: "#FEF3C7" }}
-            >
-              {summary.readyForReview} ready
-            </span>
-          )}
-
-          {summary.approved > 0 && (
-            <span
-              className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium"
-              style={{ color: "#1D4ED8", backgroundColor: "#DBEAFE" }}
-            >
-              {summary.approved} approved
-            </span>
-          )}
-
-          {summary.synced > 0 && (
-            <span
-              className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium"
-              style={{ color: "#065F46", backgroundColor: "#D1FAE5" }}
-            >
-              {summary.synced} synced
-            </span>
-          )}
-
-          {summary.failed > 0 && (
-            <span
-              className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium"
-              style={{ color: "#991B1B", backgroundColor: "#FEE2E2" }}
-            >
-              {summary.failed} failed
-            </span>
+          <span className="text-[13px] text-gray-400">&middot;</span>
+          <span className="text-[13px] text-gray-500">
+            {invoices.length} invoice{invoices.length !== 1 ? "s" : ""}
+          </span>
+          <span className="text-[13px] text-gray-400">&middot;</span>
+          <span className="text-[13px]" style={{ color: "#94A3B8" }}>
+            {formatRelativeTime(earliestUploadedAt)}
+          </span>
+          {showViewAll && (
+            <>
+              <span className="text-[13px] text-gray-400">&middot;</span>
+              <button
+                type="button"
+                onClick={handleViewAll}
+                className="text-[13px] text-blue-600 underline hover:text-blue-700"
+              >
+                View all {totalCount}
+              </button>
+            </>
           )}
         </div>
 
-        {/* Action buttons */}
-        <div
-          className="flex w-full flex-col gap-2 sm:flex-row md:w-auto"
-          onClick={(e) => e.stopPropagation()}
-        >
-          {/* Retry All Failed */}
-          {summary.failed > 0 && (
-            <button
-              type="button"
-              onClick={handleRetryAll}
-              disabled={isRetrying}
-              className="inline-flex w-full items-center justify-center gap-1.5 rounded-md border border-red-600 px-3 py-1.5 text-sm font-medium text-red-600 transition-colors hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-60 md:w-auto"
-            >
-              {isRetrying ? (
-                <>
-                  <Spinner />
-                  Retrying&hellip;
-                </>
-              ) : (
-                <>Retry {summary.failed} Failed</>
-              )}
-            </button>
-          )}
-
-          {/* Prepare & Approve N */}
-          {summary.readyForReview > 0 && (
-            <button
-              type="button"
-              onClick={handlePrepareApprove}
-              disabled={isLoadingPreview || isExecuting}
-              className="inline-flex w-full items-center justify-center gap-1.5 rounded-md bg-blue-600 px-3 py-1.5 text-sm font-medium text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60 md:w-auto"
-            >
-              {isLoadingPreview ? (
-                <>
-                  <Spinner />
-                  Checking&hellip;
-                </>
-              ) : (
-                <>Prepare &amp; Approve {summary.readyForReview}</>
-              )}
-            </button>
-          )}
-
-          {/* Sync N to accounting */}
-          {summary.approved > 0 && isAccountingConnected && (
-            <button
-              type="button"
-              onClick={handleSyncAllClick}
-              disabled={isSyncing}
-              className="inline-flex w-full items-center justify-center gap-1.5 rounded-md border border-green-600 px-3 py-1.5 text-sm font-medium text-green-700 transition-colors hover:bg-green-50 disabled:cursor-not-allowed disabled:opacity-60 md:w-auto"
-            >
-              {syncButtonLabel}
-            </button>
-          )}
-
-          {/* Review Next */}
-          <button
-            type="button"
-            onClick={handleReviewNext}
-            disabled={reviewNextDisabled}
-            title={reviewNextTitle}
-            className="inline-flex w-full items-center justify-center rounded-md bg-blue-600 px-3 py-1.5 text-sm font-medium text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60 md:w-auto"
-          >
-            Review Next
-          </button>
+        {/* Right: tiny status dot indicators */}
+        <div className="ml-auto flex items-center gap-2">
+          <StatusDot color="#2563EB" count={summary.processing} />
+          <StatusDot color="#EA580C" count={summary.readyForReview} />
+          <StatusDot color="#2563EB" count={summary.approved} />
+          <StatusDot color="#059669" count={summary.synced} />
+          <StatusDot color="#DC2626" count={summary.failed} />
         </div>
       </div>
+
+      {/* Expanded children (invoice rows) */}
+      {children}
+
+      {/* Footer with actions (only when expanded and there are actions) */}
+      {isExpanded && hasFooterActions && (
+        <div
+          className="flex items-center border-l-2 border-blue-200 ml-4 py-2.5 px-5"
+          style={{ backgroundColor: "#FAFBFC", borderBottom: "1px solid #F1F5F9" }}
+        >
+          {/* Left: text summary */}
+          <span className="text-xs text-gray-500">
+            {footerSummaryText}
+          </span>
+
+          {/* Right: action buttons */}
+          <div
+            className="ml-auto flex items-center gap-2"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Retry All Failed */}
+            {summary.failed > 0 && (
+              <button
+                type="button"
+                onClick={handleRetryAll}
+                disabled={isRetrying}
+                className="inline-flex items-center gap-1.5 rounded-lg border border-red-600 px-3 py-1.5 text-xs font-medium text-red-600 transition-colors hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {isRetrying ? (
+                  <>
+                    <Spinner />
+                    Retrying&hellip;
+                  </>
+                ) : (
+                  <>Retry {summary.failed} Failed</>
+                )}
+              </button>
+            )}
+
+            {/* Prepare & Approve N */}
+            {summary.readyForReview > 0 && (
+              <button
+                type="button"
+                onClick={handlePrepareApprove}
+                disabled={isLoadingPreview || isExecuting}
+                className="inline-flex items-center gap-1.5 rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {isLoadingPreview ? (
+                  <>
+                    <Spinner />
+                    Checking&hellip;
+                  </>
+                ) : (
+                  <>Prepare &amp; Approve {summary.readyForReview}</>
+                )}
+              </button>
+            )}
+
+            {/* Sync N to accounting */}
+            {summary.approved > 0 && isAccountingConnected && (
+              <button
+                type="button"
+                onClick={handleSyncAllClick}
+                disabled={isSyncing}
+                className="inline-flex items-center gap-1.5 rounded-lg border border-green-600 px-3 py-1.5 text-xs font-medium text-green-700 transition-colors hover:bg-green-50 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {syncButtonLabel}
+              </button>
+            )}
+
+            {/* Review Next */}
+            <button
+              type="button"
+              onClick={handleReviewNext}
+              disabled={reviewNextDisabled}
+              title={reviewNextTitle}
+              className="inline-flex items-center rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              Review Next
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Prepare & Approve confirmation dialog */}
       {preparePreview && (
